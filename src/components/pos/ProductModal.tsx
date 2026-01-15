@@ -211,7 +211,7 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-card rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden shadow-2xl flex flex-col"
+          className="bg-card rounded-2xl w-full max-w-lg max-h-[95vh] sm:max-h-[85vh] overflow-hidden shadow-2xl flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -297,7 +297,7 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
                 <h3 className="text-sm font-medium text-muted-foreground mb-3">
                   Suppléments
                 </h3>
-                <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                <div className="grid grid-cols-2 gap-2 max-h-[40vh] sm:max-h-48 overflow-y-auto overscroll-contain">
                   {supplementsProducts.map((supplement) => {
                     const supplementVariants = getVariantsByProduct(supplement.id);
                     const isSelected = selectedSupplements.has(supplement.id);
@@ -374,8 +374,8 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
             </div>
           </div>
 
-          {/* Footer */}
-          <div className="p-4 border-t border-border bg-muted/30 flex-shrink-0">
+          {/* Footer - Always visible at bottom */}
+          <div className="p-3 sm:p-4 border-t border-border bg-muted/30 flex-shrink-0 sticky bottom-0">
             {selectedSupplements.size > 0 && (
               <div className="mb-3 space-y-1">
                 <div className="flex justify-between text-sm">
@@ -391,7 +391,7 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
             <Button
               onClick={handleAdd}
               disabled={!canAdd}
-              className="w-full h-16 text-lg font-bold gradient-primary border-0"
+              className="w-full h-14 sm:h-16 text-base sm:text-lg font-bold gradient-primary border-0"
             >
               <span className="flex-1">{t('order.addToCart')}</span>
               <span className="px-4 py-1 bg-white/20 rounded-lg">

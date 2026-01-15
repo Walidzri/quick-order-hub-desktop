@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
@@ -71,6 +71,7 @@ const createWindow = (): void => {
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     frame: true,
     show: false,
+    autoHideMenuBar: true, // Hide menu bar (can be toggled with Alt key)
   });
 
   // Load the app
@@ -175,7 +176,11 @@ const createWindow = (): void => {
 };
 
 // This method will be called when Electron has finished initialization
-app.on('ready', createWindow);
+app.on('ready', () => {
+  // Remove the menu bar completely
+  Menu.setApplicationMenu(null);
+  createWindow();
+});
 
 // Quit when all windows are closed, except on macOS
 app.on('window-all-closed', () => {

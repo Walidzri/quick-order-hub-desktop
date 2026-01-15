@@ -117,7 +117,7 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-card rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
+        className="bg-card rounded-2xl w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {step === 'done' ? (
@@ -144,7 +144,7 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
         ) : (
           <>
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border">
+            <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
               <h2 className="text-xl font-bold">{t('payment.title')}</h2>
               <button
                 onClick={onClose}
@@ -155,7 +155,7 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
             </div>
 
             {/* Order Summary */}
-            <div className="p-4 bg-muted/30 border-b border-border">
+            <div className="p-4 bg-muted/30 border-b border-border flex-shrink-0">
               <div className="flex justify-between text-sm mb-1">
                 <span>{t('order.subtotal')}</span>
                 <span>{formatCurrency(subtotal, currency)}</span>
@@ -173,7 +173,7 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
             </div>
 
             {step === 'method' && (
-              <div className="p-4 space-y-4">
+              <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0">
                 <h3 className="text-sm font-medium text-muted-foreground mb-3">
                   {t('payment.method')}
                 </h3>
@@ -206,17 +206,19 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
                   </button>
                 </div>
 
-                <Button
-                  onClick={() => method === 'cash' ? setStep('cash') : handlePayment()}
-                  className="w-full h-14 text-lg font-bold gradient-primary border-0 mt-4"
-                >
-                  {method === 'cash' ? 'Continuer' : t('payment.confirm')}
-                </Button>
+                <div className="pt-2 flex-shrink-0 sticky bottom-0 bg-card">
+                  <Button
+                    onClick={() => method === 'cash' ? setStep('cash') : handlePayment()}
+                    className="w-full h-14 text-base sm:text-lg font-bold gradient-primary border-0"
+                  >
+                    {method === 'cash' ? 'Continuer' : t('payment.confirm')}
+                  </Button>
+                </div>
               </div>
             )}
 
             {step === 'cash' && (
-              <div className="p-4 space-y-4 max-h-[80vh] overflow-y-auto">
+              <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0 overscroll-contain">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">
                     {t('payment.amountReceived')}

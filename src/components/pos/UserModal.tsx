@@ -99,7 +99,7 @@ export function UserModal({ isOpen, onClose, user, onSave, t }: UserModalProps) 
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-card rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden shadow-2xl"
+          className="bg-card rounded-2xl w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -202,7 +202,7 @@ export function UserModal({ isOpen, onClose, user, onSave, t }: UserModalProps) 
               </Select>
             </div>
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-3 pt-4 flex-shrink-0 sticky bottom-0 bg-card">
               <Button
                 variant="outline"
                 onClick={onClose}

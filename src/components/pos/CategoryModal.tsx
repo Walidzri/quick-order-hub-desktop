@@ -98,7 +98,7 @@ export function CategoryModal({ category, supplements: supplementsProp = [], onC
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-card rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
+        className="bg-card rounded-2xl w-full max-w-md max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -115,7 +115,7 @@ export function CategoryModal({ category, supplements: supplementsProp = [], onC
         </div>
 
         {/* Form */}
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0 overscroll-contain">
           {/* Image Upload */}
           <div>
             <label className="text-sm font-medium text-muted-foreground block mb-2">
@@ -228,7 +228,7 @@ export function CategoryModal({ category, supplements: supplementsProp = [], onC
                 {t('category.associatedSupplementsDesc')}
               </p>
               {supplements.length > 0 ? (
-                <div className="border border-border rounded-lg max-h-64 overflow-y-auto">
+                <div className="border border-border rounded-lg max-h-[40vh] sm:max-h-64 overflow-y-auto overscroll-contain">
                   <div className="p-3 space-y-2">
                     {supplements.map((supplement) => {
                       const isSelected = selectedSupplementIds.includes(supplement.id);
@@ -279,8 +279,8 @@ export function CategoryModal({ category, supplements: supplementsProp = [], onC
           )}
         </div>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-border flex gap-2">
+        {/* Footer - Always visible at bottom */}
+        <div className="p-3 sm:p-4 border-t border-border flex gap-2 flex-shrink-0 sticky bottom-0 bg-card">
           <Button
             onClick={onClose}
             variant="outline"

@@ -548,6 +548,7 @@ interface ProductModalProps {
 
 function ProductModal({ product, categories, currency, existingVariants = [], onClose, onSave }: ProductModalProps) {
   const { t, getProductsByCategory } = usePOS();
+  const { DialogComponent } = useDialog();
   const [name, setName] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [basePrice, setBasePrice] = useState('');
@@ -678,10 +679,10 @@ function ProductModal({ product, categories, currency, existingVariants = [], on
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-card rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden shadow-2xl"
+          className="bg-card rounded-2xl w-full max-w-3xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between p-4 border-b border-border">
+          <div className="flex items-center justify-between p-4 border-b border-border flex-shrink-0">
             <h2 className="text-xl font-bold">
               {product ? t('products.edit') + ' ' + t('products.title').toLowerCase() : t('products.add')}
             </h2>
@@ -693,7 +694,7 @@ function ProductModal({ product, categories, currency, existingVariants = [], on
             </button>
           </div>
 
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)] space-y-4">
+          <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 overscroll-contain space-y-4">
             {error && (
               <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
                 {error}
@@ -908,7 +909,7 @@ function ProductModal({ product, categories, currency, existingVariants = [], on
                 <p className="text-xs text-muted-foreground mb-3">
                   {t('products.associatedSupplementsDesc')}
                 </p>
-                <div className="border border-border rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
+                <div className="border border-border rounded-lg p-3 max-h-[40vh] sm:max-h-48 overflow-y-auto overscroll-contain space-y-2">
                   {allSupplements.map((supplement) => {
                     const isSelected = selectedSupplementIds.includes(supplement.id);
                     return (
@@ -959,7 +960,8 @@ function ProductModal({ product, categories, currency, existingVariants = [], on
             </div>
           </div>
 
-          <div className="flex gap-2 p-4 border-t border-border">
+          {/* Footer - Always visible at bottom */}
+          <div className="flex gap-2 p-3 sm:p-4 border-t border-border flex-shrink-0 sticky bottom-0 bg-card">
             <Button
               onClick={onClose}
               variant="outline"
