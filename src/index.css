@@ -1,0 +1,266 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Fast-food POS - Warm, appetizing, professional */
+    --background: 0 0% 98%;
+    --foreground: 220 20% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+
+    /* Warm orange - appetizing, energetic */
+    --primary: 25 95% 53%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 20% 10%;
+
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 10% 46%;
+
+    --accent: 35 100% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Success green for completed orders */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning amber for pending states */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Info blue for kitchen status */
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 25 95% 53%;
+
+    --radius: 0.75rem;
+
+    /* Custom POS tokens */
+    --touch-target: 60px;
+    --sidebar-width: 260px;
+    --cart-width: 380px;
+
+    --sidebar-background: 220 14% 96%;
+    --sidebar-foreground: 220 20% 10%;
+    --sidebar-primary: 25 95% 53%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 92%;
+    --sidebar-accent-foreground: 220 20% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 25 95% 53%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(25 95% 53%) 0%, hsl(35 100% 50%) 100%);
+    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%) 0%, hsl(142 72% 46%) 100%);
+    --gradient-dark: linear-gradient(180deg, hsl(220 20% 14%) 0%, hsl(220 20% 8%) 100%);
+  }
+
+  .dark {
+    --background: 220 20% 8%;
+    --foreground: 220 14% 96%;
+
+    --card: 220 20% 12%;
+    --card-foreground: 220 14% 96%;
+
+    --popover: 220 20% 12%;
+    --popover-foreground: 220 14% 96%;
+
+    --primary: 25 95% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 20% 16%;
+    --secondary-foreground: 220 14% 96%;
+
+    --muted: 220 20% 16%;
+    --muted-foreground: 220 10% 60%;
+
+    --accent: 35 100% 52%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 72% 42%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 217 91% 65%;
+    --info-foreground: 0 0% 100%;
+
+    --border: 220 20% 18%;
+    --input: 220 20% 18%;
+    --ring: 25 95% 55%;
+
+    --sidebar-background: 220 20% 10%;
+    --sidebar-foreground: 220 14% 96%;
+    --sidebar-primary: 25 95% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 20% 14%;
+    --sidebar-accent-foreground: 220 14% 96%;
+    --sidebar-border: 220 20% 18%;
+    --sidebar-ring: 25 95% 55%;
+  }
+
+  /* RTL Support for Arabic */
+  [dir="rtl"] {
+    direction: rtl;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Touch-friendly scrollbars */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted/30 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/30 transition-colors;
+  }
+}
+
+@layer components {
+  /* Touch-friendly button base */
+  .touch-target {
+    @apply min-h-[60px] min-w-[60px] flex items-center justify-center;
+  }
+
+  /* Category button styles */
+  .category-btn {
+    @apply touch-target w-full px-4 py-3 rounded-xl text-left font-medium transition-all duration-200;
+    @apply hover:bg-accent/10 active:scale-[0.98];
+  }
+
+  .category-btn-active {
+    @apply bg-primary text-primary-foreground shadow-lg shadow-primary/25;
+  }
+
+  /* Product card styles */
+  .product-card {
+    @apply p-4 rounded-xl bg-card border border-border/50 cursor-pointer transition-all duration-200;
+    @apply hover:border-primary/50 hover:shadow-lg hover:shadow-primary/10 active:scale-[0.98];
+  }
+
+  /* Cart item styles */
+  .cart-item {
+    @apply p-3 rounded-lg bg-secondary/50 border border-border/30 transition-all duration-200;
+  }
+
+  /* POS Grid layout */
+  .pos-layout {
+    @apply grid h-screen;
+    grid-template-columns: var(--sidebar-width) 1fr var(--cart-width);
+  }
+
+  /* Kiosk mode - fullscreen */
+  .kiosk-mode {
+    @apply fixed inset-0 z-50;
+  }
+
+  /* Large touch numpad */
+  .numpad-btn {
+    @apply touch-target text-2xl font-bold rounded-xl bg-secondary hover:bg-secondary/80 active:bg-primary active:text-primary-foreground transition-all duration-150;
+  }
+
+  /* Status badges */
+  .status-draft {
+    @apply bg-muted text-muted-foreground;
+  }
+
+  .status-kitchen {
+    @apply bg-warning/20 text-warning;
+  }
+
+  .status-paid {
+    @apply bg-success/20 text-success;
+  }
+
+  .status-cancelled {
+    @apply bg-destructive/20 text-destructive;
+  }
+
+  /* Smooth animations */
+  .animate-slide-in {
+    animation: slideIn 0.2s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-pop {
+    animation: pop 0.15s ease-out;
+  }
+
+  @keyframes pop {
+    0% {
+      transform: scale(0.95);
+    }
+    50% {
+      transform: scale(1.02);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-success {
+    background: var(--gradient-success);
+  }
+
+  .gradient-dark {
+    background: var(--gradient-dark);
+  }
+
+  /* Safe area for touch devices */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
