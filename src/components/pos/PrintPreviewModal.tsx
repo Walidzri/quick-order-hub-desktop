@@ -113,32 +113,8 @@ export function PrintPreviewModal({
     }
   };
 
-  useEffect(() => {
-    if (isOpen && type === 'receipt' && order && printers.length > 0) {
-      // Auto-print receipt immediately (only if printer is configured)
-      const printerRole = 'cashier';
-      const printerConfig = printers.find(p => p.role === printerRole);
-      
-      if (printerConfig && printerConfig.tcpHost) {
-        // Auto-print immediately when modal opens
-        handleDirectPrint();
-      } else {
-        // Show error if printer not configured
-        setPrintError(
-          `Imprimante caissier non configurée. ` +
-          `Veuillez configurer l'imprimante dans Paramètres > Imprimantes avec son adresse IP réseau.`
-        );
-      }
-      
-      // Also print kitchen ticket if receipt is being printed
-      const kitchenPrinter = printers.find(p => p.role === 'kitchen');
-      if (kitchenPrinter && kitchenPrinter.tcpHost) {
-        // Print kitchen ticket as well
-        handlePrintKitchenTicket();
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, type, order, printers]);
+  // Remove auto-print - user should click print button manually after preview
+  // useEffect removed - no auto-printing anymore
 
   // Direct printing via app (not browser)
   const handleDirectPrint = async () => {
@@ -170,12 +146,13 @@ export function PrintPreviewModal({
         : dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
       // Format receipt content as text (ESC/POS format)
+      const isKitchen = type === 'kitchen';
       const receiptText = DirectPrinter.formatTextReceipt({
         restaurantName: settings?.restaurantName,
-        address: settings?.showAddress ? settings.address : undefined,
-        phone: settings?.showPhone ? settings.phone : undefined,
-        header: settings?.receiptHeader,
-        footer: settings?.receiptFooter,
+        address: isKitchen ? undefined : (settings?.showAddress ? settings.address : undefined),
+        phone: isKitchen ? undefined : (settings?.showPhone ? settings.phone : undefined),
+        header: isKitchen ? undefined : settings?.receiptHeader,
+        footer: isKitchen ? undefined : settings?.receiptFooter,
         orderNumber: order.orderNumber,
         date: `${formattedDate} ${formattedTime}`,
         type: order.type === 'dine-in' ? '[SUR PLACE]' : '[A EMPORTER]',
@@ -189,17 +166,21 @@ export function PrintPreviewModal({
             size: line.variantSize,
             modifiers: line.modifiers.map(m => `(S) ${m.optionName}`),
             note: line.note,
-            price: type === 'receipt' ? formatCurrency(lineTotal, currency) : undefined,
+            // For kitchen tickets, only show price if enabled in customization
+            price: isKitchen 
+              ? (customization?.kitchenShowProductPrices ? formatCurrency(lineTotal, currency) : undefined)
+              : formatCurrency(lineTotal, currency),
           };
         }),
-        subtotal: formatCurrency(order.subtotal, currency),
-        discount: order.discount > 0 ? formatCurrency(order.discount, currency) : undefined,
-        total: formatCurrency(order.total, currency),
-        amountReceived: amountReceived ? formatCurrency(amountReceived, currency) : undefined,
-        change: change ? formatCurrency(change, currency) : undefined,
-        showPrices: type === 'receipt',
+        subtotal: isKitchen ? '' : formatCurrency(order.subtotal, currency),
+        discount: isKitchen ? undefined : (order.discount > 0 ? formatCurrency(order.discount, currency) : undefined),
+        total: isKitchen ? '' : formatCurrency(order.total, currency),
+        amountReceived: isKitchen ? undefined : (amountReceived ? formatCurrency(amountReceived, currency) : undefined),
+        change: isKitchen ? undefined : (change ? formatCurrency(change, currency) : undefined),
+        showPrices: isKitchen ? (customization?.kitchenShowProductPrices || false) : true,
         customization: customization,
         numberingPrefix: settings?.numberingPrefix || '',
+        isKitchenTicket: isKitchen, // CRITICAL: Mark as kitchen ticket for proper formatting
       });
 
       // Create printer connection based on config

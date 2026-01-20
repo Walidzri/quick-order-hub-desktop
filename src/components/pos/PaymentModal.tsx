@@ -8,6 +8,7 @@ import { X, Banknote, CreditCard, Check, Trash2, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { DirectPrinter, PrinterConnection } from '@/lib/printer';
 
 interface PaymentModalProps {
   onClose: () => void;
@@ -59,6 +60,72 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
     setAmountReceived('');
   };
 
+  // Print kitchen ticket automatically after payment
+  const printKitchenTicketAutomatically = async (order: Order) => {
+    try {
+      const kitchenPrinter = printers?.find(p => p.role === 'kitchen');
+      if (!kitchenPrinter || !kitchenPrinter.tcpHost) {
+        // Silent fail - kitchen printer might not be configured
+        return;
+      }
+
+      // Get customization settings for kitchen ticket
+      const customization = settings?.receiptCustomization;
+      const dateObj = new Date(order.createdAt);
+      const formattedDate = customization 
+        ? DirectPrinter.formatDate(dateObj, customization.dateFormat)
+        : dateObj.toLocaleDateString('fr-FR');
+      const formattedTime = customization
+        ? DirectPrinter.formatDate(dateObj, customization.timeFormat)
+        : dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+      // Get cashier name
+      const cashierName = user?.name || '';
+
+      // Format kitchen ticket
+      const receiptText = DirectPrinter.formatTextReceipt({
+        restaurantName: settings?.restaurantName,
+        orderNumber: order.orderNumber,
+        date: `${formattedDate} ${formattedTime}`,
+        type: order.type === 'dine-in' ? '[SUR PLACE]' : '[A EMPORTER]',
+        paymentMethod: order.paymentMethod === 'cash' ? 'Especes' : 'Carte',
+        cashier: cashierName,
+        lines: order.lines.map(line => {
+          const lineTotal = (line.unitPrice + line.modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0)) * line.quantity;
+          return {
+            quantity: line.quantity,
+            name: line.productName,
+            size: line.variantSize,
+            modifiers: line.modifiers.map(m => `(S) ${m.optionName}`),
+            note: line.note,
+            price: customization?.kitchenShowProductPrices ? formatCurrency(lineTotal, currency) : undefined,
+          };
+        }),
+        subtotal: '',
+        total: '',
+        showPrices: customization?.kitchenShowProductPrices || false,
+        customization: customization,
+        numberingPrefix: settings?.numberingPrefix || '',
+        isKitchenTicket: true,
+      });
+
+      const connection: PrinterConnection = {
+        type: 'network',
+        name: t('printer.kitchenPrinter'),
+        address: kitchenPrinter.tcpHost,
+        port: kitchenPrinter.tcpPort || 9100,
+      };
+
+      const printer = new DirectPrinter(connection);
+      // Use printer type from settings (default to false for regular printers)
+      await printer.print(receiptText, kitchenPrinter.isThermalPrinter ?? false);
+      console.log('✅ Kitchen ticket printed automatically after payment');
+    } catch (error) {
+      // Silent fail - don't block payment if kitchen printer fails
+      console.error('Kitchen ticket auto-print error (non-blocking):', error);
+    }
+  };
+
   const handlePayment = async () => {
     setIsProcessing(true);
     setStep('processing');
@@ -81,6 +148,11 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
       // Mark as paid
       const paidOrderData = await markAsPaid(order.id, method);
       
+      // Automatically print kitchen ticket after payment
+      // This is non-blocking - if it fails, payment still succeeds
+      printKitchenTicketAutomatically(paidOrderData).catch(err => {
+        console.error('Kitchen ticket print failed (non-blocking):', err);
+      });
       
       setStep('done');
       

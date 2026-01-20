@@ -1476,28 +1476,8 @@ interface PrinterSettingsProps {
 function PrinterSettings({ printers, updatePrinter, t }: PrinterSettingsProps) {
   const [editingPrinter, setEditingPrinter] = useState<PrinterType | null>(null);
   const [showPrinterModal, setShowPrinterModal] = useState(false);
-  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [testingPrinters, setTestingPrinters] = useState<Record<string, boolean>>({});
   const [testResults, setTestResults] = useState<Record<string, { success: boolean; message: string }>>({});
-
-  // Check print server status
-  useEffect(() => {
-    const checkServer = async () => {
-      try {
-        const response = await fetch('http://localhost:3001/health');
-        if (response.ok) {
-          setServerStatus('online');
-        } else {
-          setServerStatus('offline');
-        }
-      } catch (error) {
-        setServerStatus('offline');
-      }
-    };
-    checkServer();
-    const interval = setInterval(checkServer, 30000); // Check every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
 
   const kitchenPrinter = printers.find(p => p.role === 'kitchen') || {
     id: 'kitchen',
@@ -1550,60 +1530,146 @@ function PrinterSettings({ printers, updatePrinter, t }: PrinterSettingsProps) {
     });
 
     try {
-      const printServerUrl = import.meta.env.VITE_PRINT_SERVER_URL || 'http://localhost:3001';
-      const testUrl = `${printServerUrl}/test`;
+      let result: { success: boolean; message?: string; error?: string; details?: string };
 
-      const response = await fetch(testUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          printer: {
-            address: printer.tcpHost,
-            port: printer.tcpPort || 9100,
-          },
-        }),
-      });
-
-      // Check if response is JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error(t('printer.serverNotAccessible'));
+      // In Electron, use direct IPC (no server needed!)
+      // Check if we're in Electron - if electronAPI exists with printDirect, we're in Electron
+      const isElectron = typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.printDirect === 'function';
+      const hasTestPrinter = isElectron && typeof window.electronAPI.testPrinter === 'function';
+      
+      console.log('[TEST] Environment check:');
+      console.log('  - window exists:', typeof window !== 'undefined');
+      console.log('  - electronAPI exists:', typeof window !== 'undefined' && !!window.electronAPI);
+      console.log('  - isElectron (has printDirect):', isElectron);
+      console.log('  - hasTestPrinter:', hasTestPrinter);
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        console.log('  - electronAPI keys:', Object.keys(window.electronAPI));
+        console.log('  - testPrinter type:', typeof window.electronAPI.testPrinter);
+        console.log('  - printDirect type:', typeof window.electronAPI.printDirect);
       }
 
-      const result = await response.json();
+      if (isElectron && hasTestPrinter) {
+        console.log(`🔍 Testing printer connection via Electron IPC to ${printer.tcpHost}:${printer.tcpPort || 9100}`);
+        try {
+          result = await window.electronAPI.testPrinter(
+            printer.tcpHost,
+            printer.tcpPort || 9100
+          );
+        } catch (ipcError) {
+          console.error('[TEST] IPC test error:', ipcError);
+          throw ipcError;
+        }
+      } else if (isElectron && !hasTestPrinter) {
+        // Workaround: use printDirect with minimal content to test connection
+        // This will attempt to connect and print nothing, just to test connectivity
+        console.warn('[TEST] ⚠️ testPrinter not available in preload. Using printDirect workaround...');
+        console.warn('[TEST] 💡 TIP: Redémarrez complètement l\'application Electron pour charger le nouveau preload avec testPrinter');
+        
+        try {
+          // Send minimal ESC/POS command (just initialize, no print, no feed, no cut)
+          // This tests the connection without printing anything
+          const testContent = '\x1B@'; // ESC @ (initialize printer only)
+          const printResult = await window.electronAPI.printDirect(
+            testContent,
+            printer.tcpHost,
+            printer.tcpPort || 9100,
+            true // isThermalPrinter
+          );
+          
+          if (printResult.success) {
+            result = {
+              success: true,
+              message: `Connexion réussie à ${printer.tcpHost}:${printer.tcpPort || 9100} (via printDirect)`
+            };
+          } else {
+            result = {
+              success: false,
+              message: 'Impossible de se connecter à l\'imprimante',
+              error: 'Connection failed',
+              details: 'La connexion TCP à l\'imprimante a échoué. Vérifiez l\'adresse IP et le port.'
+            };
+          }
+        } catch (printError) {
+          console.error('[TEST] PrintDirect test error:', printError);
+          const errorMsg = printError instanceof Error ? printError.message : 'Erreur inconnue';
+          result = {
+            success: false,
+            message: `Erreur de connexion: ${errorMsg}`,
+            error: 'Connection error',
+            details: errorMsg.includes('timeout') 
+              ? 'L\'imprimante n\'a pas répondu dans les délais. Vérifiez qu\'elle est allumée et accessible.'
+              : `Impossible de se connecter à ${printer.tcpHost}:${printer.tcpPort || 9100}. Vérifiez l\'adresse IP et le réseau.`
+          };
+        }
+      } else {
+        // Not in Electron - use print server (web version)
+        const printServerUrl = import.meta.env.VITE_PRINT_SERVER_URL || 'http://localhost:3001';
+        const testUrl = `${printServerUrl}/test`;
+
+        const response = await fetch(testUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            printer: {
+              address: printer.tcpHost,
+              port: printer.tcpPort || 9100,
+            },
+          }),
+        });
+
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error(t('printer.serverNotAccessible'));
+        }
+
+        result = await response.json();
+      }
+
+      // Use detailed message from server/IPC
+      const message = result.message || (result.details ? `${result.message}\n\n${result.details}` : '') || 
+                     (result.success ? t('printer.connectionSuccess') : t('printer.connectionFailed'));
 
       setTestResults(prev => ({
         ...prev,
         [printer.id]: {
           success: result.success || false,
-          message: result.message || (result.success ? t('printer.connectionSuccess') : t('printer.connectionFailed'))
+          message: message
         }
       }));
 
       if (result.success) {
         toast({
           title: t('printer.testSuccess'),
-          description: t('printer.testSuccessDesc').replace('{host}', printer.tcpHost).replace('{port}', String(printer.tcpPort || 9100)),
+          description: result.message || t('printer.testSuccessDesc').replace('{host}', printer.tcpHost).replace('{port}', String(printer.tcpPort || 9100)),
         });
       } else {
+        // Show detailed error message
+        const errorDetails = result.details ? `\n\n${result.details}` : '';
         toast({
           title: t('printer.testFailed'),
-          description: result.message || t('printer.cannotConnect'),
+          description: `${result.message || t('printer.cannotConnect')}${errorDetails}`,
           variant: 'destructive',
         });
       }
     } catch (error) {
-      console.error('Test printer error:', error);
+      console.error('❌ Test printer error:', error);
       let errorMessage = 'Erreur lors du test de connexion';
       
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        errorMessage = 'Serveur d\'impression non accessible. Assurez-vous que le serveur est démarré sur localhost:3001';
-      } else if (error instanceof SyntaxError) {
-        errorMessage = 'Serveur d\'impression non accessible. Assurez-vous que le serveur est démarré sur localhost:3001';
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
+      // Only show server error if we're not in Electron (fallback scenario)
+      if (typeof window === 'undefined' || !window.electronAPI?.testPrinter) {
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          const printServerUrl = import.meta.env.VITE_PRINT_SERVER_URL || 'http://localhost:3001';
+          errorMessage = `⚠️ Serveur d'impression non accessible!\n\nAssurez-vous que le serveur d'impression Node.js est démarré sur ${printServerUrl}`;
+        } else if (error instanceof SyntaxError) {
+          errorMessage = `Serveur d'impression non accessible. Réponse invalide reçue.`;
+        }
+      }
+      
+      if (error instanceof Error) {
+        errorMessage = error.message || errorMessage;
       }
       
       setTestResults(prev => ({
@@ -1636,26 +1702,6 @@ function PrinterSettings({ printers, updatePrinter, t }: PrinterSettingsProps) {
     >
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h2 className="text-xl sm:text-2xl font-bold">{t('settings.printers')}</h2>
-        {serverStatus === 'offline' && (
-          <div className="flex items-center gap-2 text-xs sm:text-sm text-warning">
-            <AlertCircle className="w-4 h-4" />
-            <span>Serveur d'impression hors ligne</span>
-          </div>
-        )}
-        {serverStatus === 'online' && (
-          <div className="flex items-center gap-2 text-xs sm:text-sm text-success">
-            <Check className="w-4 h-4" />
-            <span>Serveur d'impression connecté</span>
-          </div>
-        )}
-      </div>
-
-      <div className="p-3 sm:p-4 bg-info/10 border border-info/20 rounded-xl text-xs sm:text-sm">
-        <p className="mb-1"><strong>Configuration réseau (RJ45)</strong></p>
-        <p className="text-muted-foreground">
-          Configurez les imprimantes réseau avec leur adresse IP. 
-          Le serveur d'impression doit être démarré sur <code className="bg-background px-1 rounded">localhost:3001</code>
-        </p>
       </div>
 
       <div className="space-y-3 sm:space-y-4">
@@ -1881,51 +1927,72 @@ function PrinterConfigModal({ printer, onClose, onSave, t }: PrinterConfigModalP
     setTestResult(null);
 
     try {
-      const printServerUrl = import.meta.env.VITE_PRINT_SERVER_URL || 'http://localhost:3001';
-      const testUrl = `${printServerUrl}/test`;
+      let result: { success: boolean; message?: string; error?: string; details?: string };
 
-      const response = await fetch(testUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          printer: {
-            address: tcpHost.trim(),
-            port: parseInt(tcpPort),
+      // In Electron, use direct IPC (no server needed!)
+      if (typeof window !== 'undefined' && window.electronAPI?.testPrinter) {
+        console.log(`🔍 Testing printer connection via Electron IPC to ${tcpHost.trim()}:${tcpPort}`);
+        result = await window.electronAPI.testPrinter(
+          tcpHost.trim(),
+          parseInt(tcpPort)
+        );
+      } else {
+        // Fallback to print server (for web version only)
+        const printServerUrl = import.meta.env.VITE_PRINT_SERVER_URL || 'http://localhost:3001';
+        const testUrl = `${printServerUrl}/test`;
+
+        const response = await fetch(testUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
           },
-        }),
-      });
+          body: JSON.stringify({
+            printer: {
+              address: tcpHost.trim(),
+              port: parseInt(tcpPort),
+            },
+          }),
+        });
 
-      // Check if response is JSON
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error(t('printer.serverNotAccessible'));
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error(t('printer.serverNotAccessible'));
+        }
+
+        result = await response.json();
       }
 
-      const result = await response.json();
+      // Use detailed message from server/IPC
+      const message = result.message || (result.details ? `${result.message}\n\n${result.details}` : '');
 
       if (result.success) {
         setTestResult({
           success: true,
-          message: `Connexion réussie à ${tcpHost.trim()}:${tcpPort}`
+          message: message || `Connexion réussie à ${tcpHost.trim()}:${tcpPort}`
         });
       } else {
         setTestResult({
           success: false,
-          message: result.message || 'Impossible de se connecter à l\'imprimante'
+          message: message || result.details || 'Impossible de se connecter à l\'imprimante'
         });
       }
     } catch (error) {
-      console.error('Test connection error:', error);
+      console.error('❌ Test connection error:', error);
       let errorMessage = 'Erreur lors du test de connexion';
       
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        errorMessage = 'Serveur d\'impression non accessible. Assurez-vous que le serveur est démarré sur localhost:3001';
-      } else if (error instanceof SyntaxError) {
-        errorMessage = 'Serveur d\'impression non accessible. Assurez-vous que le serveur est démarré sur localhost:3001';
-      } else if (error instanceof Error) {
-        errorMessage = error.message;
+      // Only show server error if we're not in Electron (fallback scenario)
+      if (typeof window === 'undefined' || !window.electronAPI?.testPrinter) {
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          const printServerUrl = import.meta.env.VITE_PRINT_SERVER_URL || 'http://localhost:3001';
+          errorMessage = `⚠️ Serveur d'impression non accessible!\n\nAssurez-vous que le serveur d'impression Node.js est démarré sur ${printServerUrl}`;
+        } else if (error instanceof SyntaxError) {
+          errorMessage = `Serveur d'impression non accessible. Réponse invalide reçue.`;
+        }
+      }
+      
+      if (error instanceof Error) {
+        errorMessage = error.message || errorMessage;
       }
       
       setTestResult({
@@ -2069,11 +2136,6 @@ function PrinterConfigModal({ printer, onClose, onSave, t }: PrinterConfigModalP
                 </>
               )}
             </Button>
-
-            <div className="p-3 bg-info/10 border border-info/20 rounded-lg text-xs text-muted-foreground">
-              <p className="font-medium mb-1">💡 Note:</p>
-              <p>{t('printer.ensureServerStarted')}</p>
-            </div>
           </div>
 
           <div className="flex gap-2 p-4 border-t border-border">

@@ -14,6 +14,8 @@ try {
     // Printer API
     printDirect: (content: string, printerAddress: string, printerPort: number, isThermalPrinter: boolean) =>
       ipcRenderer.invoke('print:direct', { content, printerAddress, printerPort, isThermalPrinter }),
+    testPrinter: (printerAddress: string, printerPort: number) =>
+      ipcRenderer.invoke('print:test', { printerAddress, printerPort }),
     
     // File system API
     readFile: (filePath: string) => ipcRenderer.invoke('fs:readFile', filePath),

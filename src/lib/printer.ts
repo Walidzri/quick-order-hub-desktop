@@ -33,8 +33,11 @@ export class DirectPrinter {
     // Bold
     boldOn: () => `${this.ESC}E1`,
     boldOff: () => `${this.ESC}E0`,
-    // Cut paper
-    cut: () => `${this.GS}V0`,
+    // Cut paper - GS V 0 = full cut, GS V 1 = partial cut
+    // Use full cut (V0) for better compatibility
+    cut: () => `${this.GS}V${String.fromCharCode(0)}`,
+    // Alternative: partial cut (if full cut doesn't work)
+    cutPartial: () => `${this.GS}V${String.fromCharCode(1)}`,
     // Feed lines
     feed: (lines: number = 1) => `${this.ESC}d${String.fromCharCode(lines)}`,
     // Open drawer
@@ -60,11 +63,14 @@ export class DirectPrinter {
       // Add content as-is (content already contains proper formatting)
       receiptStr += content;
       
-      // Feed lines before cutting
-      receiptStr += this.commands.feed(3);
+      // Feed lines before cutting (more lines for better compatibility)
+      receiptStr += this.commands.feed(5);
       
-      // Cut paper
+      // Cut paper (full cut)
       receiptStr += this.commands.cut();
+      
+      // Extra feed after cut for some printers
+      receiptStr += '\n';
     } else {
       // For regular printers (inkjet/laser), send plain text only
       // No ESC/POS commands, just the content
@@ -73,6 +79,11 @@ export class DirectPrinter {
       // Add some line feeds at the end
       receiptStr += '\n\n\n';
     }
+    
+    // Normalize string: replace non-breaking spaces (U+00A0) and other Unicode spaces with regular ASCII space
+    // This fixes issues with thousands separators in currency formatting
+    receiptStr = receiptStr.replace(/\u00A0/g, ' '); // Non-breaking space -> space
+    receiptStr = receiptStr.replace(/[\u2000-\u200B\u202F\u205F]/g, ' '); // Other Unicode spaces -> space
     
     // Debug: Log what we're sending
     if (process.env.NODE_ENV === 'development') {
@@ -143,7 +154,7 @@ export class DirectPrinter {
       return this.printViaWebSocket(content, address, isThermalPrinter);
     }
 
-    // In Electron, use the Electron API for direct printing
+    // In Electron, use the Electron API for direct printing (no server needed!)
     if (typeof window !== 'undefined' && window.electronAPI) {
       try {
         const result = await window.electronAPI.printDirect(
@@ -162,7 +173,7 @@ export class DirectPrinter {
       }
     }
 
-    // Fallback to backend print server (for web version)
+    // Fallback to backend print server (only for web version, not needed in Electron)
     try {
       const printServerUrl = import.meta.env.VITE_PRINT_SERVER_URL || 'http://localhost:3001';
       const proxyUrl = `${printServerUrl}/print`;
@@ -386,6 +397,10 @@ export class DirectPrinter {
     
     // Replace emojis and special characters with ASCII equivalents
     let cleaned = text
+      // Normalize spaces FIRST - replace non-breaking spaces and Unicode spaces with regular ASCII space
+      // This fixes issues with thousands separators in currency formatting (e.g., "1 000" instead of "1?000")
+      .replace(/\u00A0/g, ' ') // Non-breaking space (U+00A0) -> space
+      .replace(/[\u2000-\u200B\u202F\u205F]/g, ' ') // Other Unicode spaces -> space
       // Emojis (common ones)
       .replace(/🍽️/g, '[SUR PLACE]')
       .replace(/📦/g, '[A EMPORTER]')
@@ -475,7 +490,7 @@ export class DirectPrinter {
     const custom = data.customization || this.getDefaultCustomization();
     const prefix = data.numberingPrefix || '';
     const isKitchen = data.isKitchenTicket || false;
-    const width = 32; // Standard thermal printer width (58mm)
+    const width = 48; // Standard thermal printer width (80mm)
     // Use simple dash for separator to avoid encoding issues
     const separatorChar = custom.separatorStyle === 'none' ? ' ' : 
                          custom.separatorChar === '─' ? '-' : 

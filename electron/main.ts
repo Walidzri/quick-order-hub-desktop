@@ -3,6 +3,8 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { writeFile, readFile } from 'fs/promises';
+import { Socket, createConnection } from 'net';
+import { createRequire } from 'module';
 
 // Get user data path (where IndexedDB and app data are stored)
 function getUserDataPath(): string {
@@ -24,7 +26,9 @@ const __dirname = dirname(__filename);
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 // Note: electron-squirrel-startup may not be available, so we check first
+// Using createRequire for CommonJS module in ESM context
 try {
+  const require = createRequire(import.meta.url);
   if (require('electron-squirrel-startup')) {
     app.quit();
   }
@@ -89,6 +93,8 @@ const createWindow = (): void => {
           if (window.electronAPI) {
             console.log('[RENDERER] electronAPI methods:', Object.keys(window.electronAPI));
             console.log('[RENDERER] electronAPI platform:', window.electronAPI.platform);
+            console.log('[RENDERER] electronAPI.testPrinter exists:', typeof window.electronAPI.testPrinter);
+            console.log('[RENDERER] electronAPI.testPrinter is function:', typeof window.electronAPI.testPrinter === 'function');
           } else {
             console.error('[RENDERER] electronAPI is NOT available!');
             console.error('[RENDERER] This means the preload script did not load correctly.');
@@ -196,33 +202,128 @@ app.on('activate', () => {
 });
 
 // IPC Handlers for printer functionality
+// Test printer connectivity
+ipcMain.handle('print:test', async (event, { printerAddress, printerPort }) => {
+  return new Promise((resolve) => {
+    let resolved = false;
+    let timeoutId: NodeJS.Timeout;
+    const port = printerPort || 9100;
+
+    const cleanup = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (!client.destroyed) {
+        client.destroy();
+      }
+    };
+
+    const client = new Socket();
+    
+    client.connect(port, printerAddress, () => {
+      console.log(`✅ Test connection successful to ${printerAddress}:${port}`);
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        resolve({ 
+          success: true, 
+          message: `Connexion réussie à ${printerAddress}:${port}`,
+          printer: printerAddress,
+          port: port
+        });
+      }
+    });
+
+    client.on('error', (error: Error) => {
+      console.error(`❌ Test connection failed to ${printerAddress}:${port}:`, error.message);
+      if (!resolved) {
+        resolved = true;
+        cleanup();
+        resolve({ 
+          success: false,
+          error: 'Impossible de se connecter à l\'imprimante',
+          message: `L'imprimante ${printerAddress}:${port} n'est pas accessible sur le réseau`,
+          printer: printerAddress,
+          port: port,
+          details: `Erreur: ${error.message}. Vérifiez que: 1) L'imprimante est allumée, 2) L'IP est correcte, 3) L'imprimante est sur le même réseau, 4) Le port est correct (généralement 9100)`
+        });
+      }
+    });
+
+    // Timeout after 10 seconds
+    timeoutId = setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        console.error(`⏱️ Test connection timeout to ${printerAddress}:${port} after 10 seconds`);
+        cleanup();
+        resolve({ 
+          success: false,
+          error: 'Timeout',
+          message: `Timeout: l'imprimante ${printerAddress}:${port} n'a pas répondu dans les 10 secondes`,
+          printer: printerAddress,
+          port: port
+        });
+      }
+    }, 10000);
+  });
+});
+
+// Direct print to network printer
 ipcMain.handle('print:direct', async (event, { content, printerAddress, printerPort, isThermalPrinter }) => {
   try {
-    const net = require('net');
-    
+    console.log(`[PRINT] print:direct called - isThermalPrinter: ${isThermalPrinter}, printer: ${printerAddress}:${printerPort || 9100}`);
     return new Promise((resolve, reject) => {
-      const client = new net.Socket();
+      const client = new Socket();
       let hasResolved = false;
       
       client.connect(printerPort || 9100, printerAddress, () => {
         // Convert content to buffer
         let buffer: Buffer;
-        if (isThermalPrinter) {
+        // For network printers on port 9100, they're almost always thermal printers
+        // So force thermal mode unless explicitly disabled
+        const useThermalMode = isThermalPrinter !== false;
+        console.log(`[PRINT] Using thermal mode: ${useThermalMode}`);
+        
+        if (useThermalMode) {
           // For thermal printers, add ESC/POS commands
-          // Initialize printer
-          const init = Buffer.from('\x1B@', 'latin1');
-          // Set encoding to PC437
-          const encoding = Buffer.from('\x1Bt\x00', 'latin1');
-          // Content
-          const contentBuffer = Buffer.from(content, 'latin1');
-          // Feed and cut
-          const feed = Buffer.from('\n\n\n', 'latin1');
-          const cut = Buffer.from('\x1D\x56\x00', 'latin1');
+          // EXACTLY the same sequence as in DirectPrinter.formatReceipt() to ensure consistency
           
-          buffer = Buffer.concat([init, encoding, contentBuffer, feed, cut]);
+          // 1. Initialize printer (resets all settings) - ESC @
+          const init = Buffer.from('\x1B@', 'latin1');
+          
+          // 2. Set encoding to PC437 - ESC t 0
+          const encoding = Buffer.from('\x1Bt' + String.fromCharCode(0), 'latin1');
+          
+          // 3. Set left alignment (default) - ESC a 0
+          const alignLeft = Buffer.from('\x1Ba' + String.fromCharCode(0), 'latin1');
+          
+          // 4. Content as-is (content already contains proper formatting)
+          // Normalize string: replace non-breaking spaces (U+00A0) and other Unicode spaces with regular ASCII space
+          // This fixes issues with thousands separators in currency formatting
+          let normalizedContent = content.replace(/\u00A0/g, ' '); // Non-breaking space -> space
+          normalizedContent = normalizedContent.replace(/[\u2000-\u200B\u202F\u205F]/g, ' '); // Other Unicode spaces -> space
+          const contentBuffer = Buffer.from(normalizedContent, 'latin1');
+          
+          // 5. Feed lines before cutting (more lines for better compatibility) - ESC d n
+          // Using exact same format as formatReceipt: this.commands.feed(5)
+          const ESC = '\x1B';
+          const feed = Buffer.from(ESC + 'd' + String.fromCharCode(5), 'latin1');
+          
+          // 6. Cut paper (full cut) - GS V 0
+          // Using exact same format as formatReceipt: this.commands.cut()
+          const GS = '\x1D';
+          const cut = Buffer.from(GS + 'V' + String.fromCharCode(0), 'latin1');
+          
+          // 7. Extra feed after cut for some printers (just like formatReceipt does)
+          const extraFeed = Buffer.from('\n', 'latin1');
+          
+          // Concatenate in exact same order as formatReceipt
+          buffer = Buffer.concat([init, encoding, alignLeft, contentBuffer, feed, cut, extraFeed]);
+          console.log(`[PRINT] Thermal printer buffer created - length: ${buffer.length}, cut command present: ${buffer.includes(Buffer.from('\x1DV\x00', 'latin1'))}`);
         } else {
           // For regular printers, plain text
           buffer = Buffer.from(content, 'utf8');
+          console.log(`[PRINT] Regular printer buffer created - length: ${buffer.length}`);
         }
         
         client.write(buffer, (err?: Error) => {

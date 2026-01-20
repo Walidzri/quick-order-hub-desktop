@@ -14,6 +14,8 @@ try {
     // Printer API
     printDirect: (content, printerAddress, printerPort, isThermalPrinter) =>
       ipcRenderer.invoke('print:direct', { content, printerAddress, printerPort, isThermalPrinter }),
+    testPrinter: (printerAddress, printerPort) =>
+      ipcRenderer.invoke('print:test', { printerAddress, printerPort }),
     
     // File system API
     readFile: (filePath) => ipcRenderer.invoke('fs:readFile', filePath),
@@ -39,6 +41,7 @@ try {
   if (process.env.NODE_ENV === 'development') {
     console.log('[PRELOAD] electronAPI exposed successfully');
     console.log('[PRELOAD] Platform:', process.platform);
+    console.log('[PRELOAD] Available methods:', Object.keys(contextBridge.exposeInMainWorld).length > 0 ? 'contextBridge methods' : 'electronAPI methods:', ['printDirect', 'testPrinter', 'readFile', 'writeFile', 'showMessageBox', 'showSaveDialog', 'showOpenDialog', 'saveBackup', 'loadBackup', 'platform', 'getUserDataPath', 'getIndexedDBPath']);
   }
 } catch (error) {
   // Always log errors, even in production

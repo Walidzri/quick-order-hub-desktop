@@ -92,7 +92,16 @@ L'application supporte l'impression directe via TCP/IP :
 - **Imprimantes thermiques ESC/POS** (port 9100)
 - **Imprimantes classiques** (inkjet/laser)
 
+**Système d'impression automatique :**
+- ✅ **Ticket cuisine** : Impression automatique lors de la confirmation de paiement
+- ✅ **Reçu client** : Aperçu avant impression avec possibilité de téléchargement PDF
+- ✅ **Impression directe** : Communication TCP/IP directe avec les imprimantes réseau (pas besoin de serveur d'impression séparé en mode desktop)
+- ✅ **Coupure automatique** : Les tickets sont automatiquement coupés après impression
+- ✅ **Formatage optimisé** : Support des tickets 80mm avec mise en page professionnelle
+
 Configuration dans : **Paramètres > Imprimantes**
+
+**Note** : Pour activer la coupure automatique, assurez-vous d'activer l'option "Imprimante thermique" dans les paramètres de chaque imprimante.
 
 ### Base de Données
 

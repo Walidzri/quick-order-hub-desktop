@@ -4,7 +4,6 @@ import path from 'path';
 import { copyFileSync, existsSync } from 'fs';
 import electron from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
-import { componentTagger } from 'lovable-tagger';
 
 export default defineConfig(({ mode }) => ({
   server: {
@@ -13,7 +12,6 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === 'development' && componentTagger(),
     electron([
       {
         entry: 'electron/main.ts',
