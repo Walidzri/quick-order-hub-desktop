@@ -7,6 +7,8 @@ import { OrdersScreen } from '@/components/pos/OrdersScreen';
 import { ReportsScreen } from '@/components/pos/ReportsScreen';
 import { SettingsScreen } from '@/components/pos/SettingsScreen';
 import { LoginScreen } from '@/components/auth/LoginScreen';
+import { SetupScreen } from '@/components/auth/SetupScreen';
+import { LockScreen } from '@/components/auth/LockScreen';
 import { GlobalVirtualKeyboard } from '@/components/ui/GlobalVirtualKeyboard';
 import { GlobalNumericKeyboard } from '@/components/ui/GlobalNumericKeyboard';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,7 +18,7 @@ type View = 'order' | 'orders' | 'reports' | 'settings';
 
 function POSApp() {
   const { isLoading, kioskMode, direction } = usePOS();
-  const { isAuthenticated, canAccessView, user } = useAuth();
+  const { isAuthenticated, isLocked, isSetupRequired, canAccessView, user } = useAuth();
   const [activeView, setActiveView] = useState<View>('order');
 
   // Reset to accessible view if current view is not accessible
@@ -31,10 +33,33 @@ function POSApp() {
     }
   }, [isAuthenticated, activeView, canAccessView]);
 
+  // Show setup screen if no users exist
+  if (isSetupRequired) {
+    return (
+      <>
+        <SetupScreen />
+        <GlobalVirtualKeyboard />
+        <GlobalNumericKeyboard />
+      </>
+    );
+  }
+
+  // Show login screen if not authenticated
   if (!isAuthenticated) {
     return (
       <>
         <LoginScreen />
+        <GlobalVirtualKeyboard />
+        <GlobalNumericKeyboard />
+      </>
+    );
+  }
+
+  // Show lock screen if authenticated but locked
+  if (isLocked) {
+    return (
+      <>
+        <LockScreen />
         <GlobalVirtualKeyboard />
         <GlobalNumericKeyboard />
       </>

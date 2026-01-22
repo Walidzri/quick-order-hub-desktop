@@ -1,6 +1,6 @@
 import { usePOS } from '@/contexts/POSContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShoppingCart, ClipboardList, BarChart3, Settings, Maximize2, Minimize2, LogOut } from 'lucide-react';
+import { ShoppingCart, ClipboardList, BarChart3, Settings, Maximize2, Minimize2, LogOut, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -23,7 +23,7 @@ interface MainNavProps {
 
 export function MainNav({ activeView, onViewChange }: MainNavProps) {
   const { t, kioskMode, toggleKioskMode, settings } = usePOS();
-  const { canAccessView, logout, user } = useAuth();
+  const { canAccessView, logout, lock, user } = useAuth();
   
   // Filter nav items based on permissions
   const navItems = allNavItems.filter(item => canAccessView(item.id));
@@ -78,7 +78,7 @@ export function MainNav({ activeView, onViewChange }: MainNavProps) {
           ))}
         </div>
 
-        {/* Kiosk toggle & Logout */}
+        {/* Kiosk toggle, Lock & Logout */}
         <div className="hidden md:flex items-center px-4 min-w-[200px] justify-end gap-2">
           <button
             onClick={toggleKioskMode}
@@ -95,19 +95,31 @@ export function MainNav({ activeView, onViewChange }: MainNavProps) {
             </span>
           </button>
           {user && (
-            <button
-              onClick={logout}
-              className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200",
-                "hover:bg-destructive/10 active:scale-95 text-destructive"
-              )}
-              title={t('auth.logoutTitle')}
-            >
-              <LogOut className="w-5 h-5" />
-              <span className="text-sm font-medium hidden lg:inline">
-                {t('auth.logout')}
-              </span>
-            </button>
+            <>
+              <button
+                onClick={lock}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200",
+                  "hover:bg-warning/10 active:scale-95 text-warning"
+                )}
+                title={t('auth.lock') || 'Verrouiller'}
+              >
+                <Lock className="w-5 h-5" />
+              </button>
+              <button
+                onClick={logout}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-xl transition-all duration-200",
+                  "hover:bg-destructive/10 active:scale-95 text-destructive"
+                )}
+                title={t('auth.logoutTitle')}
+              >
+                <LogOut className="w-5 h-5" />
+                <span className="text-sm font-medium hidden lg:inline">
+                  {t('auth.logout')}
+                </span>
+              </button>
+            </>
           )}
         </div>
       </div>

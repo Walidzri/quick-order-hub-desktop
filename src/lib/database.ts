@@ -223,10 +223,14 @@ export interface User {
   id: string;
   username: string;
   password: string;
+  pin?: string; // 4-6 digit PIN for quick login
   role: UserRole;
   name: string;
+  avatar?: string; // Emoji or initials for quick selection
   createdAt: Date;
   lastLogin?: Date;
+  failedAttempts?: number; // Track failed login attempts
+  lockedUntil?: Date; // Account lockout time
 }
 
 export interface UserSession {
@@ -460,56 +464,24 @@ export async function getDB(): Promise<IDBPDatabase<POSDBSchema>> {
   return dbInstance;
 }
 
-/**
- * Ensure default users exist in the database
- */
-export async function ensureDefaultUsers(): Promise<void> {
-  const db = await getDB();
-  
-  const defaultUsers: User[] = [
-    {
-      id: 'admin-1',
-      username: 'admin',
-      password: 'admin123',
-      role: 'admin',
-      name: 'Administrateur',
-      createdAt: new Date(),
-    },
-    {
-      id: 'caissier-1',
-      username: 'caissier',
-      password: 'caissier123',
-      role: 'caissier',
-      name: 'Caissier',
-      createdAt: new Date(),
-    },
-    {
-      id: 'chef-1',
-      username: 'chef',
-      password: 'chef123',
-      role: 'chef',
-      name: 'Chef de Cuisine',
-      createdAt: new Date(),
-    },
-  ];
-
-  for (const user of defaultUsers) {
-    try {
-      const existing = await db.get('users', user.id);
-      if (!existing) {
-        await db.put('users', user);
-      }
-    } catch (error) {
-      console.warn('Failed to seed user:', user.username, error);
-    }
-  }
-}
-
 export async function initializeDatabase(): Promise<void> {
   const db = await getDB();
 
-  // Ensure users exist (for new installs and upgrades)
-  await ensureDefaultUsers();
+  // Créer l'admin par défaut seulement si AUCUN admin n'existe
+  const allUsers = await db.getAll('users');
+  const hasAdmin = allUsers.some(u => u.role === 'admin');
+  if (!hasAdmin) {
+    const defaultAdmin: User = {
+      id: 'admin-default',
+      username: 'administrateur',
+      password: 'admin123', // Mot de passe par défaut
+      role: 'admin',
+      name: 'Administrateur',
+      avatar: '👨‍💼',
+      createdAt: new Date(),
+    };
+    await db.put('users', defaultAdmin);
+  }
 
   // Check if already initialized (settings exist)
   const existingSettings = await db.get('settings', 'main');
@@ -679,8 +651,19 @@ export async function importProductsTemplate(templateData: {
  * Reset the database by deleting it and reinitializing
  * WARNING: This will delete ALL data including orders, settings, products, etc.
  * The database will be completely empty (no default products)
+ * NOTE: The administrator account is preserved
  */
 export async function resetDatabase(): Promise<void> {
+  // Sauvegarder l'administrateur avant de supprimer la DB
+  let adminUser: User | undefined;
+  try {
+    const currentDb = await getDB();
+    const allUsers = await currentDb.getAll('users');
+    adminUser = allUsers.find(u => u.role === 'admin');
+  } catch (error) {
+    console.warn('Could not backup admin user:', error);
+  }
+
   // Close existing connection if any
   if (dbInstance) {
     dbInstance.close();
@@ -693,8 +676,10 @@ export async function resetDatabase(): Promise<void> {
   // Reinitialize (but don't seed products - keep it empty)
   const db = await getDB();
   
-  // Ensure users exist (for login)
-  await ensureDefaultUsers();
+  // Restaurer l'administrateur s'il existait
+  if (adminUser) {
+    await db.put('users', adminUser);
+  }
   
   // Create default settings (but no products/categories)
   const defaultReceiptCustomization: ReceiptCustomization = {
