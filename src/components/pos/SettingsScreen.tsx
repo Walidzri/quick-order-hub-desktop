@@ -33,7 +33,8 @@ import {
   AlertCircle,
   Activity,
   Loader2,
-  Warehouse
+  Warehouse,
+  Database
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,7 +54,7 @@ import { UserModal } from './UserModal';
 import { ReceiptCustomizationSection } from './ReceiptCustomizationSection';
 import { InventoryManagement } from './InventoryManagement';
 
-type SettingsSection = 'general' | 'branding' | 'printers' | 'numbering' | 'receipt' | 'promotions' | 'theme' | 'products' | 'users' | 'inventory';
+type SettingsSection = 'general' | 'branding' | 'printers' | 'numbering' | 'receipt' | 'promotions' | 'theme' | 'products' | 'users' | 'inventory' | 'data';
 
 const sections: { id: SettingsSection; icon: React.ReactNode }[] = [
   { id: 'general', icon: <Globe className="w-5 h-5" /> },
@@ -66,10 +67,11 @@ const sections: { id: SettingsSection; icon: React.ReactNode }[] = [
   { id: 'promotions', icon: <Tag className="w-5 h-5" /> },
   { id: 'theme', icon: <Palette className="w-5 h-5" /> },
   { id: 'users', icon: <Users className="w-5 h-5" /> },
+  { id: 'data', icon: <Database className="w-5 h-5" /> },
 ];
 
 export function SettingsScreen() {
-  const { settings, updateSettings, t, printers, updatePrinter, promotions, savePromotion, deletePromotion, loadPromotions, currency, resetDatabase, updateSupplements, exportProductsTemplate, importProductsTemplate, categories, products, variants, saveProduct, deleteProduct, loadProducts, getVariantsByProduct, saveCategory, deleteCategory, loadCategories } = usePOS();
+  const { settings, updateSettings, t, printers, updatePrinter, promotions, savePromotion, deletePromotion, loadPromotions, currency, resetDatabase, exportProductsTemplate, importProductsTemplate, categories, products, variants, saveProduct, deleteProduct, loadProducts, getVariantsByProduct, saveCategory, deleteCategory, loadCategories } = usePOS();
   const { canAccessSettingsSection, hasPermission, users, loadUsers, saveUser, deleteUser, user } = useAuth();
   const { showDialog, showAlert, DialogComponent } = useDialog();
   const [isExporting, setIsExporting] = useState(false);
@@ -390,276 +392,6 @@ export function SettingsScreen() {
                   onCheckedChange={(checked) => updateSettings({ kioskMode: checked })}
                 />
               </div>
-
-              {/* Backup & Restore - Only for admin */}
-              {hasPermission('settings.general.resetDatabase') && (
-                <div className="p-3 sm:p-4 bg-info/10 border-2 border-info/20 rounded-xl">
-                  <h3 className="font-medium text-info mb-2 text-sm sm:text-base">Sauvegarde et Restauration</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                    Créez une sauvegarde complète de toutes vos données ou restaurez une sauvegarde précédente.
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Button
-                      variant="default"
-                      onClick={handleExportBackup}
-                      disabled={isExporting || isImporting}
-                      className="flex-1"
-                    >
-                      {isExporting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Export en cours...
-                        </>
-                      ) : (
-                        <>
-                          <Download className="w-4 h-4 mr-2" />
-                          Exporter la sauvegarde
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleImportBackup}
-                      disabled={isExporting || isImporting}
-                      className="flex-1"
-                    >
-                      {isImporting ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Import en cours...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-4 h-4 mr-2" />
-                          Importer une sauvegarde
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Update Supplements - Only for admin */}
-              {hasPermission('settings.general.updateSupplements') && (
-                <div className="p-3 sm:p-4 bg-info/10 border-2 border-info/20 rounded-xl">
-                  <h3 className="font-medium text-info mb-2 text-sm sm:text-base">{t('supplements.update')}</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                    {t('supplements.updateDesc')}
-                  </p>
-                  <Button
-                    variant="default"
-                    onClick={async () => {
-                      await updateSupplements();
-                      await showAlert(t('supplements.updateSuccess'));
-                    }}
-                    className="w-full"
-                  >
-                    {t('supplements.update')}
-                  </Button>
-                </div>
-              )}
-
-              {/* Data Location Info */}
-              {hasPermission('settings.general.resetDatabase') && typeof window !== 'undefined' && window.electronAPI && (
-                <div className="p-3 sm:p-4 bg-gray-500/10 border-2 border-gray-500/20 rounded-xl mb-4">
-                  <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2 text-sm sm:text-base">Emplacement des Données</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">
-                    Les données de l'application (produits, commandes, paramètres) sont stockées localement sur votre ordinateur.
-                  </p>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={async () => {
-                      if (window.electronAPI) {
-                        try {
-                          const userDataPath = await window.electronAPI.getUserDataPath();
-                          const indexedDBPath = await window.electronAPI.getIndexedDBPath();
-                          await showAlert(
-                            `Emplacement des données :\n\n` +
-                            `Dossier utilisateur :\n${userDataPath}\n\n` +
-                            `Base de données (IndexedDB) :\n${indexedDBPath}\n\n` +
-                            `Note : En développement, la base de données peut être dans un sous-dossier IndexedDB avec un nom basé sur l'URL.`,
-                            'Emplacement des données'
-                          );
-                        } catch (error) {
-                          console.error('Error getting paths:', error);
-                        }
-                      }
-                    }}
-                    className="w-full text-left justify-start"
-                  >
-                    📁 Afficher l'emplacement des données
-                  </Button>
-                </div>
-              )}
-
-              {/* Export/Import Products Template */}
-              {hasPermission('settings.general.resetDatabase') && (
-                <div className="p-3 sm:p-4 bg-blue-500/10 border-2 border-blue-500/20 rounded-xl mb-4">
-                  <h3 className="font-medium text-blue-600 dark:text-blue-400 mb-2 text-sm sm:text-base">Template des Produits</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                    Exportez ou importez un template de produits (catégories, produits, variantes et modifiers) pour partager votre configuration ou démarrer rapidement.
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={async () => {
-                        const isElectron = typeof window !== 'undefined' && window.electronAPI;
-                        
-                        if (!isElectron) {
-                          await showAlert(
-                            'L\'API Electron n\'est pas disponible.\n\n' +
-                            'Assurez-vous que vous utilisez la version desktop de l\'application.',
-                            'Erreur'
-                          );
-                          return;
-                        }
-
-                        setIsExportingTemplate(true);
-                        try {
-                          const templateData = await exportProductsTemplate();
-                          const jsonData = JSON.stringify(templateData, null, 2);
-                          const fileName = `products-template-${new Date().toISOString().split('T')[0]}.json`;
-
-                          const result = await window.electronAPI.showSaveDialog({
-                            title: 'Exporter le template des produits',
-                            defaultPath: fileName,
-                            filters: [
-                              { name: 'Fichiers JSON', extensions: ['json'] },
-                              { name: 'Tous les fichiers', extensions: ['*'] },
-                            ],
-                          });
-
-                          if (!result.canceled && result.filePath) {
-                            await window.electronAPI.saveBackup(jsonData, result.filePath);
-                            await showAlert('Template des produits exporté avec succès !', 'Succès');
-                          }
-                        } catch (error) {
-                          console.error('Export template error:', error);
-                          await showAlert('Erreur lors de l\'export du template: ' + (error instanceof Error ? error.message : 'Erreur inconnue'), 'Erreur');
-                        } finally {
-                          setIsExportingTemplate(false);
-                        }
-                      }}
-                      disabled={isExportingTemplate || isImportingTemplate}
-                      className="flex-1"
-                    >
-                      {isExportingTemplate ? 'Export...' : 'Exporter'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={async () => {
-                        const isElectron = typeof window !== 'undefined' && window.electronAPI;
-                        
-                        if (!isElectron) {
-                          await showAlert(
-                            'L\'API Electron n\'est pas disponible.\n\n' +
-                            'Assurez-vous que vous utilisez la version desktop de l\'application.',
-                            'Erreur'
-                          );
-                          return;
-                        }
-
-                        const confirmed = await showDialog({
-                          title: 'Importer un template',
-                          description: 'L\'importation d\'un template remplacera les produits, catégories, variantes et modifiers existants. Les autres données (commandes, paramètres, etc.) ne seront pas affectées.\n\nÊtes-vous sûr de vouloir continuer ?',
-                          confirmText: 'Continuer',
-                          cancelText: 'Annuler',
-                          variant: 'default',
-                        });
-
-                        if (!confirmed) return;
-
-                        setIsImportingTemplate(true);
-                        try {
-                          const result = await window.electronAPI.showOpenDialog({
-                            title: 'Importer un template de produits',
-                            filters: [
-                              { name: 'Fichiers JSON', extensions: ['json'] },
-                              { name: 'Tous les fichiers', extensions: ['*'] },
-                            ],
-                            properties: ['openFile'],
-                          });
-
-                          if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
-                            setIsImportingTemplate(false);
-                            return;
-                          }
-
-                          const filePath = result.filePaths[0];
-                          const loadResult = await window.electronAPI.loadBackup(filePath);
-
-                          if (!loadResult.success || !loadResult.data) {
-                            throw new Error('Impossible de lire le fichier template');
-                          }
-
-                          const templateData = JSON.parse(loadResult.data);
-
-                          // Validate template structure
-                          if (!templateData.categories && !templateData.products) {
-                            // Try nested structure (from full backup)
-                            if (templateData.data && (templateData.data.categories || templateData.data.products)) {
-                              await importProductsTemplate(templateData.data);
-                            } else {
-                              throw new Error('Format de template invalide. Le fichier doit contenir des catégories et/ou produits.');
-                            }
-                          } else {
-                            await importProductsTemplate(templateData);
-                          }
-
-                          await showAlert('Template des produits importé avec succès !', 'Succès');
-                        } catch (error) {
-                          console.error('Import template error:', error);
-                          await showAlert('Erreur lors de l\'import du template: ' + (error instanceof Error ? error.message : 'Erreur inconnue'), 'Erreur');
-                        } finally {
-                          setIsImportingTemplate(false);
-                        }
-                      }}
-                      disabled={isExportingTemplate || isImportingTemplate}
-                      className="flex-1"
-                    >
-                      {isImportingTemplate ? 'Import...' : 'Importer'}
-                    </Button>
-                  </div>
-                </div>
-              )}
-
-              {/* Database Reset - Only for admin */}
-              {hasPermission('settings.general.resetDatabase') && (
-                <div className="p-3 sm:p-4 bg-destructive/10 border-2 border-destructive/20 rounded-xl">
-                  <h3 className="font-medium text-destructive mb-2 text-sm sm:text-base">Zone de danger</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                    La réinitialisation de la base de données supprimera TOUTES les données (commandes, produits, catégories, paramètres, etc.) et rendra le logiciel complètement vierge. Cette action est irréversible.
-                  </p>
-                  <Button
-                    variant="destructive"
-                    onClick={async () => {
-                      const confirmed1 = await showDialog({
-                        title: '⚠️ ATTENTION',
-                        description: 'Vous êtes sur le point de supprimer TOUTES les données. Le logiciel sera complètement vierge (aucun produit, aucune catégorie). Cette action est irréversible.\n\nAssurez-vous d\'avoir exporté le template des produits si nécessaire.\n\nÊtes-vous vraiment sûr de vouloir continuer ?',
-                        confirmText: 'Continuer',
-                        cancelText: 'Annuler',
-                        variant: 'destructive',
-                      });
-                      if (confirmed1) {
-                        const confirmed2 = await showDialog({
-                          title: t('database.resetConfirm'),
-                          description: t('database.resetConfirm'),
-                          confirmText: 'Confirmer',
-                          cancelText: 'Annuler',
-                          variant: 'destructive',
-                        });
-                        if (confirmed2) {
-                          await resetDatabase();
-                        }
-                      }
-                    }}
-                    className="w-full"
-                  >
-                    {t('database.reset')}
-                  </Button>
-                </div>
-              )}
             </motion.div>
           )}
 
@@ -1142,7 +874,12 @@ export function SettingsScreen() {
                           >
                             <Edit className="w-4 h-4 text-primary" />
                           </button>
+                          {/* Can't delete yourself. Only admin can delete other admins (if there are multiple) */}
                           {u.id !== user?.id && (
+                            u.role !== 'admin' 
+                              ? true  // Non-admin users can be deleted by anyone with access
+                              : (user?.role === 'admin' && users.filter(x => x.role === 'admin').length > 1) // Admin can delete other admins if multiple exist
+                          ) && (
                             <button
                               onClick={async () => {
                                 const confirmed = await showDialog({
@@ -1174,6 +911,260 @@ export function SettingsScreen() {
             </motion.div>
           )}
 
+          {activeSection === 'data' && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="space-y-4 sm:space-y-6"
+            >
+              <h2 className="text-xl sm:text-2xl font-bold">{t('settings.data')}</h2>
+              
+              {/* Backup & Restore */}
+              <div className="p-3 sm:p-4 bg-info/10 border-2 border-info/20 rounded-xl">
+                <h3 className="font-medium text-info mb-2 text-sm sm:text-base">Sauvegarde et Restauration</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                  Créez une sauvegarde complète de toutes vos données ou restaurez une sauvegarde précédente.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    variant="default"
+                    onClick={handleExportBackup}
+                    disabled={isExporting || isImporting}
+                    className="flex-1"
+                  >
+                    {isExporting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Export en cours...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4 mr-2" />
+                        Exporter la sauvegarde
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleImportBackup}
+                    disabled={isExporting || isImporting}
+                    className="flex-1"
+                  >
+                    {isImporting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Import en cours...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4 mr-2" />
+                        Importer une sauvegarde
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Data Location Info */}
+              {typeof window !== 'undefined' && window.electronAPI && (
+                <div className="p-3 sm:p-4 bg-gray-500/10 border-2 border-gray-500/20 rounded-xl">
+                  <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2 text-sm sm:text-base">Emplacement des Données</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">
+                    Les données de l'application (produits, commandes, paramètres) sont stockées localement sur votre ordinateur.
+                  </p>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={async () => {
+                      if (window.electronAPI) {
+                        try {
+                          const userDataPath = await window.electronAPI.getUserDataPath();
+                          const indexedDBPath = await window.electronAPI.getIndexedDBPath();
+                          await showAlert(
+                            `Emplacement des données :\n\n` +
+                            `Dossier utilisateur :\n${userDataPath}\n\n` +
+                            `Base de données (IndexedDB) :\n${indexedDBPath}\n\n` +
+                            `Note : En développement, la base de données peut être dans un sous-dossier IndexedDB avec un nom basé sur l'URL.`,
+                            'Emplacement des données'
+                          );
+                        } catch (error) {
+                          console.error('Error getting paths:', error);
+                        }
+                      }
+                    }}
+                    className="w-full text-left justify-start"
+                  >
+                    📁 Afficher l'emplacement des données
+                  </Button>
+                </div>
+              )}
+
+              {/* Export/Import Products Template */}
+              <div className="p-3 sm:p-4 bg-blue-500/10 border-2 border-blue-500/20 rounded-xl">
+                <h3 className="font-medium text-blue-600 dark:text-blue-400 mb-2 text-sm sm:text-base">Template des Produits</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                  Exportez ou importez un template de produits (catégories, produits, variantes et modifiers) pour partager votre configuration ou démarrer rapidement.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      const isElectron = typeof window !== 'undefined' && window.electronAPI;
+                      
+                      if (!isElectron) {
+                        await showAlert(
+                          'L\'API Electron n\'est pas disponible.\n\n' +
+                          'Assurez-vous que vous utilisez la version desktop de l\'application.',
+                          'Erreur'
+                        );
+                        return;
+                      }
+
+                      setIsExportingTemplate(true);
+                      try {
+                        const templateData = await exportProductsTemplate();
+                        const jsonData = JSON.stringify(templateData, null, 2);
+                        const fileName = `products-template-${new Date().toISOString().split('T')[0]}.json`;
+
+                        const result = await window.electronAPI.showSaveDialog({
+                          title: 'Exporter le template des produits',
+                          defaultPath: fileName,
+                          filters: [
+                            { name: 'Fichiers JSON', extensions: ['json'] },
+                            { name: 'Tous les fichiers', extensions: ['*'] },
+                          ],
+                        });
+
+                        if (!result.canceled && result.filePath) {
+                          await window.electronAPI.saveBackup(jsonData, result.filePath);
+                          await showAlert('Template des produits exporté avec succès !', 'Succès');
+                        }
+                      } catch (error) {
+                        console.error('Export template error:', error);
+                        await showAlert('Erreur lors de l\'export du template: ' + (error instanceof Error ? error.message : 'Erreur inconnue'), 'Erreur');
+                      } finally {
+                        setIsExportingTemplate(false);
+                      }
+                    }}
+                    disabled={isExportingTemplate || isImportingTemplate}
+                    className="flex-1"
+                  >
+                    {isExportingTemplate ? 'Export...' : 'Exporter'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      const isElectron = typeof window !== 'undefined' && window.electronAPI;
+                      
+                      if (!isElectron) {
+                        await showAlert(
+                          'L\'API Electron n\'est pas disponible.\n\n' +
+                          'Assurez-vous que vous utilisez la version desktop de l\'application.',
+                          'Erreur'
+                        );
+                        return;
+                      }
+
+                      const confirmed = await showDialog({
+                        title: 'Importer un template',
+                        description: 'L\'importation d\'un template remplacera les produits, catégories, variantes et modifiers existants. Les autres données (commandes, paramètres, etc.) ne seront pas affectées.\n\nÊtes-vous sûr de vouloir continuer ?',
+                        confirmText: 'Continuer',
+                        cancelText: 'Annuler',
+                        variant: 'default',
+                      });
+
+                      if (!confirmed) return;
+
+                      setIsImportingTemplate(true);
+                      try {
+                        const result = await window.electronAPI.showOpenDialog({
+                          title: 'Importer un template de produits',
+                          filters: [
+                            { name: 'Fichiers JSON', extensions: ['json'] },
+                            { name: 'Tous les fichiers', extensions: ['*'] },
+                          ],
+                          properties: ['openFile'],
+                        });
+
+                        if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+                          setIsImportingTemplate(false);
+                          return;
+                        }
+
+                        const filePath = result.filePaths[0];
+                        const loadResult = await window.electronAPI.loadBackup(filePath);
+
+                        if (!loadResult.success || !loadResult.data) {
+                          throw new Error('Impossible de lire le fichier template');
+                        }
+
+                        const templateData = JSON.parse(loadResult.data);
+
+                        // Validate template structure
+                        if (!templateData.categories && !templateData.products) {
+                          // Try nested structure (from full backup)
+                          if (templateData.data && (templateData.data.categories || templateData.data.products)) {
+                            await importProductsTemplate(templateData.data);
+                          } else {
+                            throw new Error('Format de template invalide. Le fichier doit contenir des catégories et/ou produits.');
+                          }
+                        } else {
+                          await importProductsTemplate(templateData);
+                        }
+
+                        await showAlert('Template des produits importé avec succès !', 'Succès');
+                      } catch (error) {
+                        console.error('Import template error:', error);
+                        await showAlert('Erreur lors de l\'import du template: ' + (error instanceof Error ? error.message : 'Erreur inconnue'), 'Erreur');
+                      } finally {
+                        setIsImportingTemplate(false);
+                      }
+                    }}
+                    disabled={isExportingTemplate || isImportingTemplate}
+                    className="flex-1"
+                  >
+                    {isImportingTemplate ? 'Import...' : 'Importer'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Database Reset */}
+              <div className="p-3 sm:p-4 bg-destructive/10 border-2 border-destructive/20 rounded-xl">
+                <h3 className="font-medium text-destructive mb-2 text-sm sm:text-base">Zone de danger</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                  La réinitialisation de la base de données supprimera TOUTES les données (commandes, produits, catégories, paramètres, etc.) et rendra le logiciel complètement vierge. Cette action est irréversible.
+                </p>
+                <Button
+                  variant="destructive"
+                  onClick={async () => {
+                    const confirmed1 = await showDialog({
+                      title: '⚠️ ATTENTION',
+                      description: 'Vous êtes sur le point de supprimer TOUTES les données. Le logiciel sera complètement vierge (aucun produit, aucune catégorie). Cette action est irréversible.\n\nAssurez-vous d\'avoir exporté le template des produits si nécessaire.\n\nÊtes-vous vraiment sûr de vouloir continuer ?',
+                      confirmText: 'Continuer',
+                      cancelText: 'Annuler',
+                      variant: 'destructive',
+                    });
+                    if (confirmed1) {
+                      const confirmed2 = await showDialog({
+                        title: t('database.resetConfirm'),
+                        description: t('database.resetConfirm'),
+                        confirmText: 'Confirmer',
+                        cancelText: 'Annuler',
+                        variant: 'destructive',
+                      });
+                      if (confirmed2) {
+                        await resetDatabase();
+                      }
+                    }
+                  }}
+                  className="w-full"
+                >
+                  {t('database.reset')}
+                </Button>
+              </div>
+            </motion.div>
+          )}
+
           {/* User Modal */}
           {showUserModal && (
             <UserModal
@@ -1183,6 +1174,7 @@ export function SettingsScreen() {
                 setEditingUser(null);
               }}
               user={editingUser}
+              existingUsers={users}
               onSave={async (userData) => {
                 await saveUser(userData);
                 await loadUsers();

@@ -122,6 +122,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'settings.kioskOn': 'Activé (Plein écran)',
     'settings.kioskOff': 'Désactivé',
     'settings.users': 'Utilisateurs',
+    'settings.data': 'Données',
     
     // Promotions
     'promo.title': 'Gestion des Promotions',
@@ -601,6 +602,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'settings.kioskMode': 'Kiosk Mode',
     'settings.kioskOn': 'Enabled (Fullscreen)',
     'settings.kioskOff': 'Disabled',
+    'settings.users': 'Users',
+    'settings.data': 'Data',
     
     // Promotions
     'promo.title': 'Promotions Management',
@@ -854,6 +857,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'settings.kioskMode': 'وضع الكشك',
     'settings.kioskOn': 'مفعل (ملء الشاشة)',
     'settings.kioskOff': 'معطل',
+    'settings.users': 'المستخدمون',
+    'settings.data': 'البيانات',
     
     // Promotions
     'promo.title': 'إدارة العروض',

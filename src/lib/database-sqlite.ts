@@ -646,72 +646,34 @@ function isoToDate(iso: string): Date {
 }
 
 /**
- * Ensure default users exist
- */
-export async function ensureDefaultUsers(): Promise<void> {
-  const db = await getDB();
-  
-  const defaultUsers: User[] = [
-    {
-      id: 'admin-1',
-      username: 'admin',
-      password: 'admin123',
-      role: 'admin',
-      name: 'Administrateur',
-      createdAt: new Date(),
-    },
-    {
-      id: 'caissier-1',
-      username: 'caissier',
-      password: 'caissier123',
-      role: 'caissier',
-      name: 'Caissier',
-      createdAt: new Date(),
-    },
-    {
-      id: 'chef-1',
-      username: 'chef',
-      password: 'chef123',
-      role: 'chef',
-      name: 'Chef de Cuisine',
-      createdAt: new Date(),
-    },
-  ];
-
-  for (const user of defaultUsers) {
-    const stmt = db.prepare('SELECT id FROM users WHERE id = ?');
-    stmt.bind([user.id]);
-    const exists = stmt.step();
-    stmt.free();
-    
-    if (!exists) {
-      const insertStmt = db.prepare(`
-        INSERT INTO users (id, username, password, role, name, createdAt, lastLogin)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `);
-      insertStmt.run([
-        user.id,
-        user.username,
-        user.password,
-        user.role,
-        user.name,
-        dateToISO(user.createdAt),
-        user.lastLogin ? dateToISO(user.lastLogin) : null,
-      ]);
-      insertStmt.free();
-      saveDatabase();
-    }
-  }
-}
-
-/**
  * Initialize database
  */
 export async function initializeDatabase(): Promise<void> {
   const db = await getDB();
   
-  // Ensure users exist
-  await ensureDefaultUsers();
+  // Créer l'admin par défaut seulement si AUCUN admin n'existe
+  const checkAdminStmt = db.prepare('SELECT id FROM users WHERE role = ?');
+  checkAdminStmt.bind(['admin']);
+  const adminExists = checkAdminStmt.step();
+  checkAdminStmt.free();
+  
+  if (!adminExists) {
+    const insertAdminStmt = db.prepare(`
+      INSERT INTO users (id, username, password, role, name, avatar, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+    insertAdminStmt.run([
+      'admin-default',
+      'administrateur',
+      'admin123', // Mot de passe par défaut
+      'admin',
+      'Administrateur',
+      '👨‍💼',
+      dateToISO(new Date()),
+    ]);
+    insertAdminStmt.free();
+    saveDatabase();
+  }
   
   // Check if already initialized (categories exist)
   const stmt = db.prepare('SELECT COUNT(*) as count FROM categories');
@@ -728,8 +690,23 @@ export async function initializeDatabase(): Promise<void> {
 
 /**
  * Reset database
+ * NOTE: The administrator account is preserved
  */
 export async function resetDatabase(): Promise<void> {
+  // Sauvegarder l'administrateur avant de supprimer la DB
+  let adminData: any = null;
+  try {
+    const db = await getDB();
+    const stmt = db.prepare('SELECT * FROM users WHERE role = ?');
+    stmt.bind(['admin']);
+    if (stmt.step()) {
+      adminData = stmt.getAsObject();
+    }
+    stmt.free();
+  } catch (error) {
+    console.warn('Could not backup admin user:', error);
+  }
+
   if (dbInstance) {
     dbInstance.close();
     dbInstance = null;
@@ -739,6 +716,34 @@ export async function resetDatabase(): Promise<void> {
   
   // Reinitialize
   await initializeDatabase();
+  
+  // Restaurer l'administrateur s'il existait
+  if (adminData) {
+    try {
+      const db = await getDB();
+      const insertStmt = db.prepare(`
+        INSERT OR REPLACE INTO users (id, username, password, pin, role, name, avatar, createdAt, lastLogin, failedAttempts, lockedUntil)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      insertStmt.run([
+        adminData.id,
+        adminData.username,
+        adminData.password,
+        adminData.pin || null,
+        adminData.role,
+        adminData.name,
+        adminData.avatar || null,
+        adminData.createdAt,
+        adminData.lastLogin || null,
+        0, // Reset failed attempts
+        null // Clear lockout
+      ]);
+      insertStmt.free();
+      saveDatabase();
+    } catch (error) {
+      console.warn('Could not restore admin user:', error);
+    }
+  }
 }
 
 /**

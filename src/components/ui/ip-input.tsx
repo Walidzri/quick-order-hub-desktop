@@ -72,42 +72,50 @@ export function IPInput({
     // Prevent multiple consecutive dots
     cleaned = cleaned.replace(/\.\.+/g, '.');
     
-    // Split by dots to validate each segment
-    const parts = cleaned.split('.');
-    
-    // Limit to 4 parts
-    if (parts.length > 4) {
-      // Take only first 4 parts
-      cleaned = parts.slice(0, 4).join('.');
+    // Don't allow starting with a dot
+    if (cleaned.startsWith('.')) {
+      cleaned = cleaned.substring(1);
     }
     
-    // Validate each segment (0-255)
-    const validParts = parts.slice(0, 4).map((part, index) => {
-      // Remove leading zeros except for single zero
-      let trimmed = part.replace(/^0+/, '') || '0';
+    // Split by dots to validate each segment
+    let parts = cleaned.split('.');
+    
+    // Limit to 4 parts max
+    if (parts.length > 4) {
+      parts = parts.slice(0, 4);
+    }
+    
+    // Validate each segment (0-255), filter out empty parts at the end
+    const validParts: string[] = [];
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      
+      // Skip empty parts (except we'll handle trailing dot separately)
+      if (part === '') {
+        continue;
+      }
       
       // Limit segment length to 3 digits
-      if (trimmed.length > 3) {
-        trimmed = trimmed.slice(0, 3);
+      let segment = part.length > 3 ? part.slice(0, 3) : part;
+      
+      // Parse and validate numeric value (0-255)
+      const num = parseInt(segment, 10);
+      if (!isNaN(num) && num > 255) {
+        segment = '255';
       }
       
-      // Validate numeric value (0-255)
-      const num = parseInt(trimmed);
-      if (!isNaN(num)) {
-        if (num > 255) {
-          return '255';
-        }
-        return num.toString();
-      }
-      
-      return trimmed;
-    });
+      validParts.push(segment);
+    }
     
-    // Reconstruct IP, but preserve trailing dot if user is typing
+    // Reconstruct IP
     let result = validParts.join('.');
     
-    // If original ended with a dot and we have less than 4 parts, preserve it
-    if (cleaned.endsWith('.') && validParts.length < 4 && validParts[validParts.length - 1] !== '') {
+    // Add trailing dot only if:
+    // 1. Original input ended with a dot
+    // 2. We have less than 4 segments
+    // 3. The last segment is not empty (user typed something before the dot)
+    const originalEndsWithDot = cleaned.endsWith('.');
+    if (originalEndsWithDot && validParts.length < 4 && validParts.length > 0) {
       result += '.';
     }
     

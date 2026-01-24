@@ -4,7 +4,6 @@ import {
   getDB, 
   initializeDatabase,
   resetDatabase,
-  updateSupplements,
   exportProductsTemplate,
   importProductsTemplate,
   Settings, 
@@ -116,7 +115,6 @@ interface POSContextType {
   // Utilities
   generateOrderNumber: () => Promise<string>;
   resetDatabase: () => Promise<void>;
-  updateSupplements: () => Promise<void>;
   exportProductsTemplate: () => Promise<{
     categories: any[];
     products: any[];
@@ -995,9 +993,6 @@ ${settings?.receiptFooter || 'Merci de votre visite!'}
       await resetDatabase();
       // Reload window to reinitialize everything
       window.location.reload();
-    },
-    updateSupplements: async () => {
-      await updateSupplements();
     },
     exportProductsTemplate: async () => {
       return await exportProductsTemplate();
