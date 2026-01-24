@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { ChefHat, User as UserIcon, Shield, Check, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChefHat, User as UserIcon, Shield, Check, AlertCircle, Maximize2, Minimize2, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TouchInput } from '@/components/ui/touch-input';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePOS } from '@/contexts/POSContext';
+import { cn } from '@/lib/utils';
+import { LANGUAGES, Language } from '@/lib/i18n';
 
 export function SetupScreen() {
   const { saveUser, loadUsers } = useAuth();
+  const { kioskMode, toggleKioskMode, settings, updateSettings, t } = usePOS();
   const [step, setStep] = useState(1);
   
   // Chef data
@@ -17,6 +21,7 @@ export function SetupScreen() {
   
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false);
 
   const validateStep1 = () => {
     if (!chefName.trim()) {
@@ -104,7 +109,74 @@ export function SetupScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-primary/5 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary/20 via-background to-primary/5 flex items-center justify-center p-4 relative">
+      {/* Toolbar - Fullscreen & Language */}
+      <div className="absolute top-4 right-4 flex items-center gap-2 z-50">
+        {/* Language Selector */}
+        <div className="relative">
+          <button
+            onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+            className={cn(
+              "flex items-center gap-2 px-3 py-2 rounded-xl transition-all",
+              "bg-card/80 backdrop-blur-sm border border-border",
+              "hover:bg-accent/50 active:scale-95"
+            )}
+            title={t('settings.language')}
+          >
+            <Globe className="w-5 h-5" />
+            <span className="text-sm font-medium hidden sm:inline">
+              {LANGUAGES[settings?.language as Language || 'fr-FR']?.name || 'Français'}
+            </span>
+          </button>
+          
+          {/* Language Dropdown */}
+          <AnimatePresence>
+            {showLanguageMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute right-0 mt-2 bg-card border border-border rounded-xl shadow-lg overflow-hidden min-w-[140px]"
+              >
+                {(Object.entries(LANGUAGES) as [Language, typeof LANGUAGES[Language]][]).map(([code, lang]) => (
+                  <button
+                    key={code}
+                    onClick={() => {
+                      updateSettings({ language: code });
+                      setShowLanguageMenu(false);
+                    }}
+                    className={cn(
+                      "w-full px-4 py-3 text-left text-sm transition-all",
+                      "hover:bg-primary/10",
+                      settings?.language === code && "bg-primary/10 text-primary font-medium"
+                    )}
+                  >
+                    {lang.name}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+        
+        {/* Fullscreen Toggle */}
+        <button
+          onClick={toggleKioskMode}
+          className={cn(
+            "flex items-center gap-2 px-3 py-2 rounded-xl transition-all",
+            "bg-card/80 backdrop-blur-sm border border-border",
+            "hover:bg-accent/50 active:scale-95",
+            kioskMode && "bg-primary/10 text-primary border-primary/50"
+          )}
+          title={kioskMode ? t('settings.kioskOff') : t('settings.kioskOn')}
+        >
+          {kioskMode ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+          <span className="text-sm font-medium hidden sm:inline">
+            {kioskMode ? t('auth.exit') : t('auth.kiosk')}
+          </span>
+        </button>
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
