@@ -1,6 +1,6 @@
 {
   "name": "quick-order-hub-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Quick Order Hub - Desktop Application",
   "author": "Doudou Tacos",
   "main": "dist-electron/main.js",
@@ -12,7 +12,7 @@
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "electron:dev": "vite",
-    "electron:build": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false WIN_CSC_LINK= electron-builder",
+    "electron:build": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
     "lint": "eslint ."
   },
   "dependencies": {
@@ -108,7 +108,8 @@
         "nsis"
       ],
       "icon": "build/icon.ico",
-      "sign": false,
+      "sign": null,
+      "verifyUpdateCodeSignature": false,
       "signingHashAlgorithms": []
     },
     "files": [
