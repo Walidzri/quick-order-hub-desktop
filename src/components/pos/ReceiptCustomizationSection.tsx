@@ -12,7 +12,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import { Input } from '@/components/ui/input';
+import { TouchInput } from '@/components/ui/touch-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useDialog } from '@/hooks/use-dialog';
@@ -284,7 +284,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                       {customization.separatorStyle !== 'none' && (
                         <div>
                           <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Caractère de séparation personnalisé</label>
-                          <Input value={customization.separatorChar} onChange={(e) => updateCustomization({ separatorChar: e.target.value || '─' })} maxLength={1} className="w-32 font-mono text-2xl text-center" placeholder="─" />
+                          <TouchInput value={customization.separatorChar} onChange={(value) => updateCustomization({ separatorChar: value || '─' })} maxLength={1} className="w-32 font-mono text-2xl text-center" placeholder="─" />
                         </div>
                       )}
                       <div>
@@ -446,7 +446,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                       {customization.separatorStyle !== 'none' && (
                         <div>
                           <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Caractère de séparation personnalisé</label>
-                          <Input value={customization.separatorChar} onChange={(e) => updateCustomization({ separatorChar: e.target.value || '─' })} maxLength={1} className="w-32 font-mono text-2xl text-center" placeholder="─" />
+                          <TouchInput value={customization.separatorChar} onChange={(value) => updateCustomization({ separatorChar: value || '─' })} maxLength={1} className="w-32 font-mono text-2xl text-center" placeholder="─" />
                         </div>
                       )}
                       <div>
@@ -576,10 +576,11 @@ function LabelInput({ label, value, onChange }: { label: string; value: string; 
       <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-1">
         {label}
       </label>
-      <Input
+      <TouchInput
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={onChange}
         className="text-sm"
+        placeholder={label}
       />
     </div>
   );

@@ -220,11 +220,46 @@ function sendToWindowsPrinter(payload: { content: string; printerName?: string; 
 
     let stderr = '';
     let stdout = '';
+    let hasResolved = false;
+    let timeoutId: NodeJS.Timeout | null = null;
 
     const proc = spawn(exePath, args, {
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
+      detached: false, // Le processus est attaché au parent, se terminera automatiquement
     });
+
+    // Timeout de sécurité : tuer le processus après 30 secondes maximum
+    timeoutId = setTimeout(() => {
+      if (!hasResolved && proc && !proc.killed) {
+        console.error(`[PRINT-DAEMON] ⚠️ Timeout: RawPrinterHelper prend trop de temps, arrêt forcé`);
+        hasResolved = true;
+        try {
+          // Tuer le processus et tous ses enfants
+          proc.kill('SIGTERM');
+          // Si SIGTERM ne fonctionne pas, forcer avec SIGKILL après 2 secondes
+          setTimeout(() => {
+            if (proc && !proc.killed) {
+              console.error(`[PRINT-DAEMON] ⚠️ Force kill du processus`);
+              proc.kill('SIGKILL');
+            }
+          }, 2000);
+        } catch (e) {
+          console.error(`[PRINT-DAEMON] Erreur lors du kill du processus:`, e);
+        }
+        
+        // Nettoyer le fichier temporaire
+        try {
+          if (existsSync(filePath)) {
+            unlinkSync(filePath);
+          }
+        } catch (e) {
+          console.warn(`[PRINT-DAEMON] Failed to delete temp file:`, e);
+        }
+        
+        reject(new Error('RawPrinterHelper: Timeout - le processus a pris plus de 30 secondes et a été arrêté'));
+      }
+    }, 30000); // 30 secondes timeout
 
     proc.stdout?.on('data', (data) => {
       stdout += data.toString();
@@ -235,11 +270,26 @@ function sendToWindowsPrinter(payload: { content: string; printerName?: string; 
     });
 
     proc.on('error', (error) => {
-      console.error(`[PRINT-DAEMON] Spawn error:`, error);
-      reject(new Error(`Failed to execute RawPrinterHelper: ${error.message}. Path: ${exePath}`));
+      if (timeoutId) clearTimeout(timeoutId);
+      if (!hasResolved) {
+        hasResolved = true;
+        console.error(`[PRINT-DAEMON] Spawn error:`, error);
+        reject(new Error(`Failed to execute RawPrinterHelper: ${error.message}. Path: ${exePath}`));
+      }
     });
 
     proc.on('exit', (code, signal) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      
+      if (hasResolved) {
+        // Déjà résolu (timeout ou erreur)
+        return;
+      }
+      hasResolved = true;
+
+      // Le processus s'est terminé normalement
+      console.log(`[PRINT-DAEMON] RawPrinterHelper process exited with code ${code}, signal ${signal}`);
+      
       // Clean up temp file
       try {
         if (existsSync(filePath)) {
@@ -250,13 +300,13 @@ function sendToWindowsPrinter(payload: { content: string; printerName?: string; 
       }
 
       if (code === 0) {
-        console.log(`[PRINT-DAEMON] RawPrinterHelper succeeded`);
+        console.log(`[PRINT-DAEMON] ✅ RawPrinterHelper succeeded`);
         if (stdout) console.log(`[PRINT-DAEMON] stdout:`, stdout);
         resolve({ success: true });
       } else {
         const errorCode = code ?? signal ?? 'unknown';
         const errorMsg = stderr || stdout || 'No error message';
-        console.error(`[PRINT-DAEMON] RawPrinterHelper failed with code ${errorCode}`);
+        console.error(`[PRINT-DAEMON] ❌ RawPrinterHelper failed with code ${errorCode}`);
         console.error(`[PRINT-DAEMON] stderr:`, stderr);
         console.error(`[PRINT-DAEMON] stdout:`, stdout);
         console.error(`[PRINT-DAEMON] File path: ${filePath}`);
