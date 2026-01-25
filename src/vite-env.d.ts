@@ -14,5 +14,15 @@ interface Window {
     platform: string;
     getUserDataPath: () => Promise<string>;
     getIndexedDBPath: () => Promise<string>;
+    writeLog: (logLine: string) => Promise<{ success: boolean; error?: string }>;
+    getDaemonStatus: () => Promise<{
+      running: boolean;
+      status?: string;
+      message?: string;
+      version?: string;
+      error?: string;
+      daemonProcess?: { pid: number | undefined; killed: boolean };
+    }>;
+    restartDaemon: () => Promise<{ success: boolean; message?: string; error?: string }>;
   };
 }

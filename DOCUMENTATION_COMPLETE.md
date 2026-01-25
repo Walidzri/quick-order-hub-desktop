@@ -11,8 +11,9 @@
 7. [Gestion des Données](#gestion-des-données)
 8. [Configuration des Imprimantes](#configuration-des-imprimantes)
 9. [Sauvegarde et Restauration](#sauvegarde-et-restauration)
-10. [Dépannage](#dépannage)
-11. [Développement](#développement)
+10. [Logs et Monitoring](#logs-et-monitoring)
+11. [Dépannage](#dépannage)
+12. [Développement](#développement)
 
 ---
 
@@ -29,8 +30,10 @@
 - ✅ **Gestion d'inventaire** (marchandises, fournisseurs, factures)
 - ✅ **Rapports et statistiques**
 - ✅ **Personnalisation des tickets** (reçu client et ticket cuisine)
-- ✅ **Sauvegarde/Restauration** des données
+- ✅ **Sauvegarde automatique** avec planification flexible (intervalles, quotidienne, hebdomadaire, mensuelle)
+- ✅ **Sauvegarde/Restauration manuelle** des données (format JSON)
 - ✅ **Export/Import de templates** de produits
+- ✅ **Système de logging** centralisé avec persistance des logs
 - ✅ **Multi-langue** (Français/Anglais)
 - ✅ **Clavier virtuel** (QWERTY/AZERTY)
 
@@ -53,8 +56,9 @@
 │         │                              │                   │
 │         ▼                              ▼                   │
 │  ┌──────────────┐              ┌──────────────┐           │
-│  │ File System  │              │  IndexedDB   │           │
-│  │  (Backups)   │              │  (Local DB)  │           │
+│  │ File System  │              │   SQLite     │           │
+│  │  (Backups,   │              │  (Local DB)  │           │
+│  │   Logs)      │              │              │           │
 │  └──────────────┘              └──────────────┘           │
 │         │                              │                   │
 │         └──────────┬───────────────────┘                   │
@@ -86,7 +90,7 @@
 │                                                             │
 │  Base de Données:                                           │
 │  ┌─────────────┐                                            │
-│  │ IndexedDB   │  (Stockage local côté navigateur)         │
+│  │   SQLite    │  (via sql.js, stocké dans localStorage)   │
 │  └─────────────┘                                            │
 │                                                             │
 │  Impression:                                                │
@@ -133,8 +137,10 @@ quick-order-hub-desktop/
 │   │   ├── AuthContext.tsx    # Authentification
 │   │   └── POSContext.tsx     # État global POS
 │   ├── lib/                    # Bibliothèques utilitaires
-│   │   ├── database.ts        # Gestion IndexedDB
+│   │   ├── database.ts        # Interfaces de données
+│   │   ├── database-sqlite.ts # Gestion SQLite (via sql.js)
 │   │   ├── printer.ts         # Gestion impression
+│   │   ├── logger.ts          # Système de logging
 │   │   └── i18n.ts            # Internationalisation
 │   └── pages/                  # Pages de l'application
 │
@@ -740,7 +746,102 @@ IndexedDB: FastFoodPOS
 
 ### Sauvegarde Automatique
 
-L'application sauvegarde automatiquement les données dans IndexedDB. Cependant, pour une sécurité maximale, effectuez des sauvegardes manuelles régulières.
+L'application propose un système de sauvegarde automatique configurable avec plusieurs types de planification :
+
+#### Types de Planification
+
+1. **À intervalles réguliers**
+   - Intervalle configurable en minutes (1 à 10080 minutes = 7 jours)
+   - Exemple : Toutes les 60 minutes, toutes les 4 heures
+
+2. **Quotidienne**
+   - Heure fixe chaque jour (format HH:MM)
+   - Exemple : Tous les jours à 02:00
+
+3. **Hebdomadaire**
+   - Jour de la semaine (0=Dimanche, 6=Samedi) + heure
+   - Exemple : Chaque dimanche à 02:00
+
+4. **Mensuelle**
+   - Jour du mois (1-31) + heure
+   - Exemple : Le 1er de chaque mois à 02:00
+
+#### Configuration
+
+1. Aller dans **Paramètres > Données > Sauvegarde automatique**
+2. Activer la sauvegarde automatique
+3. Choisir le type de planification
+4. Configurer les paramètres selon le type choisi :
+   - **Intervalles** : Définir l'intervalle en minutes
+   - **Quotidienne** : Choisir l'heure (HH:MM)
+   - **Hebdomadaire** : Choisir le jour de la semaine + l'heure
+   - **Mensuelle** : Choisir le jour du mois (1-31) + l'heure
+5. Sélectionner le répertoire de sauvegarde
+6. Les sauvegardes seront créées automatiquement au format JSON
+
+#### Format des Sauvegardes
+
+- **Format** : JSON
+- **Nom** : `backup-YYYY-MM-DD-HH-MM-SS.json`
+- **Contenu** : Toutes les données de l'application (produits, commandes, paramètres, etc.)
+- **Compatibilité** : Compatible avec la fonction d'import/export manuelle
+
+#### Emplacement
+
+Les sauvegardes sont stockées dans le répertoire configuré par l'administrateur. Il est recommandé de choisir un emplacement externe (clé USB, disque réseau) pour une meilleure sécurité.
+
+**Note** : Pour une sécurité maximale, effectuez également des sauvegardes manuelles régulières sur des supports externes.
+
+---
+
+## Logs et Monitoring
+
+### Système de Logging
+
+L'application dispose d'un système de logging centralisé pour faciliter le diagnostic et le monitoring.
+
+#### Niveaux de Log
+
+- **DEBUG** : Informations détaillées (développement uniquement)
+- **INFO** : Informations générales (opérations normales)
+- **WARN** : Avertissements (situations non critiques)
+- **ERROR** : Erreurs (problèmes nécessitant une attention)
+- **FATAL** : Erreurs critiques (bloquant l'application)
+
+#### Emplacement des Logs
+
+Les logs sont stockés dans :
+```
+Windows: C:\Users\[USERNAME]\AppData\Roaming\Quick Order Hub\logs\
+```
+
+Format des fichiers : `app-YYYY-MM-DD.log` (un fichier par jour)
+
+#### Rotation des Logs
+
+- Conservation automatique des 10 derniers jours
+- Les anciens fichiers sont automatiquement supprimés
+- Format JSON pour faciliter l'analyse
+
+#### Consultation des Logs
+
+1. **Via l'explorateur Windows** :
+   - Naviguer vers `%APPDATA%\Quick Order Hub\logs\`
+   - Ouvrir le fichier du jour avec un éditeur de texte
+
+2. **En cas d'erreur** :
+   - Les erreurs sont automatiquement loggées
+   - Consulter le fichier de log correspondant à la date de l'erreur
+   - Rechercher les lignes avec `"level":"ERROR"` ou `"level":"FATAL"`
+
+#### Export des Logs
+
+Pour partager les logs avec le support technique :
+1. Ouvrir le répertoire des logs
+2. Copier le fichier `app-YYYY-MM-DD.log` correspondant
+3. Envoyer le fichier au support
+
+**Note** : Les logs peuvent contenir des informations sensibles. Vérifiez leur contenu avant de les partager.
 
 ---
 
@@ -755,7 +856,7 @@ L'application sauvegarde automatiquement les données dans IndexedDB. Cependant,
 **Solutions** :
 - Vérifier que l'application est bien installée
 - Réinstaller l'application
-- Vérifier les logs dans la console (F12 si DevTools disponibles)
+- Consulter les logs dans `%APPDATA%\Quick Order Hub\logs\` pour plus de détails
 
 #### 2. L'Imprimante ne Fonctionne Pas
 
@@ -781,9 +882,11 @@ L'application sauvegarde automatiquement les données dans IndexedDB. Cependant,
 - Corruption des données
 
 **Solutions** :
-1. Vérifier s'il existe une sauvegarde
-2. Restaurer depuis une sauvegarde
-3. Si aucune sauvegarde : les données sont perdues
+1. Vérifier s'il existe une sauvegarde automatique dans le répertoire configuré
+2. Vérifier s'il existe une sauvegarde manuelle
+3. Restaurer depuis une sauvegarde
+4. Consulter les logs pour identifier la cause
+5. Si aucune sauvegarde : les données sont perdues
 
 #### 4. L'Application est Lente
 

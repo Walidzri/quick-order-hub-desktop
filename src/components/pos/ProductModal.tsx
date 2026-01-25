@@ -211,7 +211,10 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
           initial={{ scale: 0.9, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
-          className="bg-card rounded-2xl w-full max-w-lg max-h-[95vh] sm:max-h-[85vh] overflow-hidden shadow-2xl flex flex-col"
+          className={cn(
+            "bg-card rounded-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl flex flex-col",
+            supplementsProducts.length > 0 ? "max-w-6xl" : "max-w-lg"
+          )}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -244,7 +247,7 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
                 <h3 className="text-sm font-medium text-muted-foreground mb-3">
                   {t('order.size')}
                 </h3>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2 max-w-md">
                   {variants.map((variant) => (
                     <button
                       key={variant.id}
@@ -262,6 +265,59 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
                       </div>
                     </button>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Supplements - Full width grid */}
+            {supplementsProducts.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-muted-foreground mb-3">
+                  Suppléments
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+                  {supplementsProducts.map((supplement) => {
+                    const supplementVariants = getVariantsByProduct(supplement.id);
+                    const isSelected = selectedSupplements.has(supplement.id);
+                    const selectedSup = selectedSupplements.get(supplement.id);
+                    // Use actual selected price if available, otherwise calculate based on selected variant size
+                    const supplementPrice = selectedSup?.price || 
+                      getSupplementPriceForSize(supplement, supplementVariants, selectedVariant?.size);
+
+                    return (
+                      <button
+                        key={supplement.id}
+                        onClick={() => toggleSupplement(supplement)}
+                        className={cn(
+                          "p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 text-left relative touch-target",
+                          "flex items-center justify-between gap-3",
+                          isSelected
+                            ? "border-primary bg-primary/10"
+                            : "border-border hover:border-primary/50 active:bg-muted/50"
+                        )}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-sm flex items-center gap-2">
+                            {supplement.name}
+                            {isSelected && (
+                              <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+                                <Check className="w-3 h-3 text-primary-foreground" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-xs sm:text-sm text-primary font-semibold mt-1">
+                            {formatCurrency(supplementPrice, currency)}
+                            {supplementVariants.length > 1 && !isSelected && selectedVariant && (
+                              <span className="text-muted-foreground text-xs"> ({selectedVariant.size})</span>
+                            )}
+                          </div>
+                        </div>
+                        {!isSelected && (
+                          <div className="w-6 h-6 rounded-full border-2 border-border flex-shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -290,51 +346,6 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
                 </button>
               </div>
             </div>
-
-            {/* Supplements */}
-            {supplementsProducts.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-sm font-medium text-muted-foreground mb-3">
-                  Suppléments
-                </h3>
-                <div className="grid grid-cols-2 gap-2 max-h-[40vh] sm:max-h-48 overflow-y-auto overscroll-contain">
-                  {supplementsProducts.map((supplement) => {
-                    const supplementVariants = getVariantsByProduct(supplement.id);
-                    const isSelected = selectedSupplements.has(supplement.id);
-                    const selectedSup = selectedSupplements.get(supplement.id);
-                    // Use actual selected price if available, otherwise calculate based on selected variant size
-                    const supplementPrice = selectedSup?.price || 
-                      getSupplementPriceForSize(supplement, supplementVariants, selectedVariant?.size);
-
-                    return (
-                      <button
-                        key={supplement.id}
-                        onClick={() => toggleSupplement(supplement)}
-                        className={cn(
-                          "p-3 rounded-xl border-2 transition-all duration-200 text-left relative",
-                          isSelected
-                            ? "border-primary bg-primary/10"
-                            : "border-border hover:border-primary/50"
-                        )}
-                      >
-                        {isSelected && (
-                          <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                            <Check className="w-3 h-3 text-primary-foreground" />
-                          </div>
-                        )}
-                        <div className="font-medium text-sm pr-6">{supplement.name}</div>
-                        <div className="text-xs text-primary font-semibold mt-1">
-                          {formatCurrency(supplementPrice, currency)}
-                          {supplementVariants.length > 1 && !isSelected && selectedVariant && (
-                            <span className="text-muted-foreground"> ({selectedVariant.size})</span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* Note */}
             <div>
@@ -376,28 +387,30 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
 
           {/* Footer - Always visible at bottom */}
           <div className="p-3 sm:p-4 border-t border-border bg-muted/30 flex-shrink-0 sticky bottom-0">
-            {selectedSupplements.size > 0 && (
-              <div className="mb-3 space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{t('product.product')}:</span>
-                  <span>{formatCurrency(basePrice * quantity, currency)}</span>
+            <div className="max-w-md mx-auto">
+              {selectedSupplements.size > 0 && (
+                <div className="mb-3 space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{t('product.product')}:</span>
+                    <span>{formatCurrency(basePrice * quantity, currency)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{t('product.supplements')}:</span>
+                    <span>{formatCurrency(supplementsTotal * quantity, currency)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{t('product.supplements')}:</span>
-                  <span>{formatCurrency(supplementsTotal * quantity, currency)}</span>
-                </div>
-              </div>
-            )}
-            <Button
-              onClick={handleAdd}
-              disabled={!canAdd}
-              className="w-full h-14 sm:h-16 text-base sm:text-lg font-bold gradient-primary border-0"
-            >
-              <span className="flex-1">{t('order.addToCart')}</span>
-              <span className="px-4 py-1 bg-white/20 rounded-lg">
-                {formatCurrency(totalPrice, currency)}
-              </span>
-            </Button>
+              )}
+              <Button
+                onClick={handleAdd}
+                disabled={!canAdd}
+                className="w-full h-14 sm:h-16 text-base sm:text-lg font-bold gradient-primary border-0"
+              >
+                <span className="flex-1">{t('order.addToCart')}</span>
+                <span className="px-4 py-1 bg-white/20 rounded-lg">
+                  {formatCurrency(totalPrice, currency)}
+                </span>
+              </Button>
+            </div>
           </div>
         </motion.div>
       </motion.div>

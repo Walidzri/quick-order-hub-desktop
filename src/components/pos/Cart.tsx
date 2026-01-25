@@ -47,10 +47,12 @@ export function Cart() {
     currency,
     t,
     pendingCartItem,
+    setPendingCartItem,
     createDraftWithType,
     updateDraftType,
     settings,
     printers,
+    addToCart,
   } = usePOS();
 
   const activeDraft: OrderDraft | null = orderDrafts.find(d => d.id === activeOrderId) || orderDrafts[0] || null;
@@ -68,12 +70,16 @@ export function Cart() {
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [editingCartItem, setEditingCartItem] = useState<any | null>(null);
 
-  // Show type modal if there's a pending cart item
+  // Show type modal if there's a pending cart item and no active draft
   useEffect(() => {
-    if (pendingCartItem) {
+    if (pendingCartItem && !activeDraft) {
       setShowOrderType(true);
+    } else if (pendingCartItem && activeDraft) {
+      // If there's a pending item but we have an active draft, add it directly
+      addToCart(pendingCartItem);
+      setPendingCartItem(null);
     }
-  }, [pendingCartItem]);
+  }, [pendingCartItem, activeDraft, addToCart, setPendingCartItem]);
 
   const handleApplyPromo = async () => {
     if (!promoInput.trim()) return;
@@ -427,7 +433,13 @@ export function Cart() {
 
       <OrderTypeModal 
         isOpen={showOrderType} 
-        onClose={() => setShowOrderType(false)} 
+        onClose={() => {
+          setShowOrderType(false);
+          // Clear pending item if user closes modal without selecting
+          if (pendingCartItem) {
+            setPendingCartItem(null);
+          }
+        }} 
         onSelect={handleOrderTypeSelect}
       />
 
@@ -437,16 +449,18 @@ export function Cart() {
         onSelect={handleChangeType}
       />
 
-      {editingCartItem && (
-        <EditCartItemModal
-          item={editingCartItem}
-          onClose={() => setEditingCartItem(null)}
-          onSave={(updates) => {
-            updateCartItem(editingCartItem.id, updates);
-            setEditingCartItem(null);
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {editingCartItem && (
+          <EditCartItemModal
+            item={editingCartItem}
+            onClose={() => setEditingCartItem(null)}
+            onSave={(updates) => {
+              updateCartItem(editingCartItem.id, updates);
+              setEditingCartItem(null);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 }

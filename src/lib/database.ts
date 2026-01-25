@@ -9,10 +9,13 @@ export type OrderStatus = 'draft' | 'sentToKitchen' | 'paid' | 'cancelled';
 export type PaymentMethod = 'cash' | 'card';
 export type OrderType = 'dine-in' | 'takeaway';
 export type PrinterMode = 'queue' | 'tcp';
+// Type de connexion physique de l'imprimante
+// - 'tcp' / 'wifi' / 'bluetooth' : gérés via daemon
+// - 'windows' : impression via daemon local + spooler Windows (RawPrinterHelper)
+export type PrinterConnectionType = 'tcp' | 'bluetooth' | 'wifi' | 'windows';
 export type PrinterRole = 'kitchen' | 'cashier';
 export type PrintJobStatus = 'pending' | 'printed' | 'failed';
 export type PromoType = 'percent' | 'fixed' | 'freeItem';
-export type NumberingStrategy = 'daily' | 'continuous' | 'prefixed';
 export type UserRole = 'admin' | 'caissier' | 'chef';
 export type Size = 'L' | 'XL' | 'XXL' | 'XXXL' | 'petite' | 'grande' | 'Simple' | 'Cheddar' | 'Classique' | 'Double';
 
@@ -101,12 +104,20 @@ export interface Order {
 
 export interface Printer {
   id: string;
+  /** Rôle principal de l'imprimante (pour quel ticket elle sert) */
   role: PrinterRole;
+  /** Mode interne (hérité de l'ancienne implémentation) */
   mode: PrinterMode;
+  /** Type de connexion physique de l'imprimante */
+  connectionType?: PrinterConnectionType;
+  /** Nom lisible de l'imprimante (ex: Cuisine 1, Caisse 2) */
+  name?: string;
   queueName?: string;
   tcpHost?: string;
   tcpPort?: number;
   isThermalPrinter?: boolean; // true for ESC/POS thermal printers, false for regular printers
+  /** Imprimante active ou désactivée (true par défaut si non défini) */
+  enabled?: boolean;
 }
 
 export interface PrintJob {
@@ -151,8 +162,6 @@ export interface ReceiptCustomization {
   showChange: boolean;
   
   // Formatting options
-  orderNumberFormat: string; // Template: "{number}", "{prefix}{number}", etc.
-  orderNumberPadding: number; // Padding zeros
   dateFormat: string; // "DD/MM/YYYY", "MM/DD/YYYY", etc.
   timeFormat: string; // "HH:mm", "hh:mm A", etc.
   
@@ -182,6 +191,8 @@ export interface ReceiptCustomization {
   labelThankYou: string;
   
   // Kitchen ticket specific
+  labelKitchenTicket: string;
+  labelBonAppetit: string;
   kitchenShowOrderNumber: boolean;
   kitchenShowDate: boolean;
   kitchenShowTime: boolean;
@@ -193,6 +204,12 @@ export interface ReceiptCustomization {
   kitchenShowNotes: boolean;
 }
 
+export interface SavedReceiptTemplate {
+  id: string;
+  name: string;
+  customization: ReceiptCustomization;
+}
+
 export interface Settings {
   id: string;
   language: string;
@@ -201,8 +218,6 @@ export interface Settings {
   address: string;
   phone: string;
   logo?: string;
-  numberingStrategy: NumberingStrategy;
-  numberingPrefix: string;
   receiptHeader: string;
   receiptFooter: string;
   showAddress: boolean;
@@ -210,7 +225,22 @@ export interface Settings {
   darkMode: boolean;
   primaryColor: string;
   kioskMode: boolean;
+  uiScale?: number; // UI scale factor (0.5 to 2.0, default: 1.0)
   receiptCustomization?: ReceiptCustomization;
+  /** Modèles de ticket sauvegardés (mode rapide) */
+  savedReceiptTemplates?: SavedReceiptTemplate[];
+  /** Configuration de la sauvegarde automatique */
+  backupEnabled?: boolean; // Activer/désactiver la sauvegarde automatique
+  backupScheduleType?: 'interval' | 'daily' | 'weekly' | 'monthly'; // Type de planification
+  backupInterval?: number; // Intervalle en minutes (pour type 'interval')
+  backupDailyTime?: string; // Heure au format HH:MM (pour type 'daily', ex: "02:00")
+  backupWeeklyDay?: number; // Jour de la semaine 0-6 (0=dimanche, pour type 'weekly')
+  backupWeeklyTime?: string; // Heure au format HH:MM (pour type 'weekly')
+  backupMonthlyDay?: number; // Jour du mois 1-31 (pour type 'monthly')
+  backupMonthlyTime?: string; // Heure au format HH:MM (pour type 'monthly')
+  backupDirectory?: string; // Répertoire de sauvegarde
+  /** Paiement par carte */
+  cardPaymentEnabled?: boolean; // Activer/désactiver le paiement par carte (défaut: false)
 }
 
 export interface NumberingCounter {
@@ -467,20 +497,26 @@ export async function getDB(): Promise<IDBPDatabase<POSDBSchema>> {
 export async function initializeDatabase(): Promise<void> {
   const db = await getDB();
 
-  // Créer l'admin par défaut seulement si AUCUN admin n'existe
+  // Créer/migrer l'admin par défaut
   const allUsers = await db.getAll('users');
-  const hasAdmin = allUsers.some(u => u.role === 'admin');
-  if (!hasAdmin) {
+  const existingAdmin = allUsers.find(u => u.role === 'admin');
+
+  if (!existingAdmin) {
+    // Aucun admin → créer un compte admin par défaut
     const defaultAdmin: User = {
       id: 'admin-default',
-      username: 'administrateur',
-      password: 'admin123', // Mot de passe par défaut
+      username: 'admin',
+      password: 'admin123', // Mot de passe par défaut (sera migré en hash à la première connexion)
       role: 'admin',
       name: 'Administrateur',
       avatar: '👨‍💼',
       createdAt: new Date(),
     };
     await db.put('users', defaultAdmin);
+  } else if (existingAdmin.username === 'administrateur') {
+    // Admin existant avec ancien username → le migrer vers "admin"
+    existingAdmin.username = 'admin';
+    await db.put('users', existingAdmin);
   }
 
   // Check if already initialized (settings exist)
@@ -505,8 +541,6 @@ export async function initializeDatabase(): Promise<void> {
     showTotal: true,
     showAmountReceived: true,
     showChange: true,
-    orderNumberFormat: '{prefix}{number}',
-    orderNumberPadding: 6,
     dateFormat: 'DD/MM/YYYY',
     timeFormat: 'HH:mm',
     headerAlignment: 'center',
@@ -547,8 +581,6 @@ export async function initializeDatabase(): Promise<void> {
     restaurantName: 'Fast Food Restaurant',
     address: '123 Rue Principale',
     phone: '+213 555 123 456',
-    numberingStrategy: 'daily',
-    numberingPrefix: 'CMD',
     receiptHeader: 'Bienvenue!',
     receiptFooter: 'Merci de votre visite!',
     showAddress: true,
@@ -559,19 +591,7 @@ export async function initializeDatabase(): Promise<void> {
     receiptCustomization: defaultReceiptCustomization,
   });
 
-  // Create default printers
-  await db.put('printers', {
-    id: 'kitchen',
-    role: 'kitchen',
-    mode: 'queue',
-  });
-
-  await db.put('printers', {
-    id: 'cashier',
-    role: 'cashier',
-    mode: 'queue',
-  });
-
+  // Aucune imprimante n'est créée par défaut - l'utilisateur les ajoute manuellement
   // No products or categories are seeded - software starts completely empty
 }
 
@@ -698,8 +718,6 @@ export async function resetDatabase(): Promise<void> {
     showTotal: true,
     showAmountReceived: true,
     showChange: true,
-    orderNumberFormat: '{prefix}{number}',
-    orderNumberPadding: 6,
     dateFormat: 'DD/MM/YYYY',
     timeFormat: 'HH:mm',
     headerAlignment: 'center',
@@ -739,8 +757,6 @@ export async function resetDatabase(): Promise<void> {
     restaurantName: 'Fast Food Restaurant',
     address: '123 Rue Principale',
     phone: '+213 555 123 456',
-    numberingStrategy: 'daily',
-    numberingPrefix: 'CMD',
     receiptHeader: 'Bienvenue!',
     receiptFooter: 'Merci de votre visite!',
     showAddress: true,
@@ -748,23 +764,9 @@ export async function resetDatabase(): Promise<void> {
     darkMode: true,
     primaryColor: '#f97316',
     kioskMode: false,
-    receiptCustomization: defaultReceiptCustomization,
-  });
-
-  // Default printers
-  await db.put('printers', {
-    id: 'kitchen',
-    role: 'kitchen',
-    mode: 'queue',
-  });
-
-  await db.put('printers', {
-    id: 'cashier',
-    role: 'cashier',
-    mode: 'queue',
   });
   
-  // Database is now completely empty (no products, no categories, no orders, etc.)
+  // Aucune imprimante par défaut - la base est vide (pas de produits, catégories, commandes, imprimantes, etc.)
 }
 
 /**
@@ -869,8 +871,6 @@ async function seedDatabase(db: IDBPDatabase<POSDBSchema>): Promise<void> {
     showChange: true,
     
     // Formatting options
-    orderNumberFormat: '{prefix}{number}',
-    orderNumberPadding: 6,
     dateFormat: 'DD/MM/YYYY',
     timeFormat: 'HH:mm',
     
@@ -900,6 +900,8 @@ async function seedDatabase(db: IDBPDatabase<POSDBSchema>): Promise<void> {
     labelThankYou: 'MERCI DE VOTRE VISITE !',
     
     // Kitchen ticket specific
+    labelKitchenTicket: 'TICKET CUISINE',
+    labelBonAppetit: 'Bon appétit !',
     kitchenShowOrderNumber: true,
     kitchenShowDate: true,
     kitchenShowTime: true,
@@ -919,8 +921,6 @@ async function seedDatabase(db: IDBPDatabase<POSDBSchema>): Promise<void> {
     restaurantName: 'Fast Food Restaurant',
     address: '123 Rue Principale',
     phone: '+213 555 123 456',
-    numberingStrategy: 'daily',
-    numberingPrefix: 'CMD',
     receiptHeader: 'Bienvenue!',
     receiptFooter: 'Merci de votre visite!',
     showAddress: true,

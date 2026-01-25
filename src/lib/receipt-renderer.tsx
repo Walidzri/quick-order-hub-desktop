@@ -37,12 +37,7 @@ export function renderReceiptHTML({
   const formattedDate = DirectPrinter.formatDate(dateObj, customization.dateFormat);
   const formattedTime = DirectPrinter.formatDate(dateObj, customization.timeFormat);
   
-  // Format order number
-  const formattedOrderNumber = DirectPrinter.formatOrderNumber(
-    order.orderNumber,
-    settings.numberingPrefix || '',
-    customization
-  );
+  const orderNumberDisplay = order.orderNumber;
   
   // Get separator character (use ASCII dash for compatibility)
   const separatorChar = customization.separatorStyle === 'none' ? '' : 
@@ -112,19 +107,24 @@ export function renderReceiptHTML({
       <>
         {/* Kitchen Ticket Header */}
         <div className={`header ${headerAlignClass}`}>
-          <div className="section-title">TICKET CUISINE</div>
+          <div className="section-title">{customization.labelKitchenTicket}</div>
         </div>
 
         <Separator />
 
-        {/* Order Info - Conditional display based on kitchen customization */}
-        {(showOrderNumber || showDate || showTime || showOrderType || showCashier) && (
+        {/* Order number #XXX large, centered, right below TICKET CUISINE */}
+        {showOrderNumber && (
+          <div className="text-center my-4">
+            <span style={{ fontSize: '1.75rem', fontWeight: 700 }}>{orderNumberDisplay}</span>
+          </div>
+        )}
+        {showOrderNumber && <Separator />}
+
+        {/* Order Info - Conditional display based on kitchen customization (no order number here) */}
+        {(showDate || showTime || showOrderType || showCashier) && (
           <>
             <div className="section">
               <div className="order-info">
-                {showOrderNumber && (
-                  <div><strong>{customization.labelOrderNumber}:</strong> {formattedOrderNumber}</div>
-                )}
                 {showOrderType && (
                   <div><strong>{customization.labelOrderType}:</strong> {typeLabel}</div>
                 )}
@@ -209,7 +209,7 @@ export function renderReceiptHTML({
         )}
 
         <div className={`footer ${headerAlignClass}`}>
-          <div>Bon appétit !</div>
+          <div>{customization.labelBonAppetit}</div>
         </div>
       </>
     );
@@ -242,7 +242,7 @@ export function renderReceiptHTML({
 
       <Separator />
 
-      {/* Receipt Header Message */}
+      {/* Receipt Header Message (Bienvenue) */}
       {settings?.receiptHeader && (
         <>
           <div className={`section text-xs mb-3 ${headerAlignClass}`} style={{ whiteSpace: 'pre-line' }}>
@@ -252,17 +252,21 @@ export function renderReceiptHTML({
         </>
       )}
 
-      {/* Order Info - Conditional display based on customization */}
-      {(customization.showOrderNumber || customization.showDate || customization.showTime || customization.showOrderType || customization.showPaymentMethod || customization.showCashier) && (
+      {/* Order number #XXX large, centered, right below Bienvenue */}
+      {customization.showOrderNumber && (
+        <>
+          <div className="text-center my-4">
+            <span style={{ fontSize: '1.75rem', fontWeight: 700 }}>{orderNumberDisplay}</span>
+          </div>
+          <Separator />
+        </>
+      )}
+
+      {/* Order Info - Conditional display (no order number here) */}
+      {(customization.showDate || customization.showTime || customization.showOrderType || customization.showPaymentMethod || customization.showCashier) && (
         <>
           <div className="section mb-4">
             <div className="order-info text-xs space-y-1">
-              {customization.showOrderNumber && (
-                <div className="flex justify-between">
-                  <span className="font-semibold">{customization.labelOrderNumber}:</span>
-                  <span className="font-mono">{formattedOrderNumber}</span>
-                </div>
-              )}
               {customization.showDate && (
                 <div className="flex justify-between">
                   <span className="font-semibold">{customization.labelDate}:</span>

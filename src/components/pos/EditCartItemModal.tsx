@@ -5,12 +5,13 @@ import { formatCurrency } from '@/lib/i18n';
 import { motion } from 'framer-motion';
 import { X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { TouchTextarea } from '@/components/ui/touch-textarea';
 import { cn, generateUUID } from '@/lib/utils';
 
 interface EditCartItemModalProps {
   item: OrderLine;
   onClose: () => void;
-  onSave: (updates: { modifiers: OrderLineModifier[]; variantId?: string; variantSize?: string; unitPrice: number }) => void;
+  onSave: (updates: { modifiers: OrderLineModifier[]; variantId?: string; variantSize?: string; unitPrice: number; note?: string }) => void;
 }
 
 interface SelectedSupplement {
@@ -31,6 +32,7 @@ export function EditCartItemModal({ item, onClose, onSave }: EditCartItemModalPr
     item.variantId ? allVariants.find(v => v.id === item.variantId) || null : null
   );
   const [selectedSupplements, setSelectedSupplements] = useState<Map<string, SelectedSupplement>>(new Map());
+  const [note, setNote] = useState(item.note || '');
 
   // Get supplements category products filtered by product, category, and supplement associations
   const supplementsProducts = useMemo(() => {
@@ -194,15 +196,17 @@ export function EditCartItemModal({ item, onClose, onSave }: EditCartItemModalPr
   };
 
   const handleSave = () => {
-    // Convert selected supplements to modifiers
-    const modifiers: OrderLineModifier[] = Array.from(selectedSupplements.values()).map(sup => ({
-      optionId: sup.supplementVariant?.id || sup.supplementProduct.id,
-      optionName: sup.supplementProduct.name + (sup.supplementVariant ? ` (${sup.supplementVariant.size})` : ''),
-      priceAdjustment: sup.price,
-    }));
+    // Convert selected supplements to modifiers (only if product exists)
+    const modifiers: OrderLineModifier[] = product 
+      ? Array.from(selectedSupplements.values()).map(sup => ({
+          optionId: sup.supplementVariant?.id || sup.supplementProduct.id,
+          optionName: sup.supplementProduct.name + (sup.supplementVariant ? ` (${sup.supplementVariant.size})` : ''),
+          priceAdjustment: sup.price,
+        }))
+      : item.modifiers; // Keep existing modifiers for manual items
     
     // Calculate new unit price
-    const newUnitPrice = hasVariants && selectedVariant 
+    const newUnitPrice = product && hasVariants && selectedVariant 
       ? selectedVariant.price 
       : (product?.basePrice || item.unitPrice);
     
@@ -211,13 +215,15 @@ export function EditCartItemModal({ item, onClose, onSave }: EditCartItemModalPr
       variantId: selectedVariant?.id,
       variantSize: selectedVariant?.size,
       unitPrice: newUnitPrice,
+      note: note.trim() || undefined,
     });
     onClose();
   };
 
-  if (!product) {
-    return null;
-  }
+  // Allow editing even if product is null (for manual items)
+  // if (!product) {
+  //   return null;
+  // }
 
   return (
     <motion.div
@@ -231,7 +237,10 @@ export function EditCartItemModal({ item, onClose, onSave }: EditCartItemModalPr
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="bg-card rounded-2xl w-full max-w-lg max-h-[95vh] sm:max-h-[85vh] overflow-hidden shadow-2xl flex flex-col"
+        className={cn(
+          "bg-card rounded-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl flex flex-col",
+          supplementsProducts.length > 0 ? "max-w-6xl" : "max-w-lg"
+        )}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -252,12 +261,12 @@ export function EditCartItemModal({ item, onClose, onSave }: EditCartItemModalPr
           </div>
 
           {/* Size selection */}
-          {hasVariants && (
+          {product && hasVariants && (
             <div className="mb-6">
               <h3 className="text-sm font-medium text-muted-foreground mb-3">
                 {t('order.size')}
               </h3>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2 max-w-md">
                 {allVariants.map((variant) => (
                   <button
                     key={variant.id}
@@ -279,13 +288,13 @@ export function EditCartItemModal({ item, onClose, onSave }: EditCartItemModalPr
             </div>
           )}
 
-          {/* Supplements */}
-          {supplementsProducts.length > 0 ? (
+          {/* Supplements - Full width grid */}
+          {product && supplementsProducts.length > 0 ? (
             <div className="mb-6">
               <h3 className="text-sm font-medium text-muted-foreground mb-3">
                 {t('general.supplements')}
               </h3>
-              <div className="grid grid-cols-2 gap-2 max-h-[40vh] sm:max-h-64 overflow-y-auto overscroll-contain">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
                 {supplementsProducts.map((supplement) => {
                   const supplementVariants = getVariantsByProduct(supplement.id);
                   const isSelected = selectedSupplements.has(supplement.id);
@@ -298,34 +307,56 @@ export function EditCartItemModal({ item, onClose, onSave }: EditCartItemModalPr
                       key={supplement.id}
                       onClick={() => toggleSupplement(supplement)}
                       className={cn(
-                        "p-3 rounded-xl border-2 transition-all duration-200 text-left relative",
+                        "p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 text-left relative touch-target",
+                        "flex items-center justify-between gap-3",
                         isSelected
                           ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
+                          : "border-border hover:border-primary/50 active:bg-muted/50"
                       )}
                     >
-                      {isSelected && (
-                        <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center">
-                          <Check className="w-3 h-3 text-primary-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-sm flex items-center gap-2">
+                          {supplement.name}
+                          {isSelected && (
+                            <div className="w-5 h-5 bg-primary rounded-full flex items-center justify-center flex-shrink-0">
+                              <Check className="w-3 h-3 text-primary-foreground" />
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <div className="font-medium text-sm pr-6">{supplement.name}</div>
-                      <div className="text-xs text-primary font-semibold mt-1">
-                        {formatCurrency(supplementPrice, currency)}
-                        {supplementVariants.length > 1 && !isSelected && (selectedVariant?.size || item.variantSize) && (
-                          <span className="text-muted-foreground"> ({selectedVariant?.size || item.variantSize})</span>
-                        )}
+                        <div className="text-xs sm:text-sm text-primary font-semibold mt-1">
+                          {formatCurrency(supplementPrice, currency)}
+                          {supplementVariants.length > 1 && !isSelected && (selectedVariant?.size || item.variantSize) && (
+                            <span className="text-muted-foreground text-xs"> ({selectedVariant?.size || item.variantSize})</span>
+                          )}
+                        </div>
                       </div>
+                      {!isSelected && (
+                        <div className="w-6 h-6 rounded-full border-2 border-border flex-shrink-0" />
+                      )}
                     </button>
                   );
                 })}
               </div>
             </div>
-          ) : (
+          ) : product ? (
             <div className="text-center py-8 text-muted-foreground">
               <p>{t('products.noSupplementsAvailable')}</p>
             </div>
-          )}
+          ) : null}
+
+          {/* Note */}
+          <div className="mb-6">
+            <label className="text-sm font-medium text-muted-foreground block mb-2">
+              {t('order.note') || 'Note'}
+            </label>
+            <TouchTextarea
+              value={note}
+              onChange={setNote}
+              placeholder={t('order.notePlaceholder') || 'Ajouter une note pour cet article...'}
+              rows={2}
+              showQuickSuggestions={false}
+            />
+          </div>
         </div>
 
         {/* Footer - Always visible at bottom */}

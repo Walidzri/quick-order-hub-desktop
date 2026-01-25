@@ -20,7 +20,9 @@ import {
   OrderType,
   NumberingCounter,
 } from '@/lib/database';
+import { createBackup } from '@/lib/database-sqlite';
 import { Language, Currency, LANGUAGES, translations } from '@/lib/i18n';
+import { DirectPrinter } from '@/lib/printer';
 
 // Polyfill for crypto.randomUUID (works on HTTP as well)
 function generateUUID(): string {
@@ -109,8 +111,7 @@ interface POSContextType {
   // Printers
   printers: Printer[];
   updatePrinter: (printer: Printer) => Promise<void>;
-  printKitchenTicket: (order: Order) => Promise<void>;
-  printReceipt: (order: Order) => Promise<void>;
+  deletePrinter: (printerId: string) => Promise<void>;
   
   // Utilities
   generateOrderNumber: () => Promise<string>;
@@ -156,17 +157,9 @@ export function POSProvider({ children }: { children: ReactNode }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [variants, setVariants] = useState<ProductVariant[]>([]);
   // Multi-draft cart state
-  const initialDraftId = generateUUID();
-  const [orderDrafts, setOrderDrafts] = useState<OrderDraft[]>([{
-    id: initialDraftId,
-    name: 'Commande 1',
-    type: 'dine-in',
-    cart: [],
-    appliedPromo: null,
-    createdAt: Date.now(),
-  }]);
-  const [activeOrderId, setActiveOrderId] = useState<string | null>(initialDraftId);
-  const [draftCounter, setDraftCounter] = useState<number>(1);
+  // Start with no draft: the first time a produit est ajouté, on demande le type (sur place / à emporter)
+  const [orderDrafts, setOrderDrafts] = useState<OrderDraft[]>([]);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const [currentOrder, setCurrentOrder] = useState<Order | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -206,6 +199,10 @@ export function POSProvider({ children }: { children: ReactNode }) {
           // Apply RTL
           const lang = loadedSettings.language as Language;
           document.documentElement.dir = LANGUAGES[lang]?.dir || 'ltr';
+          
+          // Apply UI scale
+          const uiScale = loadedSettings.uiScale ?? 1.0;
+          document.documentElement.style.setProperty('--ui-scale', uiScale.toString());
         }
         
         // Load categories
@@ -318,6 +315,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
       document.documentElement.dir = LANGUAGES[lang]?.dir || 'ltr';
     }
     
+    // Apply UI scale changes
+    if (updates.uiScale !== undefined) {
+      document.documentElement.style.setProperty('--ui-scale', updates.uiScale.toString());
+    }
+    
     if (updates.kioskMode !== undefined) {
       setKioskMode(updates.kioskMode);
     }
@@ -360,20 +362,25 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const deleteProduct = useCallback(async (productId: string) => {
-    const db = await getDB();
-    // Delete variants first
-    const productVariants = await db.getAllFromIndex('productVariants', 'by-product', productId);
-    for (const variant of productVariants) {
-      await db.delete('productVariants', variant.id);
+    try {
+      const db = await getDB();
+      // Delete variants first
+      const productVariants = await db.getAllFromIndex('productVariants', 'by-product', productId);
+      for (const variant of productVariants) {
+        await db.delete('productVariants', variant.id);
+      }
+      // Delete product
+      await db.delete('products', productId);
+      
+      // Reload products and variants
+      const loadedProducts = await db.getAll('products');
+      setProducts(loadedProducts.sort((a, b) => a.sortOrder - b.sortOrder));
+      const loadedVariants = await db.getAll('productVariants');
+      setVariants(loadedVariants);
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      throw error;
     }
-    // Delete product
-    await db.delete('products', productId);
-    
-    // Reload products and variants
-    const loadedProducts = await db.getAll('products');
-    setProducts(loadedProducts.sort((a, b) => a.sortOrder - b.sortOrder));
-    const loadedVariants = await db.getAll('productVariants');
-    setVariants(loadedVariants);
   }, []);
 
   const loadProducts = useCallback(async () => {
@@ -392,16 +399,21 @@ export function POSProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const deleteCategory = useCallback(async (categoryId: string) => {
-    const db = await getDB();
-    // Check if category has products
-    const allProducts = await db.getAll('products');
-    const productsInCategory = allProducts.filter(p => p.categoryId === categoryId);
-    if (productsInCategory.length > 0) {
-      throw new Error(`Impossible de supprimer cette catégorie car elle contient ${productsInCategory.length} produit(s). Veuillez d'abord supprimer ou déplacer les produits.`);
+    try {
+      const db = await getDB();
+      // Check if category has products
+      const allProducts = await db.getAll('products');
+      const productsInCategory = allProducts.filter(p => p.categoryId === categoryId);
+      if (productsInCategory.length > 0) {
+        throw new Error(`Impossible de supprimer cette catégorie car elle contient ${productsInCategory.length} produit(s). Veuillez d'abord supprimer ou déplacer les produits.`);
+      }
+      await db.delete('categories', categoryId);
+      const loadedCategories = await db.getAll('categories');
+      setCategories(loadedCategories.sort((a, b) => a.sortOrder - b.sortOrder));
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      throw error;
     }
-    await db.delete('categories', categoryId);
-    const loadedCategories = await db.getAll('categories');
-    setCategories(loadedCategories.sort((a, b) => a.sortOrder - b.sortOrder));
   }, []);
 
   const loadCategories = useCallback(async () => {
@@ -566,51 +578,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setOrderDrafts(prev => prev.map(d => d.id === activeOrderId ? { ...d, appliedPromo: null } : d));
   }, [activeOrderId]);
 
-  // Generate order number
+  // Generate order number: single incremental #001, #002, ...
   const generateOrderNumber = useCallback(async (): Promise<string> => {
-    if (!settings) return 'ORD-001';
-    
     const db = await getDB();
-    const today = new Date().toISOString().split('T')[0];
-    
-    if (settings.numberingStrategy === 'daily') {
-      const counterId = `counter-${today}`;
-      let counter = await db.get('numberingCounters', counterId);
-      
-      if (!counter) {
-        counter = { id: counterId, date: today, counter: 0 };
-      }
-      
-      counter.counter += 1;
-      await db.put('numberingCounters', counter);
-      
-      return `${today.replace(/-/g, '')}-${counter.counter.toString().padStart(3, '0')}`;
-    } else if (settings.numberingStrategy === 'prefixed') {
-      const counterId = 'counter-global';
-      let counter = await db.get('numberingCounters', counterId);
-      
-      if (!counter) {
-        counter = { id: counterId, date: '', counter: 0 };
-      }
-      
-      counter.counter += 1;
-      await db.put('numberingCounters', counter);
-      
-      return `${settings.numberingPrefix}-${counter.counter.toString().padStart(4, '0')}`;
-    } else {
-      const counterId = 'counter-global';
-      let counter = await db.get('numberingCounters', counterId);
-      
-      if (!counter) {
-        counter = { id: counterId, date: '', counter: 0 };
-      }
-      
-      counter.counter += 1;
-      await db.put('numberingCounters', counter);
-      
-      return counter.counter.toString().padStart(6, '0');
+    const counterId = 'counter-global';
+    let counter = await db.get('numberingCounters', counterId);
+    if (!counter) {
+      counter = { id: counterId, date: '', counter: 0 };
     }
-  }, [settings]);
+    counter.counter += 1;
+    await db.put('numberingCounters', counter);
+    return `#${counter.counter.toString().padStart(3, '0')}`;
+  }, []);
 
   // Order management
   const createOrder = useCallback(async (): Promise<Order> => {
@@ -640,9 +619,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
     await db.put('orders', order);
 
     // remove the draft we just converted
-    setOrderDrafts(prev => prev.filter(d => d.id !== (draft?.id)));
-    // create a new empty draft and make it active
-    createNewDraft();
+    setOrderDrafts(prev => {
+      const next = prev.filter(d => d.id !== (draft?.id));
+      // If we removed the active draft, select another one or set to null
+      if (activeOrderId === draft?.id) {
+        if (next.length > 0) {
+          setActiveOrderId(next[0].id);
+        } else {
+          setActiveOrderId(null);
+        }
+      }
+      return next;
+    });
+    // Don't create a new draft automatically - let user create one manually if needed
 
     setCurrentOrder(order);
     return order;
@@ -798,131 +787,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setPrinters(allPrinters);
   }, []);
 
+  const deletePrinter = useCallback(async (printerId: string) => {
+    const db = await getDB();
+    await db.delete('printers', printerId);
+    const allPrinters = await db.getAll('printers');
+    setPrinters(allPrinters);
+  }, []);
+
   const printKitchenTicket = useCallback(async (order: Order) => {
-    // Get cashier name if available
-    let cashierName = '';
-    if (order.createdBy) {
-      try {
-        const db = await getDB();
-        const cashier = await db.get('users', order.createdBy);
-        if (cashier) {
-          cashierName = `Caissier: ${cashier.name}\n`; // Keep in French for tickets
-        }
-      } catch (error) {
-        // Ignore error, just don't show cashier name
-      }
-    }
-
-    // Create kitchen ticket content (no prices)
-    const typeLabel = order.type === 'dine-in' ? '🍽️ SUR PLACE' : '📦 À EMPORTER';
-    const content = `
-═══════════════════════════════
-       TICKET CUISINE
-═══════════════════════════════
-Commande: ${order.orderNumber}
-Type: ${typeLabel}
-Date: ${new Date(order.createdAt).toLocaleString()}
-${cashierName}═══════════════════════════════
-
-${order.lines.map(line => `
-${line.quantity}x ${line.productName}
-   ${line.variantSize ? `Taille: ${line.variantSize}` : ''}
-   ${line.modifiers.map(m => `+ (S) ${m.optionName}`).join('\n   ')}
-   ${line.note ? `Note: ${line.note}` : ''}
-`).join('')}
-
-═══════════════════════════════
-    `;
-    
-    // Use browser print
-    const printWindow = window.open('', '', 'width=300,height=600');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Ticket Cuisine - ${order.orderNumber}</title>
-            <style>
-              body { font-family: monospace; font-size: 12px; white-space: pre-wrap; margin: 10px; }
-            </style>
-          </head>
-          <body>${content}</body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
-      printWindow.close();
-    }
+    // Function removed - browser print fallback no longer used
   }, []);
 
   const printReceipt = useCallback(async (order: Order) => {
-    const { formatCurrency } = await import('@/lib/i18n');
-    const curr = (settings?.currency || 'DZD') as Currency;
-    
-    // Get cashier name if available
-    let cashierName = '';
-    if (order.createdBy) {
-      try {
-        const db = await getDB();
-        const cashier = await db.get('users', order.createdBy);
-        if (cashier) {
-          cashierName = `Caissier: ${cashier.name}\n`; // Keep in French for tickets
-        }
-      } catch (error) {
-        // Ignore error, just don't show cashier name
-      }
-    }
-
-    const content = `
-═══════════════════════════════
-     ${settings?.restaurantName || 'Restaurant'}
-═══════════════════════════════
-${settings?.showAddress && settings?.address ? settings.address : ''}
-${settings?.showPhone && settings?.phone ? settings.phone : ''}
-═══════════════════════════════
-${settings?.receiptHeader || ''}
-═══════════════════════════════
-Commande: ${order.orderNumber}
-Date: ${new Date(order.createdAt).toLocaleString()}
-Type: ${order.type === 'dine-in' ? '🍽️ Sur Place' : '📦 À Emporter'}
-Mode: ${order.paymentMethod === 'cash' ? 'Espèces' : 'Carte'}
-${cashierName}═══════════════════════════════
-
-${order.lines.map(line => {
-  const lineTotal = (line.unitPrice + line.modifiers.reduce((s, m) => s + m.priceAdjustment, 0)) * line.quantity;
-  return `
-${line.quantity}x ${line.productName}
-   ${line.variantSize ? `(${line.variantSize})` : ''}
-   ${line.modifiers.map(m => `+ (S) ${m.optionName} ${formatCurrency(m.priceAdjustment, curr)}`).join('\n   ')}
-   ${formatCurrency(lineTotal, curr)}
-`;
-}).join('')}
-
-═══════════════════════════════
-Sous-total: ${formatCurrency(order.subtotal, curr)}
-${order.discount > 0 ? `Remise (${order.promoCode}): -${formatCurrency(order.discount, curr)}` : ''}
-TOTAL: ${formatCurrency(order.total, curr)}
-═══════════════════════════════
-${settings?.receiptFooter || 'Merci de votre visite!'}
-═══════════════════════════════
-    `;
-    
-    const printWindow = window.open('', '', 'width=300,height=600');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Reçu - ${order.orderNumber}</title>
-            <style>
-              body { font-family: monospace; font-size: 12px; white-space: pre-wrap; margin: 10px; }
-            </style>
-          </head>
-          <body>${content}</body>
-        </html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
-      printWindow.close();
-    }
+    // Function removed - browser print fallback no longer used
   }, [settings]);
 
   const toggleKioskMode = useCallback(() => {
@@ -986,8 +863,7 @@ ${settings?.receiptFooter || 'Merci de votre visite!'}
     deletePromotion,
     printers,
     updatePrinter,
-    printKitchenTicket,
-    printReceipt,
+    deletePrinter,
     generateOrderNumber,
     resetDatabase: async () => {
       await resetDatabase();
@@ -1017,6 +893,194 @@ ${settings?.receiptFooter || 'Merci de votre visite!'}
     createDraftWithType,
     updateDraftType,
   };
+
+  // Automatic backup system with multiple schedule types
+  useEffect(() => {
+    if (!settings?.backupEnabled || !settings.backupDirectory) {
+      return;
+    }
+
+    const scheduleType = settings.backupScheduleType || 'interval';
+    let intervalId: NodeJS.Timeout | null = null;
+    let checkIntervalId: NodeJS.Timeout | null = null;
+
+    // Create backup function
+    const performBackup = async () => {
+      try {
+        const backupPath = await createBackup(settings.backupDirectory!);
+        if (backupPath) {
+          console.log('Automatic backup completed:', backupPath);
+        } else {
+          console.error('Automatic backup failed');
+        }
+      } catch (error) {
+        console.error('Error during automatic backup:', error);
+      }
+    };
+
+    // Calculate next backup time based on schedule type
+    const getNextBackupTime = (): number => {
+      const now = new Date();
+      
+      switch (scheduleType) {
+        case 'interval': {
+          const intervalMinutes = settings.backupInterval || 60;
+          return intervalMinutes * 60 * 1000;
+        }
+        
+        case 'daily': {
+          const timeStr = settings.backupDailyTime || '02:00';
+          const [hours, minutes] = timeStr.split(':').map(Number);
+          const backupTime = new Date(now);
+          backupTime.setHours(hours, minutes, 0, 0);
+          
+          // If time has passed today, schedule for tomorrow
+          if (backupTime <= now) {
+            backupTime.setDate(backupTime.getDate() + 1);
+          }
+          
+          return backupTime.getTime() - now.getTime();
+        }
+        
+        case 'weekly': {
+          const dayOfWeek = settings.backupWeeklyDay !== undefined ? settings.backupWeeklyDay : 0; // 0 = Sunday
+          const timeStr = settings.backupWeeklyTime || '02:00';
+          const [hours, minutes] = timeStr.split(':').map(Number);
+          const backupTime = new Date(now);
+          backupTime.setHours(hours, minutes, 0, 0);
+          
+          // Calculate days until next scheduled day
+          const currentDay = now.getDay();
+          let daysUntil = (dayOfWeek - currentDay + 7) % 7;
+          
+          // If it's the same day but time has passed, schedule for next week
+          if (daysUntil === 0 && backupTime <= now) {
+            daysUntil = 7;
+          }
+          
+          backupTime.setDate(backupTime.getDate() + daysUntil);
+          return backupTime.getTime() - now.getTime();
+        }
+        
+        case 'monthly': {
+          const dayOfMonth = settings.backupMonthlyDay !== undefined ? settings.backupMonthlyDay : 1;
+          const timeStr = settings.backupMonthlyTime || '02:00';
+          const [hours, minutes] = timeStr.split(':').map(Number);
+          const backupTime = new Date(now);
+          backupTime.setHours(hours, minutes, 0, 0);
+          backupTime.setDate(dayOfMonth);
+          
+          // If date has passed this month, schedule for next month
+          if (backupTime <= now) {
+            backupTime.setMonth(backupTime.getMonth() + 1);
+          }
+          
+          return backupTime.getTime() - now.getTime();
+        }
+        
+        default:
+          return 60 * 60 * 1000; // Default: 1 hour
+      }
+    };
+
+    // Schedule next backup
+    const scheduleNextBackup = () => {
+      const delay = getNextBackupTime();
+      const delayMinutes = Math.round(delay / 1000 / 60);
+      const delayHours = Math.round(delay / 1000 / 60 / 60);
+      console.log(`Scheduling next backup in ${delayMinutes} minutes (${delayHours} hours)`);
+      
+      if (intervalId) {
+        clearTimeout(intervalId);
+      }
+      
+      intervalId = setTimeout(() => {
+        performBackup();
+        scheduleNextBackup(); // Schedule the next one
+      }, delay);
+    };
+
+    // Check if it's time for backup (for time-based schedules)
+    const checkAndPerformBackup = () => {
+      const now = new Date();
+      let shouldBackup = false;
+      
+      switch (scheduleType) {
+        case 'daily': {
+          const timeStr = settings.backupDailyTime || '02:00';
+          const [hours, minutes] = timeStr.split(':').map(Number);
+          if (now.getHours() === hours && now.getMinutes() === minutes) {
+            shouldBackup = true;
+          }
+          break;
+        }
+        case 'weekly': {
+          const dayOfWeek = settings.backupWeeklyDay !== undefined ? settings.backupWeeklyDay : 0;
+          const timeStr = settings.backupWeeklyTime || '02:00';
+          const [hours, minutes] = timeStr.split(':').map(Number);
+          if (now.getDay() === dayOfWeek && now.getHours() === hours && now.getMinutes() === minutes) {
+            shouldBackup = true;
+          }
+          break;
+        }
+        case 'monthly': {
+          const dayOfMonth = settings.backupMonthlyDay !== undefined ? settings.backupMonthlyDay : 1;
+          const timeStr = settings.backupMonthlyTime || '02:00';
+          const [hours, minutes] = timeStr.split(':').map(Number);
+          if (now.getDate() === dayOfMonth && now.getHours() === hours && now.getMinutes() === minutes) {
+            shouldBackup = true;
+          }
+          break;
+        }
+      }
+      
+      if (shouldBackup) {
+        performBackup();
+      }
+    };
+
+    // Perform initial backup
+    performBackup();
+
+    // Schedule based on type
+    if (scheduleType === 'interval') {
+      // For interval, use setInterval
+      const intervalMinutes = settings.backupInterval || 60;
+      const intervalMs = intervalMinutes * 60 * 1000;
+      console.log(`Starting automatic backup: every ${intervalMinutes} minutes to ${settings.backupDirectory}`);
+      intervalId = setInterval(performBackup, intervalMs) as unknown as NodeJS.Timeout;
+    } else {
+      // For daily/weekly/monthly, use setTimeout with recalculation
+      console.log(`Starting automatic backup: ${scheduleType} schedule to ${settings.backupDirectory}`);
+      scheduleNextBackup();
+      
+      // Check every minute to see if it's time for backup (handles app restarts)
+      checkIntervalId = setInterval(() => {
+        checkAndPerformBackup();
+      }, 60000) as unknown as NodeJS.Timeout; // Check every minute
+    }
+
+    // Cleanup on unmount or when settings change
+    return () => {
+      console.log('Stopping automatic backup');
+      if (intervalId) {
+        clearTimeout(intervalId);
+      }
+      if (checkIntervalId) {
+        clearInterval(checkIntervalId);
+      }
+    };
+  }, [
+    settings?.backupEnabled,
+    settings?.backupDirectory,
+    settings?.backupScheduleType,
+    settings?.backupInterval,
+    settings?.backupDailyTime,
+    settings?.backupWeeklyDay,
+    settings?.backupWeeklyTime,
+    settings?.backupMonthlyDay,
+    settings?.backupMonthlyTime,
+  ]);
 
   return (
     <POSContext.Provider value={value}>

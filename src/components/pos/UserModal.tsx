@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, KeyRound, AlertCircle, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TouchInput } from '@/components/ui/touch-input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { User, UserRole } from '@/lib/database';
@@ -338,12 +339,14 @@ export function UserModal({ isOpen, onClose, user, existingUsers, onSave, t }: U
                       <label className="text-sm font-medium text-muted-foreground block mb-2">
                         Code PIN (4-6 chiffres) *
                       </label>
-                      <TouchInput
-                        type="password"
+                      <NumericInput
                         value={pin}
                         onChange={(v) => setPin(v.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="••••"
-                        className="mt-1 text-center tracking-[0.3em] text-lg"
+                        placeholder="0000"
+                        className="mt-1 text-center text-lg tracking-[0.3em]"
+                        masked
+                        allowDecimal={false}
+                        maxDecimals={0}
                       />
                       {user?.pin && (
                         <p className="text-xs text-muted-foreground mt-1">
@@ -357,12 +360,14 @@ export function UserModal({ isOpen, onClose, user, existingUsers, onSave, t }: U
                         <label className="text-sm font-medium text-muted-foreground block mb-2">
                           Confirmer le code PIN *
                         </label>
-                        <TouchInput
-                          type="password"
+                        <NumericInput
                           value={confirmPin}
                           onChange={(v) => setConfirmPin(v.replace(/\D/g, '').slice(0, 6))}
-                          placeholder="••••"
-                          className="mt-1 text-center tracking-[0.3em] text-lg"
+                          placeholder="0000"
+                          className="mt-1 text-center text-lg tracking-[0.3em]"
+                          masked
+                          allowDecimal={false}
+                          maxDecimals={0}
                         />
                       </div>
                     )}
@@ -391,12 +396,14 @@ export function UserModal({ isOpen, onClose, user, existingUsers, onSave, t }: U
                         <label className="text-sm font-medium text-muted-foreground block mb-2">
                           Code PIN {!user?.pin && '*'}
                         </label>
-                        <TouchInput
-                          type="password"
+                        <NumericInput
                           value={pin}
                           onChange={(v) => setPin(v.replace(/\D/g, '').slice(0, 6))}
-                          placeholder="••••"
+                          placeholder="0000"
                           className="mt-1 text-center tracking-[0.3em]"
+                          masked
+                          allowDecimal={false}
+                          maxDecimals={0}
                         />
                         {user?.pin && (
                           <p className="text-xs text-muted-foreground mt-1">
@@ -410,12 +417,14 @@ export function UserModal({ isOpen, onClose, user, existingUsers, onSave, t }: U
                           <label className="text-sm font-medium text-muted-foreground block mb-2">
                             Confirmer le code PIN
                           </label>
-                          <TouchInput
-                            type="password"
+                          <NumericInput
                             value={confirmPin}
                             onChange={(v) => setConfirmPin(v.replace(/\D/g, '').slice(0, 6))}
-                            placeholder="••••"
+                            placeholder="0000"
                             className="mt-1 text-center tracking-[0.3em]"
+                            masked
+                            allowDecimal={false}
+                            maxDecimals={0}
                           />
                         </div>
                       )}

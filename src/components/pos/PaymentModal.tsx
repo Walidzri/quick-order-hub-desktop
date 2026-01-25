@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { usePOS } from '@/contexts/POSContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/i18n';
-import { PaymentMethod, Order } from '@/lib/database';
+import { PaymentMethod, Order, PrinterConnectionType } from '@/lib/database';
 import { motion } from 'framer-motion';
 import { X, Banknote, CreditCard, Check, Trash2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -63,14 +63,19 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
   // Print kitchen ticket automatically after payment
   const printKitchenTicketAutomatically = async (order: Order) => {
     try {
-      const kitchenPrinter = printers?.find(p => p.role === 'kitchen');
-      if (!kitchenPrinter || !kitchenPrinter.tcpHost) {
-        // Silent fail - kitchen printer might not be configured
+      console.log('[AUTO-KITCHEN] Imprimantes disponibles =', printers);
+      // Toutes les imprimantes cuisine actives
+      const kitchenPrinters = printers?.filter(
+        (p) => p.role === 'kitchen' && p.enabled !== false
+      );
+      console.log('[AUTO-KITCHEN] Imprimantes cuisine actives =', kitchenPrinters);
+      if (!kitchenPrinters || kitchenPrinters.length === 0) {
+        console.log('[AUTO-KITCHEN] Aucune imprimante cuisine ACTIVE définie.');
         return;
       }
 
       // Get customization settings for kitchen ticket
-      const customization = settings?.receiptCustomization;
+      const customization = settings?.receiptCustomization || DirectPrinter.getDefaultCustomization();
       const dateObj = new Date(order.createdAt);
       const formattedDate = customization 
         ? DirectPrinter.formatDate(dateObj, customization.dateFormat)
@@ -96,7 +101,7 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
             quantity: line.quantity,
             name: line.productName,
             size: line.variantSize,
-            modifiers: line.modifiers.map(m => `(S) ${m.optionName}`),
+            modifiers: line.modifiers.map(m => m.optionName),
             note: line.note,
             price: customization?.kitchenShowProductPrices ? formatCurrency(lineTotal, currency) : undefined,
           };
@@ -105,21 +110,136 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
         total: '',
         showPrices: customization?.kitchenShowProductPrices || false,
         customization: customization,
-        numberingPrefix: settings?.numberingPrefix || '',
         isKitchenTicket: true,
       });
 
-      const connection: PrinterConnection = {
-        type: 'network',
-        name: t('printer.kitchenPrinter'),
-        address: kitchenPrinter.tcpHost,
-        port: kitchenPrinter.tcpPort || 9100,
-      };
+      // Impression en parallèle sur toutes les imprimantes cuisine actives
+      await Promise.all(
+        kitchenPrinters.map(async (kitchenPrinter) => {
+          const effectiveConnectionType: PrinterConnectionType =
+            kitchenPrinter.connectionType || 'tcp';
 
-      const printer = new DirectPrinter(connection);
-      // Use printer type from settings (default to false for regular printers)
-      await printer.print(receiptText, kitchenPrinter.isThermalPrinter ?? false);
-      console.log('✅ Kitchen ticket printed automatically after payment');
+          if (
+            (effectiveConnectionType === 'tcp' ||
+              effectiveConnectionType === 'wifi') &&
+            !kitchenPrinter.tcpHost
+          ) {
+            console.log(
+              '[AUTO-KITCHEN] Imprimante cuisine sans IP configurée, ignorée.',
+              kitchenPrinter
+            );
+            return;
+          }
+
+          try {
+            const daemonUrl = 'http://127.0.0.1:9100/print';
+
+            // Impression via daemon : Windows (spooler), Ethernet, Wi‑Fi
+            if (effectiveConnectionType === 'windows') {
+              if (!kitchenPrinter.name) {
+                console.error(
+                  "[AUTO-KITCHEN][Daemon] Nom d'imprimante Windows manquant dans la config.",
+                  kitchenPrinter
+                );
+                return;
+              }
+
+              const body = {
+                connectionType: 'windows',
+                target: { printerName: kitchenPrinter.name },
+                content: receiptText,
+                isThermalPrinter: kitchenPrinter.isThermalPrinter ?? true,
+                role: 'kitchen' as const,
+              };
+
+              console.log('[AUTO-KITCHEN][Daemon] Payload envoyé =', body);
+
+              const response = await fetch(daemonUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+              });
+
+              if (!response.ok) {
+                console.error(
+                  '[AUTO-KITCHEN][Daemon] HTTP error =',
+                  response.status
+                );
+                return;
+              }
+
+              const result = await response.json().catch(() => null);
+              if (!result || result.success !== true) {
+                console.error(
+                  '[AUTO-KITCHEN][Daemon] Erreur côté daemon:',
+                  result
+                );
+                return;
+              }
+
+              console.log(
+                '✅ Kitchen ticket printed automatically via Windows daemon sur',
+                kitchenPrinter.name
+              );
+            } else if (
+              (effectiveConnectionType === 'tcp' ||
+                effectiveConnectionType === 'wifi') &&
+              kitchenPrinter.tcpHost
+            ) {
+              const body = {
+                connectionType: effectiveConnectionType,
+                target: {
+                  host: kitchenPrinter.tcpHost,
+                  port: kitchenPrinter.tcpPort || 9100,
+                },
+                content: receiptText,
+                isThermalPrinter: kitchenPrinter.isThermalPrinter ?? true,
+                role: 'kitchen' as const,
+              };
+
+              console.log('[AUTO-KITCHEN][Daemon] Payload TCP/WiFi envoyé =', body);
+
+              const response = await fetch(daemonUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+              });
+
+              if (!response.ok) {
+                console.error(
+                  '[AUTO-KITCHEN][Daemon] HTTP error =',
+                  response.status
+                );
+                return;
+              }
+
+              const result = await response.json().catch(() => null);
+              if (!result || result.success !== true) {
+                console.error(
+                  '[AUTO-KITCHEN][Daemon] Erreur côté daemon:',
+                  result
+                );
+                return;
+              }
+
+              console.log(
+                '✅ Kitchen ticket printed automatically via Ethernet/Wi‑Fi sur',
+                kitchenPrinter.name
+              );
+            } else {
+              console.log(
+                "[AUTO-KITCHEN] Type de connexion non supporté pour l'auto-impression cuisine:",
+                effectiveConnectionType
+              );
+            }
+          } catch (err) {
+            console.error(
+              '[AUTO-KITCHEN] Erreur sur une imprimante cuisine (non bloquant):',
+              err
+            );
+          }
+        })
+      );
     } catch (error) {
       // Silent fail - don't block payment if kitchen printer fails
       console.error('Kitchen ticket auto-print error (non-blocking):', error);
@@ -266,25 +386,48 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
                   
                   <button
                     onClick={() => setMethod('card')}
+                    disabled={!settings?.cardPaymentEnabled}
                     className={cn(
-                      "p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-2",
-                      method === 'card'
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-primary/50"
+                      "p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-2 relative",
+                      !settings?.cardPaymentEnabled
+                        ? "border-border/30 bg-muted/30 opacity-50 cursor-not-allowed"
+                        : method === 'card'
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
                     )}
+                    title={!settings?.cardPaymentEnabled ? "Paiement par carte désactivé dans les paramètres" : undefined}
                   >
-                    <CreditCard className="w-10 h-10 text-info" />
-                    <span className="font-bold">{t('payment.card')}</span>
+                    <CreditCard className={cn(
+                      "w-10 h-10",
+                      !settings?.cardPaymentEnabled ? "text-muted-foreground" : "text-info"
+                    )} />
+                    <span className={cn(
+                      "font-bold",
+                      !settings?.cardPaymentEnabled && "text-muted-foreground"
+                    )}>
+                      {t('payment.card')}
+                    </span>
+                    {!settings?.cardPaymentEnabled && (
+                      <span className="absolute top-2 right-2 text-xs bg-muted-foreground/20 text-muted-foreground px-2 py-0.5 rounded">
+                        Désactivé
+                      </span>
+                    )}
                   </button>
                 </div>
 
                 <div className="pt-2 flex-shrink-0 sticky bottom-0 bg-card">
                   <Button
                     onClick={() => method === 'cash' ? setStep('cash') : handlePayment()}
+                    disabled={method === 'card' && !settings?.cardPaymentEnabled}
                     className="w-full h-14 text-base sm:text-lg font-bold gradient-primary border-0"
                   >
                     {method === 'cash' ? 'Continuer' : t('payment.confirm')}
                   </Button>
+                  {method === 'card' && !settings?.cardPaymentEnabled && (
+                    <p className="text-xs text-muted-foreground text-center mt-2">
+                      Le paiement par carte est désactivé. Activez-le dans les paramètres.
+                    </p>
+                  )}
                 </div>
               </div>
             )}

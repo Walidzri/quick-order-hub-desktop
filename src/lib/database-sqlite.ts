@@ -10,7 +10,6 @@ export type {
   PrinterRole,
   PrintJobStatus,
   PromoType,
-  NumberingStrategy,
   UserRole,
   Size,
   Category,
@@ -38,7 +37,6 @@ import type {
   PrinterRole,
   PrintJobStatus,
   PromoType,
-  NumberingStrategy,
   UserRole,
   Category,
   ProductVariant,
@@ -113,13 +111,24 @@ async function loadOrCreateDB(): Promise<Database> {
 
 /**
  * Save database to localStorage
+ * Uses chunking to avoid stack overflow with large databases
  */
 function saveDatabase(): void {
   if (!dbInstance) return;
   
   try {
     const data = dbInstance.export();
-    const base64 = btoa(String.fromCharCode(...data));
+    
+    // Convert Uint8Array to base64 in chunks to avoid stack overflow
+    const chunkSize = 8192; // Process 8KB at a time
+    let binaryString = '';
+    
+    for (let i = 0; i < data.length; i += chunkSize) {
+      const chunk = data.slice(i, i + chunkSize);
+      binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    
+    const base64 = btoa(binaryString);
     localStorage.setItem('pos_sqlite_db', base64);
   } catch (error) {
     console.error('Failed to save database:', error);
@@ -306,9 +315,95 @@ function createSchema(db: Database): void {
       showPhone INTEGER NOT NULL DEFAULT 1,
       darkMode INTEGER NOT NULL DEFAULT 0,
       primaryColor TEXT NOT NULL,
-      kioskMode INTEGER NOT NULL DEFAULT 0
+      kioskMode INTEGER NOT NULL DEFAULT 0,
+      uiScale REAL DEFAULT 1.0,
+      receiptCustomization TEXT,
+      savedReceiptTemplates TEXT,
+      backupEnabled INTEGER DEFAULT 0,
+      backupScheduleType TEXT DEFAULT 'interval',
+      backupInterval INTEGER DEFAULT 60,
+      backupDailyTime TEXT,
+      backupWeeklyDay INTEGER,
+      backupWeeklyTime TEXT,
+      backupMonthlyDay INTEGER,
+      backupMonthlyTime TEXT,
+      backupDirectory TEXT,
+      cardPaymentEnabled INTEGER DEFAULT 0
     )
   `);
+  
+  // Migration: Add uiScale column if it doesn't exist
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN uiScale REAL DEFAULT 1.0`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  
+  // Migration: Add backup columns if they don't exist
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN backupEnabled INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN backupScheduleType TEXT DEFAULT 'interval'`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN backupInterval INTEGER DEFAULT 60`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN backupDailyTime TEXT`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN backupWeeklyDay INTEGER`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN backupWeeklyTime TEXT`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN backupMonthlyDay INTEGER`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN backupMonthlyTime TEXT`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN backupDirectory TEXT`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN cardPaymentEnabled INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  
+  // Migration: Add receiptCustomization column if it doesn't exist
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN receiptCustomization TEXT`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
+  
+  // Migration: Add savedReceiptTemplates column if it doesn't exist
+  try {
+    db.run(`ALTER TABLE settings ADD COLUMN savedReceiptTemplates TEXT`);
+  } catch (e) {
+    // Column already exists, ignore error
+  }
   
   // Numbering Counters
   db.run(`
@@ -530,6 +625,9 @@ export class IndexedDBLikeDB {
   
   async delete(store: string, key: string): Promise<void> {
     switch (store) {
+      case 'categories':
+        await this.sqliteDB.deleteCategory(key);
+        break;
       case 'products':
         await this.sqliteDB.deleteProduct(key);
         break;
@@ -651,20 +749,22 @@ function isoToDate(iso: string): Date {
 export async function initializeDatabase(): Promise<void> {
   const db = await getDB();
   
-  // Créer l'admin par défaut seulement si AUCUN admin n'existe
-  const checkAdminStmt = db.prepare('SELECT id FROM users WHERE role = ?');
+  // Créer/migrer l'admin par défaut
+  const checkAdminStmt = db.prepare('SELECT id, username FROM users WHERE role = ?');
   checkAdminStmt.bind(['admin']);
-  const adminExists = checkAdminStmt.step();
+  const hasAdmin = checkAdminStmt.step();
+  const adminRow = hasAdmin ? checkAdminStmt.getAsObject() as { id: string; username: string } : null;
   checkAdminStmt.free();
-  
-  if (!adminExists) {
+
+  if (!hasAdmin) {
+    // Aucun admin → créer un compte admin par défaut
     const insertAdminStmt = db.prepare(`
       INSERT INTO users (id, username, password, role, name, avatar, createdAt)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
     insertAdminStmt.run([
       'admin-default',
-      'administrateur',
+      'admin',
       'admin123', // Mot de passe par défaut
       'admin',
       'Administrateur',
@@ -672,6 +772,12 @@ export async function initializeDatabase(): Promise<void> {
       dateToISO(new Date()),
     ]);
     insertAdminStmt.free();
+    saveDatabase();
+  } else if (adminRow && adminRow.username === 'administrateur') {
+    // Admin existant avec ancien username → le migrer vers "admin"
+    const updateStmt = db.prepare('UPDATE users SET username = ? WHERE id = ?');
+    updateStmt.run(['admin', adminRow.id]);
+    updateStmt.free();
     saveDatabase();
   }
   
@@ -845,8 +951,8 @@ async function seedDatabase(db: Database): Promise<void> {
     'Fast Food Restaurant',
     '123 Rue Principale',
     '+213 555 123 456',
-    'daily',
-    'CMD',
+    'continuous',
+    '',
     'Bienvenue!',
     'Merci de votre visite!',
     1,
@@ -1165,6 +1271,17 @@ export class SQLiteDB {
     return undefined;
   }
   
+  async deleteCategory(id: string): Promise<void> {
+    const stmt = this.db.prepare('DELETE FROM categories WHERE id = ?');
+    stmt.run([id]);
+    stmt.free();
+    // Ensure dbInstance is synchronized with this.db for saveDatabase()
+    if (dbInstance !== this.db) {
+      dbInstance = this.db;
+    }
+    saveDatabase();
+  }
+  
   async putCategory(category: Category): Promise<void> {
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO categories (id, name, sortOrder, icon, image)
@@ -1172,6 +1289,10 @@ export class SQLiteDB {
     `);
     stmt.run([category.id, category.name, category.sortOrder, category.icon || null, category.image || null]);
     stmt.free();
+    // Ensure dbInstance is synchronized with this.db for saveDatabase()
+    if (dbInstance !== this.db) {
+      dbInstance = this.db;
+    }
     saveDatabase();
   }
   
@@ -1259,6 +1380,10 @@ export class SQLiteDB {
       product.image || null,
     ]);
     stmt.free();
+    // Ensure dbInstance is synchronized with this.db for saveDatabase()
+    if (dbInstance !== this.db) {
+      dbInstance = this.db;
+    }
     saveDatabase();
   }
   
@@ -1271,6 +1396,10 @@ export class SQLiteDB {
     const stmt = this.db.prepare('DELETE FROM products WHERE id = ?');
     stmt.run([id]);
     stmt.free();
+    // Ensure dbInstance is synchronized with this.db for saveDatabase()
+    if (dbInstance !== this.db) {
+      dbInstance = this.db;
+    }
     saveDatabase();
   }
   
@@ -1357,8 +1486,6 @@ export class SQLiteDB {
         address: row.address as string,
         phone: row.phone as string,
         logo: row.logo as string | undefined,
-        numberingStrategy: row.numberingStrategy as NumberingStrategy,
-        numberingPrefix: row.numberingPrefix as string,
         receiptHeader: row.receiptHeader as string,
         receiptFooter: row.receiptFooter as string,
         showAddress: (row.showAddress as number) === 1,
@@ -1366,6 +1493,19 @@ export class SQLiteDB {
         darkMode: (row.darkMode as number) === 1,
         primaryColor: row.primaryColor as string,
         kioskMode: (row.kioskMode as number) === 1,
+        uiScale: row.uiScale !== undefined && row.uiScale !== null ? (row.uiScale as number) : undefined,
+        receiptCustomization: row.receiptCustomization ? deserializeJSON(row.receiptCustomization as string) : undefined,
+        savedReceiptTemplates: row.savedReceiptTemplates ? deserializeJSON(row.savedReceiptTemplates as string) : undefined,
+        backupEnabled: row.backupEnabled !== undefined && row.backupEnabled !== null ? (row.backupEnabled as number) === 1 : false,
+        backupScheduleType: (row.backupScheduleType as 'interval' | 'daily' | 'weekly' | 'monthly') || 'interval',
+        backupInterval: row.backupInterval !== undefined && row.backupInterval !== null ? (row.backupInterval as number) : 60,
+        backupDailyTime: row.backupDailyTime as string | undefined,
+        backupWeeklyDay: row.backupWeeklyDay !== undefined && row.backupWeeklyDay !== null ? (row.backupWeeklyDay as number) : undefined,
+        backupWeeklyTime: row.backupWeeklyTime as string | undefined,
+        backupMonthlyDay: row.backupMonthlyDay !== undefined && row.backupMonthlyDay !== null ? (row.backupMonthlyDay as number) : undefined,
+        backupMonthlyTime: row.backupMonthlyTime as string | undefined,
+        backupDirectory: row.backupDirectory as string | undefined,
+        cardPaymentEnabled: row.cardPaymentEnabled !== undefined && row.cardPaymentEnabled !== null ? (row.cardPaymentEnabled as number) === 1 : false,
       };
     }
     stmt.free();
@@ -1377,8 +1517,9 @@ export class SQLiteDB {
       INSERT OR REPLACE INTO settings (
         id, language, currency, restaurantName, address, phone, logo,
         numberingStrategy, numberingPrefix, receiptHeader, receiptFooter,
-        showAddress, showPhone, darkMode, primaryColor, kioskMode
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        showAddress, showPhone, darkMode, primaryColor, kioskMode, uiScale, receiptCustomization, savedReceiptTemplates,
+        backupEnabled, backupScheduleType, backupInterval, backupDailyTime, backupWeeklyDay, backupWeeklyTime, backupMonthlyDay, backupMonthlyTime, backupDirectory, cardPaymentEnabled
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run([
       settings.id,
@@ -1388,8 +1529,8 @@ export class SQLiteDB {
       settings.address,
       settings.phone,
       settings.logo || null,
-      settings.numberingStrategy,
-      settings.numberingPrefix,
+      'continuous',
+      '',
       settings.receiptHeader,
       settings.receiptFooter,
       settings.showAddress ? 1 : 0,
@@ -1397,6 +1538,19 @@ export class SQLiteDB {
       settings.darkMode ? 1 : 0,
       settings.primaryColor,
       settings.kioskMode ? 1 : 0,
+      settings.uiScale !== undefined ? settings.uiScale : 1.0,
+      settings.receiptCustomization ? serializeJSON(settings.receiptCustomization) : null,
+      settings.savedReceiptTemplates ? serializeJSON(settings.savedReceiptTemplates) : null,
+      settings.backupEnabled ? 1 : 0,
+      settings.backupScheduleType || 'interval',
+      settings.backupInterval !== undefined ? settings.backupInterval : 60,
+      settings.backupDailyTime || null,
+      settings.backupWeeklyDay !== undefined ? settings.backupWeeklyDay : null,
+      settings.backupWeeklyTime || null,
+      settings.backupMonthlyDay !== undefined ? settings.backupMonthlyDay : null,
+      settings.backupMonthlyTime || null,
+      settings.backupDirectory || null,
+      settings.cardPaymentEnabled ? 1 : 0,
     ]);
     stmt.free();
     saveDatabase();
@@ -2240,4 +2394,97 @@ export class SQLiteDB {
 export async function getSQLiteDB(): Promise<SQLiteDB> {
   const db = await loadOrCreateDB();
   return new SQLiteDB(db);
+}
+
+/**
+ * Export database as Uint8Array for backup
+ */
+export async function exportDatabase(): Promise<Uint8Array> {
+  const db = await loadOrCreateDB();
+  return db.export();
+}
+
+/**
+ * Export database as base64 string for backup
+ * Uses chunking to avoid stack overflow with large databases
+ */
+export async function exportDatabaseAsBase64(): Promise<string> {
+  const data = await exportDatabase();
+  
+  // Convert Uint8Array to base64 in chunks to avoid stack overflow
+  const chunkSize = 8192; // Process 8KB at a time
+  let binaryString = '';
+  
+  for (let i = 0; i < data.length; i += chunkSize) {
+    const chunk = data.slice(i, i + chunkSize);
+    binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+  }
+  
+  return btoa(binaryString);
+}
+
+/**
+ * Create a backup of the database to a JSON file (compatible with existing import/export)
+ * @param directory Directory where to save the backup
+ * @returns Path to the saved backup file or null if failed
+ */
+export async function createBackup(directory: string): Promise<string | null> {
+  try {
+    // Check if Electron API is available
+    if (typeof window === 'undefined' || !window.electronAPI) {
+      console.error('Electron API not available for backup');
+      return null;
+    }
+
+    // Generate backup filename with timestamp
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const filename = `backup_${timestamp}.json`;
+    const filePath = directory ? `${directory}/${filename}` : filename;
+
+    // Get database wrapper
+    const { getDB } = await import('@/lib/database');
+    const db = await getDB();
+
+    // Export all data from all stores (same format as manual export)
+    const backupData = {
+      version: '1.0.0',
+      exportDate: new Date().toISOString(),
+      data: {
+        categories: await db.getAll('categories'),
+        products: await db.getAll('products'),
+        productVariants: await db.getAll('productVariants'),
+        modifierGroups: await db.getAll('modifierGroups'),
+        modifierOptions: await db.getAll('modifierOptions'),
+        orders: await db.getAll('orders'),
+        printers: await db.getAll('printers'),
+        printJobs: await db.getAll('printJobs'),
+        promotions: await db.getAll('promotions'),
+        settings: await db.getAll('settings'),
+        numberingCounters: await db.getAll('numberingCounters'),
+        users: await db.getAll('users'),
+        userSessions: await db.getAll('userSessions'),
+        suppliers: await db.getAll('suppliers'),
+        inventoryItems: await db.getAll('inventoryItems'),
+        invoices: await db.getAll('invoices'),
+      },
+    };
+
+    const jsonData = JSON.stringify(backupData, null, 2);
+
+    // Save to file using Electron API (saveBackup expects string data)
+    const result = await window.electronAPI.saveBackup(jsonData, filePath);
+
+    if (result.success) {
+      console.log('Backup created successfully:', filePath);
+      console.log(`Backup contains: ${backupData.data.categories.length} categories, ${backupData.data.products.length} products, ${backupData.data.orders.length} orders`);
+      return filePath;
+    } else {
+      console.error('Failed to create backup');
+      return null;
+    }
+  } catch (error) {
+    console.error('Error creating backup:', error);
+    return null;
+  }
 }

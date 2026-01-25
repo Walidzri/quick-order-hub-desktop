@@ -362,6 +362,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'printer.serverMustBeStarted': 'Le serveur d\'impression doit être démarré sur localhost:3001',
     'printer.ensureServerStarted': 'Assurez-vous que le serveur d\'impression est démarré et que l\'imprimante est accessible sur le réseau.',
     'printer.kitchenPrinter': 'Imprimante cuisine',
+    'printer.cashierPrinter': 'Imprimante caisse',
     'printer.printerType': 'Type d\'imprimante',
     'printer.printerTypeDesc': 'Imprimante thermique ESC/POS',
     'printer.thermalPrinterNote': 'Imprimante thermique ESC/POS (utilise les commandes spéciales)',
@@ -715,6 +716,7 @@ export const translations: Record<Language, Record<string, string>> = {
     
     // Printer
     'printer.kitchenPrinter': 'Kitchen Printer',
+    'printer.cashierPrinter': 'Cashier Printer',
     'printer.printerType': 'Printer Type',
     'printer.printerTypeDesc': 'Thermal ESC/POS Printer',
     'printer.thermalPrinterNote': 'Thermal ESC/POS printer (uses special commands)',
@@ -829,6 +831,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'settings.kitchenPrinter': 'طابعة المطبخ',
     'settings.cashierPrinter': 'طابعة الصندوق',
     'printer.kitchenPrinter': 'طابعة المطبخ',
+    'printer.cashierPrinter': 'طابعة الصندوق',
     'printer.printerType': 'نوع الطابعة',
     'printer.printerTypeDesc': 'طابعة حرارية ESC/POS',
     'printer.thermalPrinterNote': 'طابعة حرارية ESC/POS (تستخدم أوامر خاصة)',

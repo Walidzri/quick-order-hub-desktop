@@ -33,9 +33,16 @@ try {
   // Platform info
   platform: process.platform,
   
-  // App paths
-  getUserDataPath: () => ipcRenderer.invoke('app:getUserDataPath'),
-  getIndexedDBPath: () => ipcRenderer.invoke('app:getIndexedDBPath'),
+    // App paths
+    getUserDataPath: () => ipcRenderer.invoke('app:getUserDataPath'),
+    getIndexedDBPath: () => ipcRenderer.invoke('app:getIndexedDBPath'),
+    
+    // Logging API
+    writeLog: (logLine: string) => ipcRenderer.invoke('log:write', logLine),
+    
+    // Print daemon API
+    getDaemonStatus: () => ipcRenderer.invoke('daemon:status'),
+    restartDaemon: () => ipcRenderer.invoke('daemon:restart'),
 });
   
   if (process.env.NODE_ENV === 'development') {

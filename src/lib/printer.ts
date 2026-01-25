@@ -2,7 +2,7 @@
 import { ReceiptCustomization } from './database';
 
 export interface PrinterConnection {
-  type: 'usb' | 'network' | 'bluetooth';
+  type: 'network' | 'bluetooth';
   name: string;
   address?: string; // IP address for network printers
   port?: number; // Port for network printers (default 9100 for raw printing)
@@ -107,40 +107,8 @@ export class DirectPrinter {
     return bytes;
   }
 
-  // Print via Web USB (for USB printers)
-  async printViaUSB(content: string, isThermalPrinter: boolean = true): Promise<void> {
-    if (!navigator.usb) {
-      throw new Error('Web USB API is not available. Please use HTTPS or localhost.');
-    }
-
-    try {
-      // Request USB device
-      const device = await navigator.usb.requestDevice({
-        filters: [
-          { classCode: 7 }, // Printer class
-        ],
-      });
-
-      await device.open();
-      await device.selectConfiguration(1);
-      await device.claimInterface(0);
-
-      // Format and send data
-      const data = this.formatReceipt(content, isThermalPrinter);
-      
-      // Send data to printer
-      await device.transferOut(1, data);
-
-      await device.releaseInterface(0);
-      await device.close();
-    } catch (error) {
-      console.error('USB print error:', error);
-      throw new Error(`Erreur d'impression USB: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
-    }
-  }
-
   // Print via Network (TCP/IP for network printers)
-  // In Electron, we can use the Electron API for direct printing
+  // Always use the integrated daemon API for consistency
   async printViaNetwork(content: string, isThermalPrinter: boolean = true): Promise<void> {
     if (!this.connection?.address) {
       throw new Error('Adresse réseau non configurée');
@@ -154,57 +122,47 @@ export class DirectPrinter {
       return this.printViaWebSocket(content, address, isThermalPrinter);
     }
 
-    // In Electron, use the Electron API for direct printing (no server needed!)
-    if (typeof window !== 'undefined' && window.electronAPI) {
-      try {
-        const result = await window.electronAPI.printDirect(
-          content,
-          address,
-          port,
-          isThermalPrinter
-        );
-        if (!result.success) {
-          throw new Error('Erreur lors de l\'impression');
-        }
-        return;
-      } catch (error) {
-        console.error('Electron print error:', error);
-        throw error;
-      }
-    }
-
-    // Fallback to backend print server (only for web version, not needed in Electron)
+    // Use the integrated daemon API (always, even in Electron)
+    // This ensures consistent behavior and avoids needing printer names
+    const daemonUrl = 'http://127.0.0.1:9100/print';
+    
     try {
-      const printServerUrl = import.meta.env.VITE_PRINT_SERVER_URL || 'http://localhost:3001';
-      const proxyUrl = `${printServerUrl}/print`;
-      
-      const response = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const body = {
+        connectionType: 'tcp', // Use 'tcp' for all network printers (IP/WiFi)
+        target: {
+          host: address,
+          port: port,
         },
-        body: JSON.stringify({
-          printer: {
-            address,
-            port,
-          },
-          data: Array.from(this.formatReceipt(content, isThermalPrinter)),
-          isThermalPrinter,
-        }),
+        content: content,
+        isThermalPrinter: isThermalPrinter,
+        role: 'cashier' as const,
+      };
+
+      console.log('[PRINTER] Sending to daemon via TCP/IP:', { address, port, isThermalPrinter });
+
+      const response = await fetch(daemonUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Erreur inconnue' }));
-        throw new Error(errorData.message || `Erreur du serveur d'impression: ${response.status}`);
+        const result = await response.json().catch(() => null);
+        const errorMsg = result?.message || result?.error || `HTTP ${response.status}`;
+        throw new Error(`Erreur daemon d'impression: ${errorMsg}`);
       }
 
       const result = await response.json();
-      console.log('Print success:', result);
+      if (!result || result.success !== true) {
+        throw new Error(result?.message || 'Erreur lors de l\'impression');
+      }
+
+      console.log('[PRINTER] Print successful via daemon');
     } catch (error) {
-      console.error('Network print error:', error);
+      console.error('[PRINTER] Network print error:', error);
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error(
-          `Serveur d'impression non accessible. Assurez-vous que le serveur d'impression est démarré sur ${printServerUrl}`
+          'Daemon d\'impression non accessible. Vérifiez qu\'il est démarré.'
         );
       }
       throw error;
@@ -243,8 +201,6 @@ export class DirectPrinter {
     }
 
     switch (this.connection.type) {
-      case 'usb':
-        return this.printViaUSB(content, isThermalPrinter);
       case 'network':
         // Try direct network first, fallback to WebSocket if configured
         if (this.connection.address?.startsWith('ws://') || this.connection.address?.startsWith('wss://')) {
@@ -258,6 +214,14 @@ export class DirectPrinter {
         throw new Error(`Type de connexion non supporté: ${this.connection.type}`);
     }
   }
+
+  // ESC/POS raw strings for use in static formatTextReceipt (order number large, centered)
+  private static ESC = '\x1B';
+  private static escCenter = '\x1Ba\x01';
+  private static escLeft = '\x1Ba\x00';
+  private static escRight = '\x1Ba\x02';
+  private static escDoubleSize = '\x1B!\x11'; // (2-1)|((2-1)<<4)
+  private static escNormalSize = '\x1B!\x00';
 
   // Get default customization
   static getDefaultCustomization(): ReceiptCustomization {
@@ -277,8 +241,6 @@ export class DirectPrinter {
       showTotal: true,
       showAmountReceived: true,
       showChange: true,
-      orderNumberFormat: '{prefix}{number}',
-      orderNumberPadding: 6,
       dateFormat: 'DD/MM/YYYY',
       timeFormat: 'HH:mm',
       headerAlignment: 'center',
@@ -300,6 +262,8 @@ export class DirectPrinter {
       labelAmountReceived: 'MONTANT REÇU',
       labelChange: 'MONNAIE',
       labelThankYou: 'MERCI DE VOTRE VISITE !',
+      labelKitchenTicket: 'TICKET CUISINE',
+      labelBonAppetit: 'Bon appétit !',
       kitchenShowOrderNumber: true,
       kitchenShowDate: true,
       kitchenShowTime: true,
@@ -330,65 +294,6 @@ export class DirectPrinter {
       .replace('hh', hours12)
       .replace('mm', minutes)
       .replace('A', ampm);
-  }
-
-  // Format order number according to template
-  // The orderNumber stored in DB may already be formatted according to numbering strategy:
-  // - daily: "20240101-001" (YYYYMMDD-NNN) - keep original format as-is
-  // - prefixed: "CMD-0001" (PREFIX-NNNN) - apply customization format
-  // - continuous: "000001" (NNNNNN) - apply customization format
-  // We need to detect the format and apply the customization format accordingly
-  static formatOrderNumber(orderNumber: string, prefix: string, customization: ReceiptCustomization): string {
-    // Detect if it's a daily format (8 digits-date followed by dash and number)
-    const dailyMatch = orderNumber.match(/^(\d{8})-(\d+)$/);
-    if (dailyMatch) {
-      // Daily format: keep the original format exactly as stored (same as in order history)
-      // Don't apply customization padding, just return the original format
-      return orderNumber;
-    }
-    
-    // Detect if it's a prefixed format (letters/prefix followed by dash and number)
-    const prefixedMatch = orderNumber.match(/^([A-Za-z]+)-(\d+)$/);
-    if (prefixedMatch) {
-      // Prefixed format: extract number and apply customization format with prefix
-      const numPart = prefixedMatch[2];
-      const actualNumber = parseInt(numPart, 10) || 0;
-      const padded = actualNumber.toString().padStart(customization.orderNumberPadding, '0');
-      
-      return customization.orderNumberFormat
-        .replace('{prefix}', prefix)
-        .replace('{number}', padded);
-    }
-    
-    // Continuous format: just numbers, apply customization format
-    const digitsOnly = orderNumber.replace(/\D/g, '');
-    if (digitsOnly) {
-      const actualNumber = parseInt(digitsOnly, 10) || 0;
-      const padded = actualNumber.toString().padStart(customization.orderNumberPadding, '0');
-      
-      // For continuous, use prefix only if format includes it
-      if (customization.orderNumberFormat.includes('{prefix}')) {
-        return customization.orderNumberFormat
-          .replace('{prefix}', prefix)
-          .replace('{number}', padded);
-      } else {
-        return customization.orderNumberFormat
-          .replace('{number}', padded);
-      }
-    }
-    
-    // Fallback: try to extract any number and format it
-    const match = orderNumber.match(/(\d+)$/);
-    if (match) {
-      const actualNumber = parseInt(match[1], 10) || 0;
-      const padded = actualNumber.toString().padStart(customization.orderNumberPadding, '0');
-      return customization.orderNumberFormat
-        .replace('{prefix}', prefix)
-        .replace('{number}', padded);
-    }
-    
-    // Last resort: return as-is
-    return orderNumber;
   }
 
   // Clean text for ESC/POS printer compatibility (remove emojis, special Unicode chars)
@@ -446,14 +351,15 @@ export class DirectPrinter {
 
   // Apply text style
   static applyTextStyle(text: string, style: 'normal' | 'uppercase' | 'lowercase'): string {
-    let cleaned = this.cleanTextForPrinter(text);
+    // Don't clean again if text is already cleaned
+    // Just apply the style transformation
     switch (style) {
       case 'uppercase':
-        return cleaned.toUpperCase();
+        return text.toUpperCase();
       case 'lowercase':
-        return cleaned.toLowerCase();
+        return text.toLowerCase();
       default:
-        return cleaned;
+        return text;
     }
   }
 
@@ -484,11 +390,9 @@ export class DirectPrinter {
     change?: string;
     showPrices: boolean;
     customization?: ReceiptCustomization;
-    numberingPrefix?: string;
     isKitchenTicket?: boolean;
   }): string {
     const custom = data.customization || this.getDefaultCustomization();
-    const prefix = data.numberingPrefix || '';
     const isKitchen = data.isKitchenTicket || false;
     const width = 48; // Standard thermal printer width (80mm)
     // Use simple dash for separator to avoid encoding issues
@@ -509,54 +413,89 @@ export class DirectPrinter {
     const showNotes = isKitchen ? custom.kitchenShowNotes : custom.showNotes;
     
     let receipt = '';
+    const bigOrderNumberBlock = () => {
+      if (!showOrderNumber) return;
+      const num = this.cleanTextForPrinter(data.orderNumber);
+      receipt += DirectPrinter.escCenter + DirectPrinter.escDoubleSize + num + '\n' + DirectPrinter.escNormalSize + DirectPrinter.escLeft;
+      if (custom.separatorStyle !== 'none') receipt += '\n' + separator;
+      receipt += '\n';
+    };
     
-    // Header with customizable alignment
     receipt += '\n';
-    if (data.restaurantName) {
-      const name = this.applyTextStyle(data.restaurantName, custom.restaurantNameStyle);
-      // Simple center alignment calculation
-      const padding = Math.max(0, Math.floor((width - name.length) / 2));
+    if (isKitchen) {
+      // Kitchen: TICKET CUISINE → #XXX large, centered
+      // Use ESC/POS alignment command based on headerAlignment (same as receipt)
+      const cleanedTitle = this.cleanTextForPrinter(custom.labelKitchenTicket);
+      const title = this.applyTextStyle(cleanedTitle, 'normal');
       if (custom.headerAlignment === 'center') {
-        receipt += ' '.repeat(padding) + name + '\n';
+        receipt += DirectPrinter.escCenter + title + '\n' + DirectPrinter.escLeft;
       } else if (custom.headerAlignment === 'right') {
-        receipt += ' '.repeat(Math.max(0, width - name.length)) + name + '\n';
+        receipt += DirectPrinter.escRight + title + '\n' + DirectPrinter.escLeft;
       } else {
-        receipt += name + '\n';
+        receipt += title + '\n';
       }
-      if (custom.separatorStyle !== 'none') {
+      if (custom.separatorStyle !== 'none') receipt += '\n' + separator;
+      receipt += '\n';
+      bigOrderNumberBlock();
+    } else {
+      // Receipt: restaurant, address, phone, Bienvenue (header) → #XXX large, centered
+      if (data.restaurantName) {
+        // Use ESC/POS alignment commands (like order number) instead of manual spacing
+        const cleanedName = this.cleanTextForPrinter(data.restaurantName);
+        const name = this.applyTextStyle(cleanedName, custom.restaurantNameStyle);
+        if (custom.headerAlignment === 'center') {
+          receipt += DirectPrinter.escCenter + name + '\n' + DirectPrinter.escLeft;
+        } else if (custom.headerAlignment === 'right') {
+          receipt += DirectPrinter.escRight + name + '\n' + DirectPrinter.escLeft;
+        } else {
+          receipt += name + '\n';
+        }
+        if (custom.separatorStyle !== 'none') receipt += '\n' + separator;
+        receipt += '\n';
+      }
+      if (data.address) {
+        // Use ESC/POS alignment command based on headerAlignment (same as restaurant name)
+        const cleanedAddress = this.cleanTextForPrinter(data.address);
+        if (custom.headerAlignment === 'center') {
+          receipt += DirectPrinter.escCenter + cleanedAddress + '\n' + DirectPrinter.escLeft;
+        } else if (custom.headerAlignment === 'right') {
+          receipt += DirectPrinter.escRight + cleanedAddress + '\n' + DirectPrinter.escLeft;
+        } else {
+          receipt += cleanedAddress + '\n';
+        }
+      }
+      if (data.phone) {
+        // Use ESC/POS alignment command based on headerAlignment (same as restaurant name)
+        const cleanedPhone = this.cleanTextForPrinter(data.phone);
+        if (custom.headerAlignment === 'center') {
+          receipt += DirectPrinter.escCenter + cleanedPhone + '\n' + DirectPrinter.escLeft;
+        } else if (custom.headerAlignment === 'right') {
+          receipt += DirectPrinter.escRight + cleanedPhone + '\n' + DirectPrinter.escLeft;
+        } else {
+          receipt += cleanedPhone + '\n';
+        }
+      }
+      if (data.address || data.phone) receipt += separator + '\n';
+      if (data.header) {
+        // Use ESC/POS alignment command based on headerAlignment (same as restaurant name)
+        const headerLines = data.header.split('\n');
+        headerLines.forEach(line => {
+          const cleanedLine = this.cleanTextForPrinter(line);
+          if (custom.headerAlignment === 'center') {
+            receipt += DirectPrinter.escCenter + cleanedLine + '\n' + DirectPrinter.escLeft;
+          } else if (custom.headerAlignment === 'right') {
+            receipt += DirectPrinter.escRight + cleanedLine + '\n' + DirectPrinter.escLeft;
+          } else {
+            receipt += cleanedLine + '\n';
+          }
+        });
         receipt += separator + '\n';
       }
-    }
-    if (data.address) {
-      const cleanedAddress = this.cleanTextForPrinter(data.address);
-      const padding = Math.max(0, Math.floor((width - cleanedAddress.length) / 2));
-      receipt += ' '.repeat(padding) + cleanedAddress + '\n';
-    }
-    if (data.phone) {
-      const cleanedPhone = this.cleanTextForPrinter(data.phone);
-      const padding = Math.max(0, Math.floor((width - cleanedPhone.length) / 2));
-      receipt += ' '.repeat(padding) + cleanedPhone + '\n';
-    }
-    if (data.address || data.phone) {
-      receipt += separator + '\n';
+      bigOrderNumberBlock();
     }
     
-    if (data.header) {
-      const headerLines = data.header.split('\n');
-      headerLines.forEach(line => {
-        const cleanedLine = this.cleanTextForPrinter(line);
-        const padding = Math.max(0, Math.floor((width - cleanedLine.length) / 2));
-        receipt += ' '.repeat(padding) + cleanedLine + '\n';
-      });
-      receipt += separator + '\n';
-    }
-    
-    // Order info - Conditional display
+    // Order info - Conditional display (no order number here)
     receipt += '\n';
-    if (showOrderNumber) {
-      const formattedOrderNumber = this.formatOrderNumber(data.orderNumber, prefix, custom);
-      receipt += `${this.cleanTextForPrinter(custom.labelOrderNumber)}: ${formattedOrderNumber}\n`;
-    }
     if (showDate) {
       receipt += `${this.cleanTextForPrinter(custom.labelDate)}: ${data.date.split(' ')[0]}\n`;
     }
@@ -673,12 +612,29 @@ export class DirectPrinter {
       receipt += separator + '\n';
     }
     
-    // Closing message (only for receipts, not kitchen tickets)
-    if (!isKitchen) {
+    // Closing message
+    receipt += '\n';
+    if (isKitchen) {
+      // Kitchen ticket closing message - use ESC/POS alignment based on headerAlignment
+      const bonAppetitMsg = this.cleanTextForPrinter(custom.labelBonAppetit);
+      if (custom.headerAlignment === 'center') {
+        receipt += DirectPrinter.escCenter + bonAppetitMsg + '\n' + DirectPrinter.escLeft;
+      } else if (custom.headerAlignment === 'right') {
+        receipt += DirectPrinter.escRight + bonAppetitMsg + '\n' + DirectPrinter.escLeft;
+      } else {
+        receipt += bonAppetitMsg + '\n';
+      }
       receipt += '\n';
+    } else {
+      // Receipt closing message - use ESC/POS alignment based on headerAlignment
       const thankYouMsg = this.cleanTextForPrinter(custom.labelThankYou);
-      const padding = Math.max(0, Math.floor((width - thankYouMsg.length) / 2));
-      receipt += ' '.repeat(padding) + thankYouMsg + '\n';
+      if (custom.headerAlignment === 'center') {
+        receipt += DirectPrinter.escCenter + thankYouMsg + '\n' + DirectPrinter.escLeft;
+      } else if (custom.headerAlignment === 'right') {
+        receipt += DirectPrinter.escRight + thankYouMsg + '\n' + DirectPrinter.escLeft;
+      } else {
+        receipt += thankYouMsg + '\n';
+      }
       receipt += '\n';
     }
     
@@ -688,12 +644,10 @@ export class DirectPrinter {
 
 // Utility function to detect available printing methods
 export async function detectPrintCapabilities(): Promise<{
-  usb: boolean;
   network: boolean;
   bluetooth: boolean;
 }> {
   return {
-    usb: !!navigator.usb,
     network: true, // Always available via fetch/WebSocket
     bluetooth: !!navigator.bluetooth,
   };

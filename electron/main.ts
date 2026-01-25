@@ -1,10 +1,13 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu } from 'electron';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { writeFile, readFile } from 'fs/promises';
-import { Socket, createConnection } from 'net';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { writeFile, readFile, appendFile } from 'fs/promises';
+import { Socket, createConnection, Server as NetServer } from 'net';
+import { createServer as createHttpServer, IncomingMessage, ServerResponse } from 'http';
 import { createRequire } from 'module';
+import { spawn, ChildProcess } from 'child_process';
+import { createPrintDaemonServer } from './print-daemon-integrated';
 
 // Get user data path (where IndexedDB and app data are stored)
 function getUserDataPath(): string {
@@ -37,6 +40,11 @@ try {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let printDaemonServer: NetServer | null = null;
+let isQuitting = false;
+
+const PRINT_DAEMON_PORT = 9100;
+const PRINT_DAEMON_HOST = '127.0.0.1';
 
 const createWindow = (): void => {
   // Create the browser window.
@@ -181,16 +189,81 @@ const createWindow = (): void => {
   });
 };
 
+// Start print daemon server (integrated HTTP server - no separate process)
+function startPrintDaemon(): void {
+  // Stop existing server if any
+  if (printDaemonServer) {
+    try {
+      printDaemonServer.close();
+      console.log('[MAIN] Stopped existing print daemon server');
+    } catch (e) {
+      // Ignore
+    }
+  }
+
+  const resourcesPath = process.resourcesPath || app.getAppPath();
+  
+  printDaemonServer = createPrintDaemonServer(resourcesPath);
+  
+  printDaemonServer.listen(PRINT_DAEMON_PORT, PRINT_DAEMON_HOST, () => {
+    console.log(`[MAIN] ✅ Print daemon server listening on http://${PRINT_DAEMON_HOST}:${PRINT_DAEMON_PORT}`);
+    console.log(`[MAIN] Resources path: ${resourcesPath}`);
+    console.log(`[MAIN] Test health endpoint: http://${PRINT_DAEMON_HOST}:${PRINT_DAEMON_PORT}/health`);
+  });
+
+  printDaemonServer.on('error', (error: Error) => {
+    console.error('[MAIN] Print daemon server error:', error);
+    if ((error as any).code === 'EADDRINUSE') {
+      console.error(`[MAIN] Port ${PRINT_DAEMON_PORT} is already in use. Another instance may be running.`);
+    } else {
+      console.error('[MAIN] Print daemon server error details:', {
+        code: (error as any).code,
+        message: error.message,
+        stack: error.stack,
+      });
+    }
+  });
+  
+  // Log server events for debugging
+  printDaemonServer.on('request', (req, res) => {
+    console.log(`[MAIN] Print daemon received ${req.method} ${req.url}`);
+  });
+}
+
+// Stop print daemon server
+function stopPrintDaemon(): void {
+  if (printDaemonServer) {
+    console.log('[MAIN] Stopping print daemon server...');
+    try {
+      printDaemonServer.close(() => {
+        console.log('[MAIN] Print daemon server stopped');
+      });
+    } catch (error) {
+      console.error('[MAIN] Error stopping print daemon server:', error);
+    }
+    printDaemonServer = null;
+  }
+}
+
 // This method will be called when Electron has finished initialization
 app.on('ready', () => {
   // Remove the menu bar completely
   Menu.setApplicationMenu(null);
   createWindow();
+  // Start print daemon after window is created
+  startPrintDaemon();
 });
 
 // Quit when all windows are closed, except on macOS
+app.on('before-quit', () => {
+  isQuitting = true;
+  stopPrintDaemon();
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
+    isQuitting = true;
+    stopPrintDaemon();
     app.quit();
   }
 });
@@ -198,6 +271,10 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+    // Ensure daemon is running
+    if (!printDaemonServer) {
+      startPrintDaemon();
+    }
   }
 });
 
@@ -436,4 +513,140 @@ ipcMain.handle('app:getUserDataPath', () => {
 // IPC Handler for getting IndexedDB path
 ipcMain.handle('app:getIndexedDBPath', () => {
   return getIndexedDBPath();
+});
+
+// Get logs directory path
+function getLogsPath(): string {
+  const userData = app.getPath('userData');
+  return join(userData, 'logs');
+}
+
+// Ensure logs directory exists
+function ensureLogsDirectory(): void {
+  const logsPath = getLogsPath();
+  if (!existsSync(logsPath)) {
+    mkdirSync(logsPath, { recursive: true });
+  }
+}
+
+// Get current log file path (one file per day)
+function getCurrentLogFile(): string {
+  ensureLogsDirectory();
+  const logsPath = getLogsPath();
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  return join(logsPath, `app-${today}.log`);
+}
+
+// Rotate old log files (keep last 10 days)
+function rotateLogFiles(): void {
+  try {
+    const logsPath = getLogsPath();
+    if (!existsSync(logsPath)) return;
+    
+    // In a real implementation, you would list files and delete old ones
+    // For now, we just ensure the directory exists
+  } catch (error) {
+    console.error('Error rotating log files:', error);
+  }
+}
+
+// Initialize logging on app start
+ensureLogsDirectory();
+rotateLogFiles();
+
+// Log startup to console
+const logsPath = getLogsPath();
+console.log('[Electron] Logs directory:', logsPath);
+console.log('[Electron] Current log file:', getCurrentLogFile());
+
+// IPC Handler for writing logs
+ipcMain.handle('log:write', async (event, logLine: string) => {
+  try {
+    const logFile = getCurrentLogFile();
+    await appendFile(logFile, logLine, 'utf8');
+    // Log to console in development for debugging
+    if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+      console.log('[Log File] Written to:', logFile);
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to write log:', error);
+    console.error('Log file path:', getCurrentLogFile());
+    return { success: false, error: String(error) };
+  }
+});
+
+// IPC Handler to check print daemon status
+ipcMain.handle('daemon:status', async () => {
+  try {
+    const { request } = await import('http');
+    return new Promise((resolve) => {
+      const req = request({
+        hostname: '127.0.0.1',
+        port: 9100,
+        path: '/health',
+        method: 'GET',
+        timeout: 2000,
+      }, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(data);
+            resolve({
+              running: true,
+              status: json.status,
+              message: json.message,
+              version: json.version,
+            });
+          } catch (e) {
+            resolve({
+              running: true,
+              status: 'unknown',
+              message: 'Daemon responded but response is invalid',
+            });
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        resolve({
+          running: false,
+          error: error.message,
+        });
+      });
+
+      req.on('timeout', () => {
+        req.destroy();
+        resolve({
+          running: false,
+          error: 'Connection timeout',
+        });
+      });
+
+      req.end();
+    });
+  } catch (error) {
+    return {
+      running: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+});
+
+// IPC Handler to restart print daemon
+ipcMain.handle('daemon:restart', async () => {
+  try {
+    stopPrintDaemon();
+    await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms for clean shutdown
+    startPrintDaemon();
+    return { success: true, message: 'Print daemon restarted' };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 });

@@ -9,6 +9,8 @@ interface NumericInputProps {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  /** When true, input text is visually masked (password style) */
+  masked?: boolean;
   min?: number;
   max?: number;
   step?: number;
@@ -22,6 +24,7 @@ export function NumericInput({
   onChange,
   placeholder,
   className,
+  masked = false,
   min,
   max,
   step,
@@ -136,7 +139,7 @@ export function NumericInput({
       <div className="relative">
         <Input
           ref={inputRef}
-          type="number"
+          type={masked ? 'password' : 'number'}
           value={stringValue}
           onChange={handleInputChange}
           placeholder={placeholder}

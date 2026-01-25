@@ -56,6 +56,7 @@ export function ProductsManagement({
   loadCategories,
 }: ProductsManagementProps) {
   const { t, getProductsByCategory } = usePOS();
+  const { showDialog, DialogComponent } = useDialog();
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -192,9 +193,11 @@ export function ProductsManagement({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+    <>
+      {DialogComponent}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
       className="space-y-6"
     >
       <div className="flex items-center justify-between">
@@ -327,8 +330,11 @@ export function ProductsManagement({
                       if (confirmed) {
                         try {
                           await deleteCategory(category.id);
+                          // deleteCategory already reloads categories, but we call loadCategories to ensure UI updates
+                          await loadCategories();
                           toast({ title: t('category.deleted'), description: t('category.deletedDesc').replace('{name}', category.name) });
                         } catch (error) {
+                          console.error('Failed to delete category:', error);
                           toast({ 
                             title: t('general.error'), 
                             description: error instanceof Error ? error.message : t('general.cannotDeleteCategory'),
@@ -463,8 +469,19 @@ export function ProductsManagement({
                         variant: 'destructive',
                       });
                       if (confirmed) {
-                        await deleteProduct(product.id);
-                        await loadProducts();
+                        try {
+                          await deleteProduct(product.id);
+                          // deleteProduct already reloads products, but we call loadProducts to ensure UI updates
+                          await loadProducts();
+                          toast({ title: t('products.deleted'), description: t('products.deletedDesc').replace('{name}', product.name) });
+                        } catch (error) {
+                          console.error('Failed to delete product:', error);
+                          toast({ 
+                            title: t('general.error'), 
+                            description: error instanceof Error ? error.message : t('general.cannotDeleteProduct'),
+                            variant: 'destructive'
+                          });
+                        }
                       }
                     }}
                     className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
@@ -533,7 +550,8 @@ export function ProductsManagement({
           }}
         />
       )}
-    </motion.div>
+      </motion.div>
+    </>
   );
 }
 

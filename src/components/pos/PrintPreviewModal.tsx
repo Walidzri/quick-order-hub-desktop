@@ -1,11 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Order, Settings, Printer as PrinterType } from '@/lib/database';
+import { Order, Settings, Printer as PrinterType, PrinterConnectionType } from '@/lib/database';
 import { formatCurrency, Currency } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Printer, Download, FileText, Wifi, Usb, AlertCircle } from 'lucide-react';
+import { X, Printer, Download, FileText, Wifi, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { DirectPrinter, PrinterConnection, detectPrintCapabilities } from '@/lib/printer';
+import { DirectPrinter, PrinterConnection } from '@/lib/printer';
 import { usePOS } from '@/contexts/POSContext';
 import { renderReceiptHTML } from '@/lib/receipt-renderer';
 import { useDialog } from '@/hooks/use-dialog';
@@ -42,12 +42,6 @@ export function PrintPreviewModal({
   const printRef = useRef<HTMLDivElement>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
-  const [printCapabilities, setPrintCapabilities] = useState<Awaited<ReturnType<typeof detectPrintCapabilities>> | null>(null);
-
-  useEffect(() => {
-    // Detect print capabilities on mount
-    detectPrintCapabilities().then(setPrintCapabilities);
-  }, []);
 
   // Print kitchen ticket separately
   const handlePrintKitchenTicket = async () => {
@@ -60,7 +54,7 @@ export function PrintPreviewModal({
       }
 
       // Get customization settings for kitchen ticket
-      const customization = settings?.receiptCustomization;
+      const customization = settings?.receiptCustomization || DirectPrinter.getDefaultCustomization();
       const dateObj = new Date(order.createdAt);
       const formattedDate = customization 
         ? DirectPrinter.formatDate(dateObj, customization.dateFormat)
@@ -83,7 +77,7 @@ export function PrintPreviewModal({
             quantity: line.quantity,
             name: line.productName,
             size: line.variantSize,
-            modifiers: line.modifiers.map(m => `(S) ${m.optionName}`),
+            modifiers: line.modifiers.map(m => m.optionName),
             note: line.note,
             price: customization?.kitchenShowProductPrices ? formatCurrency(lineTotal, currency) : undefined,
           };
@@ -92,7 +86,6 @@ export function PrintPreviewModal({
         total: '',
         showPrices: customization?.kitchenShowProductPrices || false,
         customization: customization,
-        numberingPrefix: settings?.numberingPrefix || '',
         isKitchenTicket: true,
       });
 
@@ -124,19 +117,24 @@ export function PrintPreviewModal({
     setPrintError(null);
 
     try {
-      // Find the appropriate printer
+      // Rôle ciblé (caisse ou cuisine)
       const printerRole = type === 'receipt' ? 'cashier' : 'kitchen';
-      const printerConfig = printers.find(p => p.role === printerRole);
+      console.log('[PRINT][Preview] Type demandé =', type, '→ rôle =', printerRole);
+      console.log('[PRINT][Preview] Imprimantes disponibles =', printers);
 
-      if (!printerConfig || !printerConfig.tcpHost) {
+      // On ne prend que les imprimantes actives (enabled !== false)
+      const rolePrinters = printers.filter(
+        (p) => p.role === printerRole && p.enabled !== false
+      );
+
+      if (rolePrinters.length === 0) {
         throw new Error(
-          `Imprimante ${printerRole === 'cashier' ? 'caissier' : 'cuisine'} non configurée. ` +
-          `Veuillez configurer l'imprimante dans Paramètres > Imprimantes avec son adresse IP réseau.`
+          `Aucune imprimante ACTIVE configurée pour le rôle "${printerRole === 'cashier' ? 'Reçu client' : 'Ticket cuisine'}".`
         );
       }
 
       // Get customization settings
-      const customization = settings?.receiptCustomization;
+      const customization = settings?.receiptCustomization || DirectPrinter.getDefaultCustomization();
       const dateObj = new Date(order.createdAt);
       const formattedDate = customization 
         ? DirectPrinter.formatDate(dateObj, customization.dateFormat)
@@ -164,7 +162,7 @@ export function PrintPreviewModal({
             quantity: line.quantity,
             name: line.productName,
             size: line.variantSize,
-            modifiers: line.modifiers.map(m => `(S) ${m.optionName}`),
+            modifiers: line.modifiers.map(m => m.optionName),
             note: line.note,
             // For kitchen tickets, only show price if enabled in customization
             price: isKitchen 
@@ -179,35 +177,268 @@ export function PrintPreviewModal({
         change: isKitchen ? undefined : (change ? formatCurrency(change, currency) : undefined),
         showPrices: isKitchen ? (customization?.kitchenShowProductPrices || false) : true,
         customization: customization,
-        numberingPrefix: settings?.numberingPrefix || '',
-        isKitchenTicket: isKitchen, // CRITICAL: Mark as kitchen ticket for proper formatting
+        isKitchenTicket: isKitchen,
       });
 
-      // Create printer connection based on config
-      let connection: PrinterConnection;
+      if (printerRole === 'cashier') {
+        // Reçu client : impression en parallèle sur toutes les imprimantes caissier actives
+        console.log('[PRINT][Preview] Imprimantes caisse actives =', rolePrinters);
 
-      if (printerConfig.mode === 'tcp' && printerConfig.tcpHost) {
-        connection = {
-          type: 'network',
-          name: `Imprimante ${printerRole}`,
-          address: printerConfig.tcpHost,
-          port: printerConfig.tcpPort || 9100,
-        };
+        await Promise.all(
+          rolePrinters.map(async (printerConfig) => {
+            const effectiveConnectionType: PrinterConnectionType =
+              printerConfig.connectionType || 'tcp';
+
+            // Validation par imprimante
+            if (
+              (effectiveConnectionType === 'tcp' || effectiveConnectionType === 'wifi') &&
+              !printerConfig.tcpHost
+            ) {
+              console.warn(
+                '[PRINT][Preview][Cashier] Imprimante sans IP, ignorée:',
+                printerConfig
+              );
+              return;
+            }
+
+            try {
+              const daemonUrl = 'http://127.0.0.1:9100/print';
+
+              if (effectiveConnectionType === 'windows') {
+                if (!printerConfig.name) {
+                  console.warn(
+                    "[PRINT][Preview][Cashier] Nom d'imprimante Windows manquant, ignorée:",
+                    printerConfig
+                  );
+                  return;
+                }
+
+                const body = {
+                  connectionType: 'windows',
+                  target: { printerName: printerConfig.name },
+                  content: receiptText,
+                  isThermalPrinter: printerConfig.isThermalPrinter ?? true,
+                  role: 'cashier' as const,
+                };
+
+                console.log('[PRINT][Preview][Cashier][Daemon] Payload envoyé =', body);
+
+                const response = await fetch(daemonUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body),
+                });
+
+                if (!response.ok) {
+                  console.error(
+                    '[PRINT][Preview][Cashier][Daemon] HTTP error =',
+                    response.status
+                  );
+                  return;
+                }
+
+                const result = await response.json().catch(() => null);
+                if (!result || result.success !== true) {
+                  console.error(
+                    '[PRINT][Preview][Cashier][Daemon] Erreur côté daemon:',
+                    result
+                  );
+                  return;
+                }
+
+                console.log(
+                  '✅ Reçu client imprimé via daemon Windows sur',
+                  printerConfig.name
+                );
+              } else if (
+                (effectiveConnectionType === 'tcp' ||
+                  effectiveConnectionType === 'wifi') &&
+                printerConfig.tcpHost
+              ) {
+                const body = {
+                  connectionType: effectiveConnectionType,
+                  target: {
+                    host: printerConfig.tcpHost,
+                    port: printerConfig.tcpPort || 9100,
+                  },
+                  content: receiptText,
+                  isThermalPrinter: printerConfig.isThermalPrinter ?? true,
+                  role: 'cashier' as const,
+                };
+
+                console.log('[PRINT][Preview][Cashier][Daemon] Payload TCP/WiFi envoyé =', body);
+
+                const response = await fetch(daemonUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body),
+                });
+
+                if (!response.ok) {
+                  console.error(
+                    '[PRINT][Preview][Cashier][Daemon] HTTP error =',
+                    response.status
+                  );
+                  return;
+                }
+
+                const result = await response.json().catch(() => null);
+                if (!result || result.success !== true) {
+                  console.error(
+                    '[PRINT][Preview][Cashier][Daemon] Erreur côté daemon:',
+                    result
+                  );
+                  return;
+                }
+
+                console.log(
+                  '✅ Reçu client imprimé via daemon Ethernet/Wi‑Fi sur',
+                  printerConfig.name
+                );
+              } else {
+                console.warn(
+                  '[PRINT][Preview][Cashier] Type de connexion non supporté, ignorée:',
+                  effectiveConnectionType
+                );
+              }
+            } catch (err) {
+              console.error(
+                '[PRINT][Preview][Cashier] Erreur sur une imprimante caisse (non bloquant):',
+                err
+              );
+            }
+          })
+        );
       } else {
-        // Try USB if available, otherwise fallback to network
-        if (printCapabilities?.usb) {
-          connection = {
-            type: 'usb',
-            name: `Imprimante ${printerRole}`,
-          };
-        } else {
-          throw new Error(t('print.noPrintMethod'));
-        }
-      }
+        // Ticket cuisine : impression en parallèle sur toutes les imprimantes cuisine actives
+        console.log('[PRINT][Preview] Imprimantes cuisine actives =', rolePrinters);
 
-      const printer = new DirectPrinter(connection);
-      // Use printer type from settings (default to false for regular printers)
-      await printer.print(receiptText, printerConfig.isThermalPrinter ?? false);
+        await Promise.all(
+          rolePrinters.map(async (printerConfig) => {
+            const effectiveConnectionType: PrinterConnectionType =
+              printerConfig.connectionType || 'tcp';
+
+            // Validation par imprimante
+            if (
+              (effectiveConnectionType === 'tcp' || effectiveConnectionType === 'wifi') &&
+              !printerConfig.tcpHost
+            ) {
+              console.warn(
+                '[PRINT][Preview][Kitchen] Imprimante sans IP, ignorée:',
+                printerConfig
+              );
+              return;
+            }
+
+            try {
+              const daemonUrl = 'http://127.0.0.1:9100/print';
+
+              if (effectiveConnectionType === 'windows') {
+                if (!printerConfig.name) {
+                  console.warn(
+                    "[PRINT][Preview][Kitchen] Nom d'imprimante Windows manquant, ignorée:",
+                    printerConfig
+                  );
+                  return;
+                }
+
+                const body = {
+                  connectionType: 'windows',
+                  target: { printerName: printerConfig.name },
+                  content: receiptText,
+                  isThermalPrinter: printerConfig.isThermalPrinter ?? true,
+                  role: 'kitchen' as const,
+                };
+
+                console.log('[PRINT][Preview][Kitchen][Daemon] Payload envoyé =', body);
+
+                const response = await fetch(daemonUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body),
+                });
+
+                if (!response.ok) {
+                  console.error(
+                    '[PRINT][Preview][Kitchen][Daemon] HTTP error =',
+                    response.status
+                  );
+                  return;
+                }
+
+                const result = await response.json().catch(() => null);
+                if (!result || result.success !== true) {
+                  console.error(
+                    '[PRINT][Preview][Kitchen][Daemon] Erreur côté daemon:',
+                    result
+                  );
+                  return;
+                }
+
+                console.log(
+                  '✅ Ticket cuisine imprimé via daemon Windows sur',
+                  printerConfig.name
+                );
+              } else if (
+                (effectiveConnectionType === 'tcp' ||
+                  effectiveConnectionType === 'wifi') &&
+                printerConfig.tcpHost
+              ) {
+                const body = {
+                  connectionType: effectiveConnectionType,
+                  target: {
+                    host: printerConfig.tcpHost,
+                    port: printerConfig.tcpPort || 9100,
+                  },
+                  content: receiptText,
+                  isThermalPrinter: printerConfig.isThermalPrinter ?? true,
+                  role: 'kitchen' as const,
+                };
+
+                console.log('[PRINT][Preview][Kitchen][Daemon] Payload TCP/WiFi envoyé =', body);
+
+                const response = await fetch(daemonUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(body),
+                });
+
+                if (!response.ok) {
+                  console.error(
+                    '[PRINT][Preview][Kitchen][Daemon] HTTP error =',
+                    response.status
+                  );
+                  return;
+                }
+
+                const result = await response.json().catch(() => null);
+                if (!result || result.success !== true) {
+                  console.error(
+                    '[PRINT][Preview][Kitchen][Daemon] Erreur côté daemon:',
+                    result
+                  );
+                  return;
+                }
+
+                console.log(
+                  '✅ Ticket cuisine imprimé via daemon Ethernet/Wi‑Fi sur',
+                  printerConfig.name
+                );
+              } else {
+                console.warn(
+                  '[PRINT][Preview][Kitchen] Type de connexion non supporté, ignorée:',
+                  effectiveConnectionType
+                );
+              }
+            } catch (err) {
+              console.error(
+                '[PRINT][Preview][Kitchen] Erreur sur une imprimante cuisine (non bloquant):',
+                err
+              );
+            }
+          })
+        );
+      }
 
       setIsPrinting(false);
       
@@ -225,67 +456,7 @@ export function PrintPreviewModal({
     }
   };
 
-  // Fallback: Browser print dialog
-  const handleBrowserPrint = async () => {
-    if (!printRef.current || !order) return;
-
-    try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        await showAlert(t('print.allowPopups'), 'Erreur');
-        return;
-      }
-
-      const printContent = printRef.current.innerHTML;
-      const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>${type === 'receipt' ? t('print.receipt') : t('print.kitchenTicket')} - ${order.orderNumber}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.4; padding: 20px; max-width: 300px; margin: 0 auto; background: white; color: black; }
-    .header { text-align: center; margin-bottom: 15px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
-    .restaurant-name { font-size: 16px; font-weight: bold; margin-bottom: 5px; }
-    .address, .phone { font-size: 10px; margin: 2px 0; }
-    .divider { border-top: 1px dashed #000; margin: 10px 0; }
-    .section { margin: 10px 0; }
-    .section-title { font-weight: bold; text-align: center; margin-bottom: 5px; font-size: 14px; }
-    .order-info { margin: 8px 0; font-size: 11px; }
-    .order-line { margin: 5px 0; font-size: 11px; }
-    .line-header { font-weight: bold; margin-bottom: 2px; }
-    .line-details { font-size: 10px; margin-left: 10px; color: #555; }
-    .totals { margin-top: 15px; border-top: 1px dashed #000; padding-top: 10px; }
-    .total-line { display: flex; justify-content: space-between; margin: 5px 0; font-size: 11px; }
-    .total-final { font-weight: bold; font-size: 14px; border-top: 2px solid #000; padding-top: 5px; margin-top: 5px; }
-    .footer { text-align: center; margin-top: 20px; font-size: 10px; border-top: 1px dashed #000; padding-top: 10px; }
-    .payment-info { margin: 8px 0; font-size: 11px; text-align: center; }
-    .cashier { font-size: 10px; margin-bottom: 5px; }
-    @media print { body { padding: 0; } .no-print { display: none; } }
-  </style>
-</head>
-<body>
-  ${printContent}
-</body>
-</html>`;
-
-      printWindow.document.write(htmlContent);
-      printWindow.document.close();
-
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.print();
-          setTimeout(() => {
-            printWindow.close();
-          }, 500);
-        }, 250);
-      };
-    } catch (error) {
-      console.error('Browser print error:', error);
-      await showAlert(t('print.printError'), 'Erreur d\'impression');
-    }
-  };
+  // Browser print function removed - no longer used
 
   const handleDownload = async () => {
     if (!printRef.current || !order) return;
@@ -423,16 +594,6 @@ export function PrintPreviewModal({
                 {t('general.close')}
               </Button>
             </div>
-            
-            <Button
-              onClick={handleBrowserPrint}
-              variant="outline"
-              className="w-full h-11 text-sm"
-              title={t('print.useBrowserPrinter')}
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              {t('print.useBrowserPrinter')}
-            </Button>
           </div>
         </motion.div>
       </motion.div>

@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 type View = 'order' | 'orders' | 'reports' | 'settings';
 
 function POSApp() {
-  const { isLoading, kioskMode, direction } = usePOS();
+  const { isLoading, kioskMode, direction, settings } = usePOS();
   const { isAuthenticated, isLocked, isSetupRequired, canAccessView, user } = useAuth();
   const [activeView, setActiveView] = useState<View>('order');
 
@@ -77,16 +77,27 @@ function POSApp() {
     );
   }
 
+  const uiScale = settings?.uiScale ?? 1.0;
+
   return (
     <div 
       className={cn(
-        "min-h-screen bg-background flex flex-col",
+        "min-h-screen bg-background",
         kioskMode && "kiosk-mode"
       )}
       dir={direction}
     >
-      {/* Main Content */}
-      <main className="flex-1 pb-20 overflow-hidden">
+      <div
+        style={{
+          transform: `scale(${uiScale})`,
+          transformOrigin: 'top left',
+          width: `${100 / uiScale}%`,
+          height: `${100 / uiScale}%`,
+        }}
+        className="flex flex-col min-h-screen"
+      >
+        {/* Main Content */}
+        <main className="flex-1 pb-20 overflow-hidden">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeView}
@@ -107,9 +118,10 @@ function POSApp() {
       {/* Navigation */}
       <MainNav activeView={activeView} onViewChange={(v) => setActiveView(v as View)} />
       
-      {/* Global Virtual Keyboard - Fixed at bottom */}
-      <GlobalVirtualKeyboard />
-      <GlobalNumericKeyboard />
+        {/* Global Virtual Keyboard - Fixed at bottom */}
+        <GlobalVirtualKeyboard />
+        <GlobalNumericKeyboard />
+      </div>
     </div>
   );
 }

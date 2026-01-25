@@ -83,14 +83,30 @@ Menu > Commandes
 
 ## Sauvegarde (Important !)
 
-**Sauvegarder régulièrement** :
+### Sauvegarde Automatique (Recommandé)
+
+**Configurer la sauvegarde automatique** :
 ```
-Paramètres > Sauvegarde et Restauration
+Paramètres > Données > Sauvegarde automatique
+→ Activer la sauvegarde automatique
+→ Choisir le type de planification :
+  • À intervalles réguliers (ex: toutes les heures)
+  • Quotidienne (ex: tous les jours à 2h du matin)
+  • Hebdomadaire (ex: chaque dimanche à 2h)
+  • Mensuelle (ex: le 1er de chaque mois à 2h)
+→ Sélectionner le répertoire de sauvegarde
+```
+
+### Sauvegarde Manuelle
+
+**Sauvegarder manuellement** :
+```
+Paramètres > Données > Sauvegarde et Restauration
 → Exporter la sauvegarde
 → Choisir un emplacement (clé USB recommandée)
 ```
 
-**Fréquence** : Quotidienne ou après modifications importantes
+**Fréquence recommandée** : Quotidienne ou après modifications importantes
 
 ## Emplacement des Données
 
@@ -105,10 +121,13 @@ Paramètres > Emplacement des Données
 
 ## Aide et Support
 
-- 📖 **Documentation complète** : `DOCUMENTATION_COMPLETE.md`
-- 🔧 **Dépannage** : Voir section Dépannage dans la documentation
+- 📖 **Documentation complète** : Voir `DOCUMENTATION_COMPLETE.md` pour tous les détails
+- 🔧 **Dépannage** : Voir section Dépannage dans la documentation complète
+- 📊 **Logs** : En cas de problème, consultez les logs dans `%APPDATA%\Quick Order Hub\logs\`
 - 📞 **Support** : [Vos coordonnées]
 
 ---
 
 **Astuce** : Gardez toujours une sauvegarde récente sur une clé USB séparée !
+
+> 💡 **Note** : Ce guide est un résumé rapide. Pour plus de détails, consultez la [Documentation Complète](DOCUMENTATION_COMPLETE.md).

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChefHat, User as UserIcon, Shield, Check, AlertCircle, Maximize2, Minimize2, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TouchInput } from '@/components/ui/touch-input';
+import { NumericInput } from '@/components/ui/numeric-input';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePOS } from '@/contexts/POSContext';
 import { cn } from '@/lib/utils';
@@ -314,27 +315,29 @@ export function SetupScreen() {
                       <label className="text-sm font-medium text-muted-foreground">
                         Code PIN (4-6 chiffres)
                       </label>
-                      <TouchInput
-                        type="password"
+                      <NumericInput
                         value={chefPin}
                         onChange={(v) => setChefPin(v.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="••••"
+                        placeholder="0000"
                         className="h-14 text-xl text-center tracking-[0.5em]"
-                        showQuickSuggestions={false}
+                        masked
+                        allowDecimal={false}
+                        maxDecimals={0}
                       />
                     </div>
-
+                    
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-muted-foreground">
                         Confirmer le code PIN
                       </label>
-                      <TouchInput
-                        type="password"
+                      <NumericInput
                         value={chefConfirmPin}
                         onChange={(v) => setChefConfirmPin(v.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="••••"
+                        placeholder="0000"
                         className="h-14 text-xl text-center tracking-[0.5em]"
-                        showQuickSuggestions={false}
+                        masked
+                        allowDecimal={false}
+                        maxDecimals={0}
                       />
                     </div>
                   </div>

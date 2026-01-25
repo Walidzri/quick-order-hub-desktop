@@ -296,7 +296,7 @@ export function LoginScreen() {
               className="bg-card rounded-2xl shadow-2xl overflow-hidden border border-border"
             >
               {/* Header */}
-              <div className="p-6 text-center border-b border-border">
+              <div className="p-6 text-center border-b border-border relative">
                 <button
                   onClick={handleBack}
                   className="absolute left-4 top-4 p-2 hover:bg-accent rounded-lg transition-colors"
