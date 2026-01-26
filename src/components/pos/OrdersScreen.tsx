@@ -17,7 +17,10 @@ import {
   Download,
   Trash2,
   CheckSquare,
-  Square
+  Square,
+  ChevronLeft,
+  ChevronRight,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TouchInput } from '@/components/ui/touch-input';
@@ -48,8 +51,10 @@ const statusColors: Record<OrderStatus, string> = {
   cancelled: 'status-cancelled',
 };
 
+const PAGE_SIZE = 50; // Number of orders per page
+
 export function OrdersScreen() {
-  const { orders, loadOrders, printKitchenTicket, printReceipt, currency, t, settings, printers, deleteOrder, deleteOrders, deleteAllOrders } = usePOS();
+  const { orders, loadOrders, loadOrdersPaginated, printKitchenTicket, printReceipt, currency, t, settings, printers, deleteOrder, deleteOrders, deleteAllOrders, updateOrderStatus } = usePOS();
   const { users, user, hasPermission } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
@@ -58,6 +63,13 @@ export function OrdersScreen() {
   const [printModalType, setPrintModalType] = useState<'receipt' | 'kitchen'>('receipt');
   const [selectedOrderIds, setSelectedOrderIds] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const [paginatedOrders, setPaginatedOrders] = useState<Order[]>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(true);
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     title: string;
@@ -89,11 +101,34 @@ export function OrdersScreen() {
     return userNamesMap.get(userId) || '-';
   };
 
+  // Load paginated orders
   useEffect(() => {
-    loadOrders();
-  }, [loadOrders]);
+    const loadData = async () => {
+      setIsLoadingOrders(true);
+      try {
+        const result = await loadOrdersPaginated(currentPage, PAGE_SIZE);
+        setPaginatedOrders(result.orders);
+        setTotalPages(result.totalPages);
+        setTotalOrders(result.total);
+      } catch (error) {
+        console.error('Failed to load orders:', error);
+      } finally {
+        setIsLoadingOrders(false);
+      }
+    };
+    loadData();
+  }, [currentPage, loadOrdersPaginated]);
 
-  const filteredOrders = orders.filter(order => {
+  // Refresh when an order is deleted or modified
+  const refreshOrders = async () => {
+    const result = await loadOrdersPaginated(currentPage, PAGE_SIZE);
+    setPaginatedOrders(result.orders);
+    setTotalPages(result.totalPages);
+    setTotalOrders(result.total);
+  };
+
+  // Filter orders client-side (for search and status filter on current page)
+  const filteredOrders = paginatedOrders.filter(order => {
     if (statusFilter !== 'all' && order.status !== statusFilter) return false;
     if (search && !order.orderNumber.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
@@ -146,6 +181,7 @@ export function OrdersScreen() {
         try {
           await deleteOrders(Array.from(selectedOrderIds));
           setSelectedOrderIds(new Set());
+          await refreshOrders(); // Refresh paginated list
         } catch (error) {
           console.error('Error deleting orders:', error);
           setConfirmDialog({
@@ -174,6 +210,8 @@ export function OrdersScreen() {
         try {
           await deleteAllOrders();
           setSelectedOrderIds(new Set());
+          setCurrentPage(1); // Reset to first page
+          await refreshOrders(); // Refresh paginated list
         } catch (error) {
           console.error('Error deleting all orders:', error);
           setConfirmDialog({
@@ -472,6 +510,7 @@ export function OrdersScreen() {
                                       newSet.delete(order.id);
                                       return newSet;
                                     });
+                                    await refreshOrders(); // Refresh paginated list
                                   } catch (error) {
                                     console.error('Error deleting order:', error);
                                     setConfirmDialog({
@@ -501,6 +540,43 @@ export function OrdersScreen() {
             </AnimatePresence>
           </div>
         </div>
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-border flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              {t('orders.showing')} {((currentPage - 1) * PAGE_SIZE) + 1}-{Math.min(currentPage * PAGE_SIZE, totalOrders)} {t('orders.of')} {totalOrders}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1 || isLoadingOrders}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm font-medium px-2">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || isLoadingOrders}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Loading indicator */}
+        {isLoadingOrders && (
+          <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          </div>
+        )}
       </div>
 
       {/* Order Details */}
@@ -530,6 +606,34 @@ export function OrdersScreen() {
                 <p className="text-sm text-muted-foreground mt-1">
                   {t('orders.cashierLabel')} {getCashierName(selectedOrder.createdBy)}
                 </p>
+              )}
+              
+              {/* Status Change Buttons - Only for admin/chef */}
+              {canManageOrders && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2">{t('orders.changeStatus')}</p>
+                  <div className="flex flex-wrap gap-1">
+                    {(['draft', 'sentToKitchen', 'paid', 'cancelled'] as const).map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => {
+                          updateOrderStatus(selectedOrder.id, status);
+                          setSelectedOrder({ ...selectedOrder, status });
+                        }}
+                        disabled={selectedOrder.status === status}
+                        className={cn(
+                          "px-2 py-1 rounded text-xs font-medium transition-all flex items-center gap-1",
+                          selectedOrder.status === status
+                            ? cn(statusColors[status], "opacity-100 ring-2 ring-offset-1 ring-primary")
+                            : cn(statusColors[status], "opacity-60 hover:opacity-100")
+                        )}
+                      >
+                        {statusIcons[status]}
+                        {t(`status.${status}`)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 

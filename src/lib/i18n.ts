@@ -81,6 +81,9 @@ export const translations: Record<Language, Record<string, string>> = {
     'orders.confirmDeleteSelected': 'Êtes-vous sûr de vouloir supprimer {count} commande(s) ?',
     'orders.confirmDeleteAll': '⚠️ ATTENTION: Vous êtes sur le point de supprimer TOUTES les commandes. Cette action est irréversible. Confirmez-vous ?',
     'orders.deleteError': 'Erreur lors de la suppression',
+    'orders.changeStatus': 'Changer le statut',
+    'orders.showing': 'Affichage',
+    'orders.of': 'sur',
     
     // Settings
     'settings.title': 'Paramètres',
@@ -241,6 +244,8 @@ export const translations: Record<Language, Record<string, string>> = {
     
     // Reports
     'reports.mostOrdered': 'Articles les Plus Commandés',
+    'reports.categoryBreakdown': 'Répartition par Catégorie',
+    'reports.otherCategory': 'Autre',
     'reports.units': 'unités',
     'reports.salesDay': 'Ventes du Jour',
     'reports.salesWeek': 'Ventes de la Semaine',
@@ -563,6 +568,9 @@ export const translations: Record<Language, Record<string, string>> = {
     'orders.confirmDeleteSelected': 'Are you sure you want to delete {count} order(s)?',
     'orders.confirmDeleteAll': '⚠️ WARNING: You are about to delete ALL orders. This action is irreversible. Do you confirm?',
     'orders.deleteError': 'Error deleting orders',
+    'orders.changeStatus': 'Change status',
+    'orders.showing': 'Showing',
+    'orders.of': 'of',
     
     // Settings
     'settings.title': 'Settings',
@@ -700,6 +708,8 @@ export const translations: Record<Language, Record<string, string>> = {
     
     // Reports
     'reports.mostOrdered': 'Most Ordered Items',
+    'reports.categoryBreakdown': 'Category Breakdown',
+    'reports.otherCategory': 'Other',
     'reports.units': 'units',
     'reports.salesDay': 'Daily Sales',
     'reports.salesWeek': 'Weekly Sales',
@@ -814,6 +824,9 @@ export const translations: Record<Language, Record<string, string>> = {
     'orders.confirmDeleteSelected': 'هل أنت متأكد من حذف {count} طلب(ات)؟',
     'orders.confirmDeleteAll': '⚠️ تحذير: أنت على وشك حذف جميع الطلبات. هذا الإجراء لا يمكن التراجع عنه. هل تؤكد؟',
     'orders.deleteError': 'خطأ في حذف الطلبات',
+    'orders.changeStatus': 'تغيير الحالة',
+    'orders.showing': 'عرض',
+    'orders.of': 'من',
     
     // Settings
     'settings.title': 'الإعدادات',
@@ -1007,6 +1020,8 @@ export const translations: Record<Language, Record<string, string>> = {
     
     // Reports
     'reports.mostOrdered': 'المنتجات الأكثر طلباً',
+    'reports.categoryBreakdown': 'التوزيع حسب الفئة',
+    'reports.otherCategory': 'أخرى',
     'reports.units': 'وحدات',
     'reports.salesDay': 'مبيعات اليوم',
     'reports.salesWeek': 'مبيعات الأسبوع',

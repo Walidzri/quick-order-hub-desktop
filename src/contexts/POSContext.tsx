@@ -97,10 +97,13 @@ interface POSContextType {
   sendToKitchen: (orderId: string) => Promise<void>;
   markAsPaid: (orderId: string, paymentMethod: PaymentMethod) => Promise<Order>;
   cancelOrder: (orderId: string) => Promise<void>;
+  updateOrderStatus: (orderId: string, status: OrderStatus) => Promise<void>;
   deleteOrder: (orderId: string) => Promise<void>;
   deleteOrders: (orderIds: string[]) => Promise<void>;
   deleteAllOrders: () => Promise<void>;
   loadOrders: (startDate?: Date, endDate?: Date) => Promise<void>;
+  loadOrdersByDateRange: (startDate: Date, endDate: Date) => Promise<Order[]>;
+  loadOrdersPaginated: (page: number, pageSize: number) => Promise<{ orders: Order[]; total: number; totalPages: number }>;
   
   // Promotions
   promotions: Promotion[];
@@ -737,6 +740,19 @@ export function POSProvider({ children }: { children: ReactNode }) {
     await loadOrders();
   }, [loadOrders]);
 
+  const updateOrderStatus = useCallback(async (orderId: string, status: OrderStatus) => {
+    const db = await getDB();
+    const order = await db.get('orders', orderId);
+    
+    if (!order) return;
+    
+    order.status = status;
+    order.updatedAt = new Date();
+    
+    await db.put('orders', order);
+    await loadOrders();
+  }, [loadOrders]);
+
   const deleteOrder = useCallback(async (orderId: string) => {
     const db = await getDB();
     await db.delete('orders', orderId);
@@ -759,6 +775,46 @@ export function POSProvider({ children }: { children: ReactNode }) {
     }
     await loadOrders();
   }, [loadOrders]);
+
+  // Optimized order loading - by date range (doesn't update state, returns directly)
+  const loadOrdersByDateRange = useCallback(async (startDate: Date, endDate: Date): Promise<Order[]> => {
+    const db = await getDB();
+    // Use optimized query if available
+    if ('getOrdersByDateRange' in db) {
+      return await (db as any).getOrdersByDateRange(startDate, endDate);
+    }
+    // Fallback to loading all and filtering
+    const allOrders = await db.getAll('orders') as Order[];
+    return allOrders.filter(order => {
+      const orderDate = new Date(order.createdAt);
+      return orderDate >= startDate && orderDate <= endDate;
+    }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, []);
+
+  // Optimized order loading - with pagination
+  const loadOrdersPaginated = useCallback(async (page: number, pageSize: number): Promise<{ orders: Order[]; total: number; totalPages: number }> => {
+    const db = await getDB();
+    const offset = (page - 1) * pageSize;
+    
+    // Use optimized query if available
+    if ('getOrdersPaginated' in db) {
+      const result = await (db as any).getOrdersPaginated(pageSize, offset);
+      return {
+        orders: result.orders,
+        total: result.total,
+        totalPages: Math.ceil(result.total / pageSize),
+      };
+    }
+    
+    // Fallback to loading all and slicing
+    const allOrders = await db.getAll('orders') as Order[];
+    const sorted = allOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return {
+      orders: sorted.slice(offset, offset + pageSize),
+      total: allOrders.length,
+      totalPages: Math.ceil(allOrders.length / pageSize),
+    };
+  }, []);
 
   // Promotions management
   const loadPromotions = useCallback(async () => {
@@ -853,10 +909,13 @@ export function POSProvider({ children }: { children: ReactNode }) {
     sendToKitchen,
     markAsPaid,
     cancelOrder,
+    updateOrderStatus,
     deleteOrder,
     deleteOrders,
     deleteAllOrders,
     loadOrders,
+    loadOrdersByDateRange,
+    loadOrdersPaginated,
     promotions,
     loadPromotions,
     savePromotion,

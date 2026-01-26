@@ -74,6 +74,7 @@ export interface OrderLine {
   id: string;
   productId?: string;
   productName: string;
+  categoryId?: string; // For category breakdown in reports
   variantId?: string;
   variantSize?: string;
   quantity: number;

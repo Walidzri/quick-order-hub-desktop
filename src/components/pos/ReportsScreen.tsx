@@ -4,7 +4,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/i18n';
 import { motion } from 'framer-motion';
 import { 
-  TrendingUp, 
+  TrendingUp,
+  TrendingDown,
   ShoppingCart, 
   DollarSign, 
   Download,
@@ -12,21 +13,28 @@ import {
   Package,
   BarChart3,
   Users,
-  Clock
+  Clock,
+  PieChart as PieChartIcon,
+  Minus,
+  Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { getDB, UserSession, User } from '@/lib/database';
+import { getDB, UserSession, User, Order } from '@/lib/database';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
 type PeriodType = 'day' | 'week' | 'month' | 'year';
 
 export function ReportsScreen() {
-  const { orders, loadOrders, currency, t } = usePOS();
+  const { loadOrdersByDateRange, currency, t } = usePOS();
   const { users, hasPermission } = useAuth();
   const [period, setPeriod] = useState<PeriodType>('day');
   const [userSessions, setUserSessions] = useState<UserSession[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [periodOrders, setPeriodOrders] = useState<Order[]>([]);
+  const [prevPeriodOrders, setPrevPeriodOrders] = useState<Order[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const loadCashierStats = useCallback(async () => {
     try {
@@ -48,51 +56,108 @@ export function ReportsScreen() {
     }
   }, []);
 
+  // Calculate period dates with useMemo for stability
+  const { startDate, endDate, prevStartDate, prevEndDate } = useMemo(() => {
+    const now = new Date();
+    let start: Date;
+    let end: Date = new Date(now);
+    end.setHours(23, 59, 59, 999);
+    let prevStart: Date;
+    let prevEnd: Date;
+
+    switch (period) {
+      case 'day':
+        start = new Date(now);
+        start.setHours(0, 0, 0, 0);
+        prevStart = new Date(start);
+        prevStart.setDate(prevStart.getDate() - 1);
+        prevEnd = new Date(prevStart);
+        prevEnd.setHours(23, 59, 59, 999);
+        break;
+      case 'week':
+        start = new Date(now);
+        const dayOfWeek = start.getDay();
+        const diff = start.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        start.setDate(diff);
+        start.setHours(0, 0, 0, 0);
+        prevStart = new Date(start);
+        prevStart.setDate(prevStart.getDate() - 7);
+        prevEnd = new Date(prevStart);
+        prevEnd.setDate(prevEnd.getDate() + 6);
+        prevEnd.setHours(23, 59, 59, 999);
+        break;
+      case 'month':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        start.setHours(0, 0, 0, 0);
+        prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        prevStart.setHours(0, 0, 0, 0);
+        prevEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+        prevEnd.setHours(23, 59, 59, 999);
+        break;
+      case 'year':
+        start = new Date(now.getFullYear(), 0, 1);
+        start.setHours(0, 0, 0, 0);
+        prevStart = new Date(now.getFullYear() - 1, 0, 1);
+        prevStart.setHours(0, 0, 0, 0);
+        prevEnd = new Date(now.getFullYear() - 1, 11, 31);
+        prevEnd.setHours(23, 59, 59, 999);
+        break;
+      default:
+        start = new Date(now);
+        start.setHours(0, 0, 0, 0);
+        prevStart = new Date(start);
+        prevStart.setDate(prevStart.getDate() - 1);
+        prevEnd = new Date(prevStart);
+        prevEnd.setHours(23, 59, 59, 999);
+    }
+
+    return { startDate: start, endDate: end, prevStartDate: prevStart, prevEndDate: prevEnd };
+  }, [period]);
+
+  // Load orders when period changes - OPTIMIZED: only loads needed date ranges
   useEffect(() => {
-    loadOrders();
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        // Load both periods in parallel for better performance
+        const [current, previous] = await Promise.all([
+          loadOrdersByDateRange(startDate, endDate),
+          loadOrdersByDateRange(prevStartDate, prevEndDate),
+        ]);
+        setPeriodOrders(current);
+        setPrevPeriodOrders(previous);
+      } catch (error) {
+        console.error('Failed to load orders:', error);
+        setPeriodOrders([]);
+        setPrevPeriodOrders([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadData();
     loadCashierStats();
-  }, [loadOrders, loadCashierStats]);
-
-  // Calculate period dates
-  const now = new Date();
-  let startDate: Date;
-  let endDate: Date = new Date(now);
-  endDate.setHours(23, 59, 59, 999);
-
-  switch (period) {
-    case 'day':
-      startDate = new Date(now);
-      startDate.setHours(0, 0, 0, 0);
-      break;
-    case 'week':
-      startDate = new Date(now);
-      const dayOfWeek = startDate.getDay();
-      const diff = startDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Monday
-      startDate.setDate(diff);
-      startDate.setHours(0, 0, 0, 0);
-      break;
-    case 'month':
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      startDate.setHours(0, 0, 0, 0);
-      break;
-    case 'year':
-      startDate = new Date(now.getFullYear(), 0, 1);
-      startDate.setHours(0, 0, 0, 0);
-      break;
-    default:
-      startDate = new Date(now);
-      startDate.setHours(0, 0, 0, 0);
-  }
-
-  // Filter orders by period
-  const periodOrders = orders.filter(o => {
-    const orderDate = new Date(o.createdAt);
-    return orderDate >= startDate && orderDate <= endDate;
-  });
+  }, [startDate, endDate, prevStartDate, prevEndDate, loadOrdersByDateRange, loadCashierStats]);
 
   const paidOrders = periodOrders.filter(o => o.status === 'paid');
+  const prevPaidOrders = prevPeriodOrders.filter(o => o.status === 'paid');
+  
   const totalRevenue = paidOrders.reduce((sum, o) => sum + o.total, 0);
+  const prevTotalRevenue = prevPaidOrders.reduce((sum, o) => sum + o.total, 0);
+  
   const avgOrderValue = paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0;
+  const prevAvgOrderValue = prevPaidOrders.length > 0 ? prevTotalRevenue / prevPaidOrders.length : 0;
+
+  // Calculate percentage changes
+  const calcChange = (current: number, previous: number): number | null => {
+    if (previous === 0) return current > 0 ? 100 : null;
+    return ((current - previous) / previous) * 100;
+  };
+
+  const ordersChange = calcChange(periodOrders.length, prevPeriodOrders.length);
+  const paidOrdersChange = calcChange(paidOrders.length, prevPaidOrders.length);
+  const revenueChange = calcChange(totalRevenue, prevTotalRevenue);
+  const avgChange = calcChange(avgOrderValue, prevAvgOrderValue);
 
   // Calculate cashier statistics
   interface CashierStats {
@@ -200,8 +265,61 @@ export function ReportsScreen() {
 
   const maxQuantity = topProducts.length > 0 ? topProducts[0].totalQuantity : 1;
 
+  // Calculate category breakdown for donut chart
+  const { categories: allCategories } = usePOS();
+  
+  interface CategoryStats {
+    name: string;
+    value: number; // revenue
+    quantity: number;
+    color: string;
+  }
+
+  const CHART_COLORS = [
+    '#3b82f6', // blue
+    '#10b981', // green
+    '#f59e0b', // amber
+    '#ef4444', // red
+    '#8b5cf6', // violet
+    '#ec4899', // pink
+    '#06b6d4', // cyan
+    '#f97316', // orange
+    '#84cc16', // lime
+    '#6366f1', // indigo
+  ];
+
+  const categoryStatsMap = new Map<string, CategoryStats>();
+
+  paidOrders.forEach(order => {
+    order.lines.forEach(line => {
+      const categoryId = line.categoryId || 'unknown';
+      const category = allCategories.find(c => c.id === categoryId);
+      const categoryName = category?.name || t('reports.otherCategory');
+      
+      if (!categoryStatsMap.has(categoryId)) {
+        categoryStatsMap.set(categoryId, {
+          name: categoryName,
+          value: 0,
+          quantity: 0,
+          color: CHART_COLORS[categoryStatsMap.size % CHART_COLORS.length],
+        });
+      }
+
+      const stats = categoryStatsMap.get(categoryId)!;
+      const lineTotal = (line.unitPrice + (line.modifiers?.reduce((sum, m) => sum + m.priceAdjustment, 0) || 0)) * line.quantity;
+      stats.value += lineTotal;
+      stats.quantity += line.quantity;
+    });
+  });
+
+  const categoryData = Array.from(categoryStatsMap.values())
+    .sort((a, b) => b.value - a.value);
+  
+  const totalCategoryRevenue = categoryData.reduce((sum, c) => sum + c.value, 0);
+
   // Get period label
   const getPeriodLabel = (): string => {
+    const now = new Date();
     switch (period) {
       case 'day':
         return now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -218,30 +336,60 @@ export function ReportsScreen() {
     }
   };
 
+  // Render comparison badge
+  const renderChange = (change: number | null) => {
+    if (change === null) return null;
+    const isPositive = change > 0;
+    const isZero = Math.abs(change) < 0.1;
+    
+    if (isZero) {
+      return (
+        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Minus className="w-3 h-3" />
+          0%
+        </span>
+      );
+    }
+    
+    return (
+      <span className={cn(
+        "flex items-center gap-1 text-xs font-medium",
+        isPositive ? "text-success" : "text-destructive"
+      )}>
+        {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+        {isPositive ? '+' : ''}{change.toFixed(1)}%
+      </span>
+    );
+  };
+
   const stats = [
     {
       title: t('reports.totalOrders'),
       value: periodOrders.length,
       icon: <ShoppingCart className="w-6 h-6" />,
       color: 'bg-info/10 text-info',
+      change: ordersChange,
     },
     {
       title: t('reports.paidOrders'),
       value: paidOrders.length,
       icon: <TrendingUp className="w-6 h-6" />,
       color: 'bg-success/10 text-success',
+      change: paidOrdersChange,
     },
     {
       title: t('reports.totalRevenue'),
       value: formatCurrency(totalRevenue, currency),
       icon: <DollarSign className="w-6 h-6" />,
       color: 'bg-primary/10 text-primary',
+      change: revenueChange,
     },
     {
       title: t('reports.avgOrder'),
       value: formatCurrency(avgOrderValue, currency),
       icon: <Calendar className="w-6 h-6" />,
       color: 'bg-warning/10 text-warning',
+      change: avgChange,
     },
   ];
 
@@ -280,7 +428,10 @@ export function ReportsScreen() {
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold">{t('reports.title')}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl sm:text-2xl font-bold">{t('reports.title')}</h1>
+              {isLoading && <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />}
+            </div>
             <p className="text-xs sm:text-sm text-muted-foreground mt-1">{getPeriodLabel()}</p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -327,6 +478,10 @@ export function ReportsScreen() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs sm:text-sm text-muted-foreground truncate">{stat.title}</p>
                       <p className="text-2xl sm:text-3xl font-bold mt-1">{stat.value}</p>
+                      {/* Comparison with previous period */}
+                      <div className="mt-1">
+                        {renderChange(stat.change)}
+                      </div>
                     </div>
                     <div className={`p-2 sm:p-3 rounded-xl ${stat.color} flex-shrink-0`}>
                       {stat.icon}
@@ -337,6 +492,82 @@ export function ReportsScreen() {
             </motion.div>
           ))}
         </div>
+
+        {/* Category Breakdown - Donut Chart */}
+        {categoryData.length > 0 && (
+          <Card className="mb-4 sm:mb-6">
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <PieChartIcon className="w-4 h-4 sm:w-5 sm:h-5" />
+                {t('reports.categoryBreakdown')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Donut Chart */}
+                <div className="h-[250px] sm:h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={2}
+                        dataKey="value"
+                        nameKey="name"
+                      >
+                        {categoryData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        formatter={(value: number) => formatCurrency(value, currency)}
+                        labelFormatter={(name: string) => name}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                {/* Category Legend & Stats */}
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {categoryData.map((category, index) => {
+                    const percentage = totalCategoryRevenue > 0 
+                      ? ((category.value / totalCategoryRevenue) * 100).toFixed(1) 
+                      : '0';
+                    return (
+                      <motion.div
+                        key={category.name}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="flex items-center justify-between p-2 sm:p-3 bg-muted/50 rounded-lg"
+                      >
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                          <div 
+                            className="w-3 h-3 sm:w-4 sm:h-4 rounded-full flex-shrink-0" 
+                            style={{ backgroundColor: category.color }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">{category.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {category.quantity} {t('reports.units')}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="font-bold text-sm">{formatCurrency(category.value, currency)}</div>
+                          <div className="text-xs text-muted-foreground">{percentage}%</div>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Top Products */}
         {paidOrders.length > 0 && (

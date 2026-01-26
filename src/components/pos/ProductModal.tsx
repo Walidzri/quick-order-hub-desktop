@@ -183,6 +183,7 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
       id: generateUUID(),
       productId: product.id,
       productName: productNameWithCategory,
+      categoryId: product.categoryId, // For category breakdown in reports
       variantId: selectedVariant?.id,
       variantSize: selectedVariant?.size,
       quantity,

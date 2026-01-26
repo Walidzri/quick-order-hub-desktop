@@ -709,6 +709,27 @@ export class IndexedDBLikeDB {
     // SQLite doesn't need explicit close in sql.js
     // The database will be saved on the next saveDatabase() call
   }
+
+  /**
+   * Get orders by date range (optimized query)
+   */
+  async getOrdersByDateRange(startDate: Date, endDate: Date): Promise<Order[]> {
+    return await this.sqliteDB.getOrdersByDateRange(startDate, endDate);
+  }
+
+  /**
+   * Get orders with pagination (optimized query)
+   */
+  async getOrdersPaginated(limit: number, offset: number): Promise<{ orders: Order[]; total: number }> {
+    return await this.sqliteDB.getOrdersPaginated(limit, offset);
+  }
+
+  /**
+   * Get total count of orders
+   */
+  async getOrdersCount(): Promise<number> {
+    return await this.sqliteDB.getOrdersCount();
+  }
 }
 
 /**
@@ -1670,6 +1691,50 @@ export class SQLiteDB {
     }
     stmt.free();
     return orders;
+  }
+
+  async getOrdersPaginated(limit: number, offset: number): Promise<{ orders: Order[]; total: number }> {
+    // Get total count
+    const countStmt = this.db.prepare('SELECT COUNT(*) as count FROM orders');
+    countStmt.step();
+    const total = (countStmt.getAsObject() as { count: number }).count;
+    countStmt.free();
+
+    // Get paginated orders
+    const stmt = this.db.prepare('SELECT * FROM orders ORDER BY createdAt DESC LIMIT ? OFFSET ?');
+    stmt.bind([limit, offset]);
+    const orders: Order[] = [];
+    while (stmt.step()) {
+      const row = stmt.getAsObject();
+      orders.push({
+        id: row.id as string,
+        orderNumber: row.orderNumber as string,
+        status: row.status as OrderStatus,
+        type: row.type as OrderType,
+        lines: deserializeJSON<OrderLine[]>(row.lines as string),
+        subtotal: row.subtotal as number,
+        discount: row.discount as number,
+        promoCode: row.promoCode as string | undefined,
+        promoName: row.promoName as string | undefined,
+        total: row.total as number,
+        paymentMethod: row.paymentMethod as PaymentMethod | undefined,
+        createdBy: row.createdBy as string | undefined,
+        createdAt: isoToDate(row.createdAt as string),
+        updatedAt: isoToDate(row.updatedAt as string),
+        paidAt: row.paidAt ? isoToDate(row.paidAt as string) : undefined,
+        sentToKitchenAt: row.sentToKitchenAt ? isoToDate(row.sentToKitchenAt as string) : undefined,
+      });
+    }
+    stmt.free();
+    return { orders, total };
+  }
+
+  async getOrdersCount(): Promise<number> {
+    const stmt = this.db.prepare('SELECT COUNT(*) as count FROM orders');
+    stmt.step();
+    const result = (stmt.getAsObject() as { count: number }).count;
+    stmt.free();
+    return result;
   }
   
   async putOrder(order: Order): Promise<void> {
