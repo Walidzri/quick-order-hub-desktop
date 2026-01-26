@@ -186,6 +186,32 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                           <DisplayToggle label="Sous-total" checked={customization.showSubtotal} onChange={(v) => updateCustomization({ showSubtotal: v })} />
                           <DisplayToggle label="Remise" checked={customization.showDiscount} onChange={(v) => updateCustomization({ showDiscount: v })} />
                           <DisplayToggle label="Total" checked={customization.showTotal} onChange={(v) => updateCustomization({ showTotal: v })} />
+                          <DisplayToggle label="Nombre d'articles" checked={customization.showItemCount} onChange={(v) => updateCustomization({ showItemCount: v })} />
+                          <DisplayToggle label="Logo" checked={customization.showLogo} onChange={(v) => updateCustomization({ showLogo: v })} />
+                          {customization.showLogo && (
+                            <div className="col-span-2">
+                              <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Taille du logo</label>
+                              <Select 
+                                value={String(customization.logoSize || 50)} 
+                                onValueChange={(v) => updateCustomization({ logoSize: parseInt(v) || 50 })}
+                              >
+                                <SelectTrigger className="w-full">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="20">20% (Petit)</SelectItem>
+                                  <SelectItem value="30">30%</SelectItem>
+                                  <SelectItem value="40">40%</SelectItem>
+                                  <SelectItem value="50">50% (Par défaut)</SelectItem>
+                                  <SelectItem value="60">60%</SelectItem>
+                                  <SelectItem value="70">70%</SelectItem>
+                                  <SelectItem value="80">80%</SelectItem>
+                                  <SelectItem value="90">90%</SelectItem>
+                                  <SelectItem value="100">100% (Grand)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                           <DisplayToggle label="Montant reçu" checked={customization.showAmountReceived} onChange={(v) => updateCustomization({ showAmountReceived: v })} />
                           <DisplayToggle label="Monnaie" checked={customization.showChange} onChange={(v) => updateCustomization({ showChange: v })} />
                         </div>
@@ -329,6 +355,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                         <LabelInput label="Sous-total" value={customization.labelSubtotal} onChange={(v) => updateCustomization({ labelSubtotal: v })} />
                         <LabelInput label="Remise" value={customization.labelDiscount} onChange={(v) => updateCustomization({ labelDiscount: v })} />
                         <LabelInput label="Total" value={customization.labelTotal} onChange={(v) => updateCustomization({ labelTotal: v })} />
+                        <LabelInput label="Nombre d'articles" value={customization.labelItemCount} onChange={(v) => updateCustomization({ labelItemCount: v })} />
                         <LabelInput label="Montant reçu" value={customization.labelAmountReceived} onChange={(v) => updateCustomization({ labelAmountReceived: v })} />
                         <LabelInput label="Monnaie" value={customization.labelChange} onChange={(v) => updateCustomization({ labelChange: v })} />
                         <LabelInput label="Message de remerciement" value={customization.labelThankYou} onChange={(v) => updateCustomization({ labelThankYou: v })} />
@@ -365,6 +392,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                           <DisplayToggle label="Prix des produits" checked={customization.kitchenShowProductPrices} onChange={(v) => updateCustomization({ kitchenShowProductPrices: v })} />
                           <DisplayToggle label="Modificateurs" checked={customization.kitchenShowModifiers} onChange={(v) => updateCustomization({ kitchenShowModifiers: v })} />
                           <DisplayToggle label="Notes" checked={customization.kitchenShowNotes} onChange={(v) => updateCustomization({ kitchenShowNotes: v })} />
+                          <DisplayToggle label="Nombre d'articles" checked={customization.kitchenShowItemCount} onChange={(v) => updateCustomization({ kitchenShowItemCount: v })} />
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
@@ -484,6 +512,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <LabelInput label="Titre du ticket" value={customization.labelKitchenTicket} onChange={(v) => updateCustomization({ labelKitchenTicket: v })} />
                         <LabelInput label="Message de fin" value={customization.labelBonAppetit} onChange={(v) => updateCustomization({ labelBonAppetit: v })} />
+                        <LabelInput label="Nombre d'articles" value={customization.kitchenLabelItemCount || customization.labelItemCount} onChange={(v) => updateCustomization({ kitchenLabelItemCount: v })} />
                         <LabelInput label="Numéro de commande" value={customization.labelOrderNumber} onChange={(v) => updateCustomization({ labelOrderNumber: v })} />
                         <LabelInput label="Date" value={customization.labelDate} onChange={(v) => updateCustomization({ labelDate: v })} />
                         <LabelInput label="Heure" value={customization.labelTime} onChange={(v) => updateCustomization({ labelTime: v })} />

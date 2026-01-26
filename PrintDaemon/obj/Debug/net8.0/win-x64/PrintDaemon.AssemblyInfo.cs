@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("Service d\'impression ESC/POS pour Quick Order Hub")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.1.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.0+7d343c9b1310a50c61c7dbb023fea0b9d9d227cb")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.1.0+e71d3494558108730b1b1e7be2e33a05cd2fe236")]
 [assembly: System.Reflection.AssemblyProductAttribute("Quick Order Hub - Print Daemon")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PrintDaemon")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.1.0.0")]

@@ -11,7 +11,7 @@ export type OrderType = 'dine-in' | 'takeaway';
 export type PrinterMode = 'queue' | 'tcp';
 // Type de connexion physique de l'imprimante
 // - 'tcp' / 'wifi' / 'bluetooth' : gérés via daemon
-// - 'windows' : impression via daemon local + spooler Windows (RawPrinterHelper)
+// - 'windows' : impression via PrintDaemon C# + spooler Windows (appels directs Win32)
 export type PrinterConnectionType = 'tcp' | 'bluetooth' | 'wifi' | 'windows';
 export type PrinterRole = 'kitchen' | 'cashier';
 export type PrintJobStatus = 'pending' | 'printed' | 'failed';
@@ -159,8 +159,11 @@ export interface ReceiptCustomization {
   showSubtotal: boolean;
   showDiscount: boolean;
   showTotal: boolean;
+  showItemCount: boolean; // Afficher le nombre d'articles à côté du total
   showAmountReceived: boolean;
   showChange: boolean;
+  showLogo: boolean; // Afficher le logo sur les reçus
+  logoSize: number; // Taille du logo en pourcentage de la largeur de l'imprimante (50 = 50%, par défaut 50% = 288px)
   
   // Formatting options
   dateFormat: string; // "DD/MM/YYYY", "MM/DD/YYYY", etc.
@@ -187,6 +190,7 @@ export interface ReceiptCustomization {
   labelSubtotal: string;
   labelDiscount: string;
   labelTotal: string;
+  labelItemCount: string; // Libellé pour le nombre d'articles
   labelAmountReceived: string;
   labelChange: string;
   labelThankYou: string;
@@ -194,6 +198,8 @@ export interface ReceiptCustomization {
   // Kitchen ticket specific
   labelKitchenTicket: string;
   labelBonAppetit: string;
+  kitchenLabelItemCount: string; // Libellé personnalisé pour le nombre d'articles sur le ticket cuisine
+  kitchenShowItemCount: boolean; // Afficher le nombre d'articles sur le ticket cuisine
   kitchenShowOrderNumber: boolean;
   kitchenShowDate: boolean;
   kitchenShowTime: boolean;
@@ -540,8 +546,11 @@ export async function initializeDatabase(): Promise<void> {
     showSubtotal: true,
     showDiscount: true,
     showTotal: true,
+    showItemCount: true,
     showAmountReceived: true,
     showChange: true,
+    showLogo: true,
+    logoSize: 50, // 50% de la largeur de l'imprimante (288px par défaut)
     dateFormat: 'DD/MM/YYYY',
     timeFormat: 'HH:mm',
     headerAlignment: 'center',
@@ -560,9 +569,13 @@ export async function initializeDatabase(): Promise<void> {
     labelSubtotal: 'SOUS-TOTAL',
     labelDiscount: 'REMISE',
     labelTotal: 'TOTAL',
+    labelItemCount: 'ARTICLES',
     labelAmountReceived: 'MONTANT REÇU',
     labelChange: 'MONNAIE',
     labelThankYou: 'MERCI DE VOTRE VISITE !',
+    labelKitchenTicket: 'TICKET CUISINE',
+    labelBonAppetit: 'Bon appétit !',
+    kitchenLabelItemCount: 'ARTICLES',
     kitchenShowOrderNumber: true,
     kitchenShowDate: true,
     kitchenShowTime: true,
@@ -717,8 +730,11 @@ export async function resetDatabase(): Promise<void> {
     showSubtotal: true,
     showDiscount: true,
     showTotal: true,
+    showItemCount: true,
     showAmountReceived: true,
     showChange: true,
+    showLogo: true,
+    logoSize: 50, // 50% de la largeur de l'imprimante (288px par défaut)
     dateFormat: 'DD/MM/YYYY',
     timeFormat: 'HH:mm',
     headerAlignment: 'center',
@@ -737,9 +753,13 @@ export async function resetDatabase(): Promise<void> {
     labelSubtotal: 'SOUS-TOTAL',
     labelDiscount: 'REMISE',
     labelTotal: 'TOTAL',
+    labelItemCount: 'ARTICLES',
     labelAmountReceived: 'MONTANT REÇU',
     labelChange: 'MONNAIE',
     labelThankYou: 'MERCI DE VOTRE VISITE !',
+    labelKitchenTicket: 'TICKET CUISINE',
+    labelBonAppetit: 'Bon appétit !',
+    kitchenLabelItemCount: 'ARTICLES',
     kitchenShowOrderNumber: true,
     kitchenShowDate: true,
     kitchenShowTime: true,
@@ -868,8 +888,10 @@ async function seedDatabase(db: IDBPDatabase<POSDBSchema>): Promise<void> {
     showSubtotal: true,
     showDiscount: true,
     showTotal: true,
+    showItemCount: true,
     showAmountReceived: true,
     showChange: true,
+    showLogo: true,
     
     // Formatting options
     dateFormat: 'DD/MM/YYYY',
@@ -896,6 +918,7 @@ async function seedDatabase(db: IDBPDatabase<POSDBSchema>): Promise<void> {
     labelSubtotal: 'SOUS-TOTAL',
     labelDiscount: 'REMISE',
     labelTotal: 'TOTAL',
+    labelItemCount: 'ARTICLES',
     labelAmountReceived: 'MONTANT REÇU',
     labelChange: 'MONNAIE',
     labelThankYou: 'MERCI DE VOTRE VISITE !',
@@ -903,6 +926,8 @@ async function seedDatabase(db: IDBPDatabase<POSDBSchema>): Promise<void> {
     // Kitchen ticket specific
     labelKitchenTicket: 'TICKET CUISINE',
     labelBonAppetit: 'Bon appétit !',
+    kitchenLabelItemCount: 'ARTICLES',
+    kitchenShowItemCount: true,
     kitchenShowOrderNumber: true,
     kitchenShowDate: true,
     kitchenShowTime: true,

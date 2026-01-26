@@ -18,6 +18,9 @@
     <PublishTrimmed>false</PublishTrimmed>
     <PublishReadyToRun>true</PublishReadyToRun>
     
+    <!-- Permettre unsafe code pour LockBits -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    
     <!-- Infos assembly -->
     <Version>1.1.0</Version>
     <Company>Doudou Tacos</Company>
@@ -28,6 +31,8 @@
   <ItemGroup>
     <!-- Nécessaire pour PrinterSettings.InstalledPrinters -->
     <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
+    <!-- Nécessaire pour l'encodage CP437 (code page pour imprimantes ESC/POS) -->
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
   </ItemGroup>
 
 </Project>

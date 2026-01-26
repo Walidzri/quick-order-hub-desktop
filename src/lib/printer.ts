@@ -2,10 +2,11 @@
 import { ReceiptCustomization } from './database';
 
 export interface PrinterConnection {
-  type: 'network' | 'bluetooth';
+  type: 'network' | 'bluetooth' | 'windows';
   name: string;
   address?: string; // IP address for network printers
   port?: number; // Port for network printers (default 9100 for raw printing)
+  printerName?: string; // Windows printer name for USB/Windows printing
 }
 
 export class DirectPrinter {
@@ -61,7 +62,9 @@ export class DirectPrinter {
       receiptStr += this.commands.alignLeft();
       
       // Add content as-is (content already contains proper formatting)
-      receiptStr += content;
+      // Remove leading newlines/whitespace to avoid extra space at top
+      const trimmedContent = content.replace(/^\s*\n+/, '');
+      receiptStr += trimmedContent;
       
       // Feed lines before cutting (more lines for better compatibility)
       receiptStr += this.commands.feed(5);
@@ -108,8 +111,8 @@ export class DirectPrinter {
   }
 
   // Print via Network (TCP/IP for network printers)
-  // Always use the integrated daemon API for consistency
-  async printViaNetwork(content: string, isThermalPrinter: boolean = true): Promise<void> {
+  // Uses PrintDaemon C# API (http://127.0.0.1:9100/print)
+  async printViaNetwork(content: string, isThermalPrinter: boolean = true, logoBase64?: string, logoSize?: number): Promise<void> {
     if (!this.connection?.address) {
       throw new Error('Adresse réseau non configurée');
     }
@@ -122,47 +125,83 @@ export class DirectPrinter {
       return this.printViaWebSocket(content, address, isThermalPrinter);
     }
 
-    // Use the integrated daemon API (always, even in Electron)
-    // This ensures consistent behavior and avoids needing printer names
+    // Use PrintDaemon C# API
+    // Format: Headers X-Printer-Name (IP:Port) + X-Printer-Type (network) + Body (bytes ESC/POS)
     const daemonUrl = 'http://127.0.0.1:9100/print';
     
     try {
-      const body = {
-        connectionType: 'tcp', // Use 'tcp' for all network printers (IP/WiFi)
-        target: {
-          host: address,
-          port: port,
-        },
-        content: content,
-        isThermalPrinter: isThermalPrinter,
-        role: 'cashier' as const,
-      };
+      // Format content as ESC/POS bytes
+      const escPosBytes = this.formatReceipt(content, isThermalPrinter);
+      
+      // Format printer name as "IP:Port" for network printers
+      const printerName = `${address}:${port}`;
 
-      console.log('[PRINTER] Sending to daemon via TCP/IP:', { address, port, isThermalPrinter });
+      console.log('[PRINTER] Sending to PrintDaemon C# via TCP/IP:', { address, port, isThermalPrinter, bytes: escPosBytes.length });
 
+      // Si logo présent, utiliser l'endpoint /print/with-logo avec JSON
+      if (logoBase64) {
+        // Convertir les bytes Uint8Array en base64 pour le JSON
+          const base64Data = uint8ToBase64(escPosBytes);
+
+        
+        const jsonBodyWithBase64 = JSON.stringify({
+          logo: logoBase64,
+          data: base64Data
+        });
+
+        const response = await fetch('http://127.0.0.1:9100/print/with-logo', {
+          method: 'POST',
+          headers: {
+            'X-Printer-Name': printerName,
+            'X-Printer-Type': 'network',
+            'Content-Type': 'application/json',
+          },
+          body: jsonBodyWithBase64,
+        });
+
+        if (!response.ok) {
+          const result = await response.json().catch(() => null);
+          const errorMsg = result?.error || result?.message || `HTTP ${response.status}`;
+          throw new Error(`Erreur PrintDaemon: ${errorMsg}`);
+        }
+
+        const result = await response.json();
+        if (!result || result.success !== true) {
+          throw new Error(result?.error || result?.message || 'Erreur lors de l\'impression');
+        }
+
+        console.log('[PRINTER] ✅ Print successful via PrintDaemon C# (with logo)', { bytesWritten: result.bytesWritten });
+        return;
+      }
+
+      // Sinon, utiliser l'endpoint standard /print
       const response = await fetch(daemonUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        headers: {
+          'X-Printer-Name': printerName,
+          'X-Printer-Type': 'network',
+          'Content-Type': 'application/octet-stream',
+        },
+        body: escPosBytes,
       });
 
       if (!response.ok) {
         const result = await response.json().catch(() => null);
-        const errorMsg = result?.message || result?.error || `HTTP ${response.status}`;
-        throw new Error(`Erreur daemon d'impression: ${errorMsg}`);
+        const errorMsg = result?.error || result?.message || `HTTP ${response.status}`;
+        throw new Error(`Erreur PrintDaemon: ${errorMsg}`);
       }
 
       const result = await response.json();
       if (!result || result.success !== true) {
-        throw new Error(result?.message || 'Erreur lors de l\'impression');
+        throw new Error(result?.error || result?.message || 'Erreur lors de l\'impression');
       }
 
-      console.log('[PRINTER] Print successful via daemon');
+      console.log('[PRINTER] ✅ Print successful via PrintDaemon C#', { bytesWritten: result.bytesWritten });
     } catch (error) {
       console.error('[PRINTER] Network print error:', error);
       if (error instanceof TypeError && error.message.includes('fetch')) {
         throw new Error(
-          'Daemon d\'impression non accessible. Vérifiez qu\'il est démarré.'
+          'PrintDaemon C# non accessible. Vérifiez qu\'il est démarré (http://127.0.0.1:9100).'
         );
       }
       throw error;
@@ -193,9 +232,94 @@ export class DirectPrinter {
     });
   }
 
+  // Print via Windows (USB/Spooler)
+  // Uses PrintDaemon C# API
+  async printViaWindows(content: string, isThermalPrinter: boolean = true, logoBase64?: string, logoSize?: number): Promise<void> {
+    if (!this.connection?.printerName) {
+      throw new Error('Nom d\'imprimante Windows non configuré');
+    }
+
+    const daemonUrl = 'http://127.0.0.1:9100/print';
+    
+    try {
+      // Format content as ESC/POS bytes
+      const escPosBytes = this.formatReceipt(content, isThermalPrinter);
+
+      console.log('[PRINTER] Sending to PrintDaemon C# via Windows:', { printerName: this.connection.printerName, bytes: escPosBytes.length });
+
+      // Si logo présent, utiliser l'endpoint /print/with-logo avec JSON
+      if (logoBase64) {
+        const base64Data = uint8ToBase64(escPosBytes);
+        const jsonBodyWithBase64 = JSON.stringify({
+          logo: logoBase64,
+          data: base64Data,
+          logoSize: logoSize || 50 // Taille par défaut: 50% (288px)
+        });
+
+        const response = await fetch('http://127.0.0.1:9100/print/with-logo', {
+          method: 'POST',
+          headers: {
+            'X-Printer-Name': this.connection.printerName,
+            'X-Printer-Type': 'usb',
+            'Content-Type': 'application/json',
+          },
+          body: jsonBodyWithBase64,
+        });
+
+        if (!response.ok) {
+          const result = await response.json().catch(() => null);
+          const errorMsg = result?.error || result?.message || `HTTP ${response.status}`;
+          throw new Error(`Erreur PrintDaemon: ${errorMsg}`);
+        }
+
+        const result = await response.json();
+        if (!result || result.success !== true) {
+          throw new Error(result?.error || result?.message || 'Erreur lors de l\'impression');
+        }
+
+        console.log('[PRINTER] ✅ Print successful via PrintDaemon C# (Windows, with logo)', { bytesWritten: result.bytesWritten });
+        return;
+      }
+
+      // Sinon, utiliser l'endpoint standard /print
+      const response = await fetch(daemonUrl, {
+        method: 'POST',
+        headers: {
+          'X-Printer-Name': this.connection.printerName,
+          'X-Printer-Type': 'usb',
+          'Content-Type': 'application/octet-stream',
+        },
+        body: escPosBytes,
+      });
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => null);
+        const errorMsg = result?.error || result?.message || `HTTP ${response.status}`;
+        throw new Error(`Erreur PrintDaemon: ${errorMsg}`);
+      }
+
+      const result = await response.json();
+      if (!result || result.success !== true) {
+        throw new Error(result?.error || result?.message || 'Erreur lors de l\'impression');
+      }
+
+      console.log('[PRINTER] ✅ Print successful via PrintDaemon C# (Windows)', { bytesWritten: result.bytesWritten });
+    } catch (error) {
+      console.error('[PRINTER] Windows print error:', error);
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new Error(
+          'PrintDaemon C# non accessible. Vérifiez qu\'il est démarré (http://127.0.0.1:9100).'
+        );
+      }
+      throw error;
+    }
+  }
+
   // Main print method - tries different methods
   // isThermalPrinter: true for ESC/POS thermal printers, false for regular printers
-  async print(content: string, isThermalPrinter: boolean = true): Promise<void> {
+  // logoBase64: optional logo image in base64 format (will be printed before content)
+  // logoSize: optional logo size in percentage of printer width (default: 50)
+  async print(content: string, isThermalPrinter: boolean = true, logoBase64?: string, logoSize?: number): Promise<void> {
     if (!this.connection) {
       throw new Error('Aucune connexion imprimante configurée');
     }
@@ -206,7 +330,9 @@ export class DirectPrinter {
         if (this.connection.address?.startsWith('ws://') || this.connection.address?.startsWith('wss://')) {
           return this.printViaWebSocket(content, this.connection.address, isThermalPrinter);
         }
-        return this.printViaNetwork(content, isThermalPrinter);
+        return this.printViaNetwork(content, isThermalPrinter, logoBase64, logoSize);
+      case 'windows':
+        return this.printViaWindows(content, isThermalPrinter, logoBase64, logoSize);
       case 'bluetooth':
         // Bluetooth printing requires Web Bluetooth API
         throw new Error('Impression Bluetooth non encore implémentée');
@@ -217,11 +343,18 @@ export class DirectPrinter {
 
   // ESC/POS raw strings for use in static formatTextReceipt (order number large, centered)
   private static ESC = '\x1B';
-  private static escCenter = '\x1Ba\x01';
-  private static escLeft = '\x1Ba\x00';
-  private static escRight = '\x1Ba\x02';
-  private static escDoubleSize = '\x1B!\x11'; // (2-1)|((2-1)<<4)
-  private static escNormalSize = '\x1B!\x00';
+  private static escCenter = '\x1Ba1'; // ESC a 1 = center alignment
+  private static escLeft = '\x1Ba0'; // ESC a 0 = left alignment
+  private static escRight = '\x1Ba2'; // ESC a 2 = right alignment
+  // ESC/POS font size command: ESC ! n
+  // n = (width-1) | ((height-1) << 4)
+  // For double width and height: (2-1) | ((2-1) << 4) = 1 | 16 = 17 = 0x11
+  // Use String.fromCharCode to ensure correct byte encoding
+  private static escDoubleSize = '\x1B!' + String.fromCharCode(0x11); // Double width + double height
+  private static escNormalSize = '\x1B!' + String.fromCharCode(0x00);
+  // Bold commands: ESC E n (n=1 for on, n=0 for off)
+  private static escBoldOn = '\x1BE' + String.fromCharCode(0x01);
+  private static escBoldOff = '\x1BE' + String.fromCharCode(0x00);
 
   // Get default customization
   static getDefaultCustomization(): ReceiptCustomization {
@@ -239,8 +372,11 @@ export class DirectPrinter {
       showSubtotal: true,
       showDiscount: true,
       showTotal: true,
+      showItemCount: true,
       showAmountReceived: true,
       showChange: true,
+      showLogo: true,
+      logoSize: 50, // 50% de la largeur de l'imprimante (288px par défaut)
       dateFormat: 'DD/MM/YYYY',
       timeFormat: 'HH:mm',
       headerAlignment: 'center',
@@ -259,11 +395,15 @@ export class DirectPrinter {
       labelSubtotal: 'SOUS-TOTAL',
       labelDiscount: 'REMISE',
       labelTotal: 'TOTAL',
+      labelItemCount: 'ARTICLES',
+      showLogo: true,
       labelAmountReceived: 'MONTANT REÇU',
       labelChange: 'MONNAIE',
       labelThankYou: 'MERCI DE VOTRE VISITE !',
       labelKitchenTicket: 'TICKET CUISINE',
       labelBonAppetit: 'Bon appétit !',
+      kitchenLabelItemCount: 'ARTICLES',
+      kitchenShowItemCount: true,
       kitchenShowOrderNumber: true,
       kitchenShowDate: true,
       kitchenShowTime: true,
@@ -370,6 +510,7 @@ export class DirectPrinter {
     phone?: string;
     header?: string;
     footer?: string;
+    logo?: string; // Base64 image data URL
     orderNumber: string;
     date: string;
     type: string;
@@ -395,6 +536,28 @@ export class DirectPrinter {
     const custom = data.customization || this.getDefaultCustomization();
     const isKitchen = data.isKitchenTicket || false;
     const width = 48; // Standard thermal printer width (80mm)
+    
+    // Helper function to format label-value pairs with label on left and value on right
+    // Similar to the preview which uses flex justify-between
+    // Calculates spaces to justify the value to the right edge of the printer
+    const formatLabelValue = (label: string, value: string): string => {
+      const cleanedLabel = this.cleanTextForPrinter(label);
+      const cleanedValue = this.cleanTextForPrinter(value);
+      const labelWithColon = `${cleanedLabel}:`;
+      
+      // Calculate spaces needed to justify value to the right
+      // Total width - label length - value length = spaces needed
+      const totalLength = labelWithColon.length + cleanedValue.length;
+      const spacesNeeded = Math.max(1, width - totalLength);
+      
+      // If label is too long, just add one space
+      if (labelWithColon.length >= width - cleanedValue.length) {
+        return `${labelWithColon} ${cleanedValue}\n`;
+      }
+      
+      return `${labelWithColon}${' '.repeat(spacesNeeded)}${cleanedValue}\n`;
+    };
+    
     // Use simple dash for separator to avoid encoding issues
     const separatorChar = custom.separatorStyle === 'none' ? ' ' : 
                          custom.separatorChar === '─' ? '-' : 
@@ -416,12 +579,41 @@ export class DirectPrinter {
     const bigOrderNumberBlock = () => {
       if (!showOrderNumber) return;
       const num = this.cleanTextForPrinter(data.orderNumber);
-      receipt += DirectPrinter.escCenter + DirectPrinter.escDoubleSize + num + '\n' + DirectPrinter.escNormalSize + DirectPrinter.escLeft;
+      // Build the order number block with proper ESC/POS commands
+      // Use explicit byte values to ensure correct encoding
+      // ESC a 1 = center alignment
+      receipt += '\x1B\x61\x01';
+      // ESC E 1 = bold on
+      receipt += '\x1B\x45\x01';
+      // ESC ! n where n = (width-1) | ((height-1) << 4)
+      // For double width + double height: (2-1) | ((2-1) << 4) = 1 | 16 = 17 = 0x11
+      // Some printers may need: 0x22 (double width only) or 0x30 (alternative)
+      // Try 0x11 first (standard double width + double height)
+      // If 0x11 doesn't work, try 0x22 (double width) or 0x30 (some printers)
+      receipt += '\x1D\x21\x11'; // GS ! 0x11  (2x width + 2x height)
+        // Alternative if above doesn't work: '\x1B\x21\x22' (double width only) or '\x1B\x21\x30'
+      receipt += num; // Order number
+      receipt += '\n'; // Newline
+      // Reset: Normal size, bold off, left align
+      receipt += '\x1B\x21\x00'; // ESC ! 0x00 = normal size
+      receipt += '\x1B\x45\x00'; // ESC E 0x00 = bold off
+      // Pour le ticket cuisine, ajouter le type de commande juste en dessous du numéro
+      if (isKitchen && showOrderType && data.type) {
+        const orderTypeText = data.type === 'dine-in' ? 'SUR PLACE' : 'A EMPORTER';
+        const cleanedType = this.cleanTextForPrinter(orderTypeText);
+        receipt += '\n'; // Retour à la ligne pour le type
+        receipt += '\x1B\x61\x01'; // ESC a 1 = center alignment
+        receipt += '\x1B\x45\x01'; // ESC E 1 = bold on
+        receipt += cleanedType;
+        receipt += '\n'; // Retour à la ligne après le type
+        receipt += '\x1B\x45\x00'; // ESC E 0x00 = bold off
+      }
+      receipt += '\x1B\x61\x00'; // ESC a 0x00 = left align
       if (custom.separatorStyle !== 'none') receipt += '\n' + separator;
       receipt += '\n';
     };
     
-    receipt += '\n';
+    // Ne pas ajouter de retour à la ligne au début - le contenu commence directement
     if (isKitchen) {
       // Kitchen: TICKET CUISINE → #XXX large, centered
       // Use ESC/POS alignment command based on headerAlignment (same as receipt)
@@ -435,14 +627,23 @@ export class DirectPrinter {
         receipt += title + '\n';
       }
       if (custom.separatorStyle !== 'none') receipt += '\n' + separator;
-      receipt += '\n';
+      receipt += '\n'; // Retour à la ligne après la séparation
+      receipt += '\n'; // Retour à la ligne supplémentaire avant le numéro de commande
       bigOrderNumberBlock();
     } else {
       // Receipt: restaurant, address, phone, Bienvenue (header) → #XXX large, centered
+      // Logo (si présent) - doit être converti en bitmap ESC/POS
+      // Note: La conversion d'image base64 en bitmap monochrome ESC/POS nécessite l'API Canvas
+      // Pour l'instant, le logo n'est pas imprimé car la conversion nécessite une fonction asynchrone
+      // et formatTextReceipt est synchrone. Le logo peut être géré par le daemon C# si nécessaire.
+      // TODO: Implémenter la conversion d'image ou déléguer au daemon C#
       if (data.restaurantName) {
         // Use ESC/POS alignment commands (like order number) instead of manual spacing
         const cleanedName = this.cleanTextForPrinter(data.restaurantName);
         const name = this.applyTextStyle(cleanedName, custom.restaurantNameStyle);
+        // Grossir le nom du restaurant (comme dans l'aperçu : text-lg = plus grand)
+        receipt += '\x1B\x45\x01'; // ESC E 1 = bold on
+        receipt += '\x1B\x21\x10'; // ESC ! 0x10 = double height
         if (custom.headerAlignment === 'center') {
           receipt += DirectPrinter.escCenter + name + '\n' + DirectPrinter.escLeft;
         } else if (custom.headerAlignment === 'right') {
@@ -450,7 +651,10 @@ export class DirectPrinter {
         } else {
           receipt += name + '\n';
         }
-        if (custom.separatorStyle !== 'none') receipt += '\n' + separator;
+        // Reset: normal size, bold off
+        receipt += '\x1B\x21\x00'; // ESC ! 0x00 = normal size
+        receipt += '\x1B\x45\x00'; // ESC E 0x00 = bold off
+        // Pas de séparateur après le nom du restaurant (comme dans l'aperçu)
         receipt += '\n';
       }
       if (data.address) {
@@ -475,8 +679,11 @@ export class DirectPrinter {
           receipt += cleanedPhone + '\n';
         }
       }
-      if (data.address || data.phone) receipt += separator + '\n';
+      // Pas de séparation entre address/phone et header (bienvenue)
+      // if (data.address || data.phone) receipt += separator + '\n';
       if (data.header) {
+        // Retour à la ligne pour aérer avant "bienvenue"
+        receipt += '\n';
         // Use ESC/POS alignment command based on headerAlignment (same as restaurant name)
         const headerLines = data.header.split('\n');
         headerLines.forEach(line => {
@@ -489,30 +696,44 @@ export class DirectPrinter {
             receipt += cleanedLine + '\n';
           }
         });
-        receipt += separator + '\n';
+        // Séparation entre le bloc "bienvenue" et le numéro de commande
+        if (custom.separatorStyle !== 'none') receipt += '\n' + separator;
+        receipt += '\n'; // Retour à la ligne après la séparation
+        receipt += '\n'; // Retour à la ligne supplémentaire avant le numéro de commande
       }
       bigOrderNumberBlock();
     }
     
     // Order info - Conditional display (no order number here)
+    // Pour le ticket cuisine, le type de commande est déjà affiché sous le numéro de commande
     receipt += '\n';
     if (showDate) {
-      receipt += `${this.cleanTextForPrinter(custom.labelDate)}: ${data.date.split(' ')[0]}\n`;
+      receipt += formatLabelValue(custom.labelDate, data.date.split(' ')[0]);
     }
     if (showTime && data.date.includes(' ')) {
       const timePart = data.date.split(' ')[1];
       if (timePart) {
-        receipt += `${this.cleanTextForPrinter(custom.labelTime)}: ${timePart}\n`;
+        receipt += formatLabelValue(custom.labelTime, timePart);
       }
     }
-    if (showOrderType) {
-      receipt += `${this.cleanTextForPrinter(custom.labelOrderType)}: ${this.cleanTextForPrinter(data.type)}\n`;
+    // Ne pas afficher le type de commande dans la section INFOS pour le ticket cuisine (déjà affiché sous le numéro)
+    if (showOrderType && !isKitchen) {
+      receipt += formatLabelValue(custom.labelOrderType, data.type);
     }
     if (!isKitchen && custom.showPaymentMethod) {
-      receipt += `${this.cleanTextForPrinter(custom.labelPaymentMethod)}: ${this.cleanTextForPrinter(data.paymentMethod)}\n`;
+      receipt += formatLabelValue(custom.labelPaymentMethod, data.paymentMethod);
     }
     if (showCashier && data.cashier) {
-      receipt += `${this.cleanTextForPrinter(custom.labelCashier)}: ${this.cleanTextForPrinter(data.cashier)}\n`;
+      receipt += formatLabelValue(custom.labelCashier, data.cashier);
+    }
+    // Afficher le nombre d'articles dans la section INFOS
+    const totalItemCount = data.lines.reduce((sum, line) => sum + line.quantity, 0);
+    if (isKitchen && custom.kitchenShowItemCount && totalItemCount > 0) {
+      // Utiliser le libellé personnalisé pour le ticket cuisine
+      receipt += formatLabelValue(custom.kitchenLabelItemCount || custom.labelItemCount, String(totalItemCount));
+    } else if (!isKitchen && custom.showItemCount && totalItemCount > 0) {
+      // Utiliser le libellé standard pour le reçu client
+      receipt += formatLabelValue(custom.labelItemCount, String(totalItemCount));
     }
     if (custom.separatorStyle !== 'none') {
       receipt += separator + '\n';
@@ -534,7 +755,7 @@ export class DirectPrinter {
         receipt += qtyName + '\n';
         
         if (showModifiers && line.size) {
-          receipt += `   Taille: ${this.cleanTextForPrinter(line.size)}\n`;
+          receipt += `   Variante: ${this.cleanTextForPrinter(line.size)}\n`;
         }
         
         if (showModifiers && line.modifiers && line.modifiers.length > 0) {
@@ -651,4 +872,14 @@ export async function detectPrintCapabilities(): Promise<{
     network: true, // Always available via fetch/WebSocket
     bluetooth: !!navigator.bluetooth,
   };
+}
+
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000; // 32 KB
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
 }

@@ -40,9 +40,8 @@ try {
     // Logging API
     writeLog: (logLine: string) => ipcRenderer.invoke('log:write', logLine),
     
-    // Print daemon API
-    getDaemonStatus: () => ipcRenderer.invoke('daemon:status'),
-    restartDaemon: () => ipcRenderer.invoke('daemon:restart'),
+    // PrintDaemon C# runs as separate process - check status via HTTP: http://127.0.0.1:9100/status
+    // No IPC handlers needed
 });
   
   if (process.env.NODE_ENV === 'development') {

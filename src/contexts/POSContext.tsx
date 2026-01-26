@@ -864,9 +864,24 @@ export function POSProvider({ children }: { children: ReactNode }) {
     updateSettings({ kioskMode: newMode });
     
     if (newMode) {
-      document.documentElement.requestFullscreen?.();
+      // Entrer en mode plein écran
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch((err) => {
+          console.warn('Failed to enter fullscreen:', err);
+        });
+      }
     } else {
-      document.exitFullscreen?.();
+      // Sortir du mode plein écran - vérifier d'abord si on est en plein écran
+      if (document.fullscreenElement) {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch((err) => {
+            // Ignorer l'erreur si le document n'est pas actif ou déjà sorti du plein écran
+            if (!err.message?.includes('not active') && !err.message?.includes('not currently in fullscreen')) {
+              console.warn('Failed to exit fullscreen:', err);
+            }
+          });
+        }
+      }
     }
   }, [kioskMode, updateSettings]);
 

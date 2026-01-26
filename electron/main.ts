@@ -3,11 +3,12 @@ import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { writeFile, readFile, appendFile } from 'fs/promises';
-import { Socket, createConnection, Server as NetServer } from 'net';
-import { createServer as createHttpServer, IncomingMessage, ServerResponse } from 'http';
+import { Socket, createConnection } from 'net';
+import { request } from 'http';
 import { createRequire } from 'module';
 import { spawn, ChildProcess } from 'child_process';
-import { createPrintDaemonServer } from './print-daemon-integrated';
+// PrintDaemon C# is now used instead of integrated Node.js daemon
+// import { createPrintDaemonServer } from './print-daemon-integrated';
 
 // Get user data path (where IndexedDB and app data are stored)
 function getUserDataPath(): string {
@@ -40,9 +41,10 @@ try {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let printDaemonServer: NetServer | null = null;
+let printDaemonProcess: ChildProcess | null = null;
 let isQuitting = false;
 
+// PrintDaemon C# runs on port 9100 as a separate process
 const PRINT_DAEMON_PORT = 9100;
 const PRINT_DAEMON_HOST = '127.0.0.1';
 
@@ -189,59 +191,154 @@ const createWindow = (): void => {
   });
 };
 
-// Start print daemon server (integrated HTTP server - no separate process)
-function startPrintDaemon(): void {
-  // Stop existing server if any
-  if (printDaemonServer) {
-    try {
-      printDaemonServer.close();
-      console.log('[MAIN] Stopped existing print daemon server');
-    } catch (e) {
-      // Ignore
-    }
-  }
+// Check if PrintDaemon is already running by checking port 9100
+function isPrintDaemonRunning(): Promise<boolean> {
+  return new Promise((resolve) => {
+    const req = request({
+      hostname: '127.0.0.1',
+      port: 9100,
+      path: '/status',
+      method: 'GET',
+      timeout: 500,
+    }, (res) => {
+      resolve(res.statusCode === 200);
+      res.on('data', () => {}); // Consume response
+      res.on('end', () => {});
+    });
 
-  const resourcesPath = process.resourcesPath || app.getAppPath();
-  
-  printDaemonServer = createPrintDaemonServer(resourcesPath);
-  
-  printDaemonServer.listen(PRINT_DAEMON_PORT, PRINT_DAEMON_HOST, () => {
-    console.log(`[MAIN] ✅ Print daemon server listening on http://${PRINT_DAEMON_HOST}:${PRINT_DAEMON_PORT}`);
-    console.log(`[MAIN] Resources path: ${resourcesPath}`);
-    console.log(`[MAIN] Test health endpoint: http://${PRINT_DAEMON_HOST}:${PRINT_DAEMON_PORT}/health`);
-  });
+    req.on('error', () => {
+      resolve(false);
+    });
 
-  printDaemonServer.on('error', (error: Error) => {
-    console.error('[MAIN] Print daemon server error:', error);
-    if ((error as any).code === 'EADDRINUSE') {
-      console.error(`[MAIN] Port ${PRINT_DAEMON_PORT} is already in use. Another instance may be running.`);
-    } else {
-      console.error('[MAIN] Print daemon server error details:', {
-        code: (error as any).code,
-        message: error.message,
-        stack: error.stack,
-      });
-    }
-  });
-  
-  // Log server events for debugging
-  printDaemonServer.on('request', (req, res) => {
-    console.log(`[MAIN] Print daemon received ${req.method} ${req.url}`);
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+
+    req.end();
   });
 }
 
-// Stop print daemon server
-function stopPrintDaemon(): void {
-  if (printDaemonServer) {
-    console.log('[MAIN] Stopping print daemon server...');
-    try {
-      printDaemonServer.close(() => {
-        console.log('[MAIN] Print daemon server stopped');
-      });
-    } catch (error) {
-      console.error('[MAIN] Error stopping print daemon server:', error);
+// Start PrintDaemon C# process
+async function startPrintDaemon(): Promise<void> {
+  // Don't start if already running
+  if (printDaemonProcess && !printDaemonProcess.killed) {
+    console.log('[MAIN] PrintDaemon C# process is already running');
+    return;
+  }
+
+  // Check if PrintDaemon is already running on port 9100
+  const alreadyRunning = await isPrintDaemonRunning();
+  if (alreadyRunning) {
+    console.log('[MAIN] PrintDaemon C# is already running on port 9100 (started externally)');
+    return;
+  }
+
+  try {
+    const resourcesPath = process.resourcesPath || app.getAppPath();
+    let printDaemonPath: string;
+
+    if (app.isPackaged) {
+      // Production: PrintDaemon.exe is in resources/PrintDaemon/
+      printDaemonPath = join(resourcesPath, 'PrintDaemon', 'PrintDaemon.exe');
+    } else {
+      // Development: PrintDaemon.exe is in PrintDaemon/bin/Release/net8.0/win-x64/publish/
+      printDaemonPath = join(__dirname, '..', 'PrintDaemon', 'bin', 'Release', 'net8.0', 'win-x64', 'publish', 'PrintDaemon.exe');
+      
+      // Fallback: try project root
+      if (!existsSync(printDaemonPath)) {
+        printDaemonPath = join(__dirname, '..', '..', 'PrintDaemon', 'bin', 'Release', 'net8.0', 'win-x64', 'publish', 'PrintDaemon.exe');
+      }
     }
-    printDaemonServer = null;
+
+    if (!existsSync(printDaemonPath)) {
+      console.warn(`[MAIN] ⚠️  PrintDaemon.exe not found at: ${printDaemonPath}`);
+      console.warn(`[MAIN] Resources path: ${resourcesPath}`);
+      console.warn(`[MAIN] App path: ${app.getAppPath()}`);
+      console.warn(`[MAIN] Is packaged: ${app.isPackaged}`);
+      console.warn(`[MAIN] Please compile PrintDaemon.exe or start it manually`);
+      return;
+    }
+
+    console.log(`[MAIN] 🚀 Starting PrintDaemon C# from: ${printDaemonPath}`);
+
+    // Start PrintDaemon.exe as a detached process
+    printDaemonProcess = spawn(printDaemonPath, [], {
+      detached: false, // Keep attached so we can kill it when app closes
+      stdio: ['ignore', 'pipe', 'pipe'], // Capture stdout/stderr for logging
+      windowsHide: true, // Hide console window on Windows
+    });
+
+    // Log stdout
+    if (printDaemonProcess.stdout) {
+      printDaemonProcess.stdout.on('data', (data) => {
+        console.log(`[PRINT-DAEMON] ${data.toString().trim()}`);
+      });
+    }
+
+    // Log stderr
+    if (printDaemonProcess.stderr) {
+      printDaemonProcess.stderr.on('data', (data) => {
+        console.error(`[PRINT-DAEMON] ${data.toString().trim()}`);
+      });
+    }
+
+    // Handle process exit
+    printDaemonProcess.on('exit', (code, signal) => {
+      console.log(`[MAIN] PrintDaemon C# exited with code ${code}, signal ${signal}`);
+      printDaemonProcess = null;
+      
+      // Restart if not quitting (unless it was killed intentionally)
+      if (!isQuitting && code !== 0 && signal !== 'SIGTERM') {
+        console.log('[MAIN] PrintDaemon C# crashed, restarting in 2 seconds...');
+        setTimeout(() => {
+          if (!isQuitting) {
+            startPrintDaemon();
+          }
+        }, 2000);
+      }
+    });
+
+    // Handle spawn errors
+    printDaemonProcess.on('error', (error) => {
+      console.error('[MAIN] ❌ Failed to start PrintDaemon C#:', error);
+      printDaemonProcess = null;
+    });
+
+    console.log(`[MAIN] ✅ PrintDaemon C# started (PID: ${printDaemonProcess.pid})`);
+  } catch (error) {
+    console.error('[MAIN] ❌ Error starting PrintDaemon C#:', error);
+    printDaemonProcess = null;
+  }
+}
+
+// Stop PrintDaemon C# process
+function stopPrintDaemon(): void {
+  if (printDaemonProcess && !printDaemonProcess.killed) {
+    console.log('[MAIN] Stopping PrintDaemon C#...');
+    try {
+      // Try graceful shutdown first
+      if (process.platform === 'win32') {
+        // On Windows, use taskkill for graceful shutdown
+        spawn('taskkill', ['/PID', printDaemonProcess.pid!.toString(), '/T', '/F'], {
+          stdio: 'ignore',
+          windowsHide: true,
+        });
+      } else {
+        printDaemonProcess.kill('SIGTERM');
+      }
+      
+      // Force kill after 3 seconds if still running
+      setTimeout(() => {
+        if (printDaemonProcess && !printDaemonProcess.killed) {
+          console.log('[MAIN] Force killing PrintDaemon C#...');
+          printDaemonProcess.kill('SIGKILL');
+        }
+      }, 3000);
+    } catch (error) {
+      console.error('[MAIN] Error stopping PrintDaemon C#:', error);
+    }
+    printDaemonProcess = null;
   }
 }
 
@@ -250,8 +347,12 @@ app.on('ready', () => {
   // Remove the menu bar completely
   Menu.setApplicationMenu(null);
   createWindow();
-  // Start print daemon after window is created
-  startPrintDaemon();
+  // Start PrintDaemon C# after a short delay to ensure everything is ready
+  setTimeout(() => {
+    startPrintDaemon().catch((error) => {
+      console.error('[MAIN] Error starting PrintDaemon:', error);
+    });
+  }, 1000); // 1 second delay
 });
 
 // Quit when all windows are closed, except on macOS
@@ -271,8 +372,8 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
-    // Ensure daemon is running
-    if (!printDaemonServer) {
+    // Ensure PrintDaemon C# is running
+    if (!printDaemonProcess || printDaemonProcess.killed) {
       startPrintDaemon();
     }
   }
@@ -576,77 +677,6 @@ ipcMain.handle('log:write', async (event, logLine: string) => {
   }
 });
 
-// IPC Handler to check print daemon status
-ipcMain.handle('daemon:status', async () => {
-  try {
-    const { request } = await import('http');
-    return new Promise((resolve) => {
-      const req = request({
-        hostname: '127.0.0.1',
-        port: 9100,
-        path: '/health',
-        method: 'GET',
-        timeout: 2000,
-      }, (res) => {
-        let data = '';
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(data);
-            resolve({
-              running: true,
-              status: json.status,
-              message: json.message,
-              version: json.version,
-            });
-          } catch (e) {
-            resolve({
-              running: true,
-              status: 'unknown',
-              message: 'Daemon responded but response is invalid',
-            });
-          }
-        });
-      });
-
-      req.on('error', (error) => {
-        resolve({
-          running: false,
-          error: error.message,
-        });
-      });
-
-      req.on('timeout', () => {
-        req.destroy();
-        resolve({
-          running: false,
-          error: 'Connection timeout',
-        });
-      });
-
-      req.end();
-    });
-  } catch (error) {
-    return {
-      running: false,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-});
-
-// IPC Handler to restart print daemon
-ipcMain.handle('daemon:restart', async () => {
-  try {
-    stopPrintDaemon();
-    await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms for clean shutdown
-    startPrintDaemon();
-    return { success: true, message: 'Print daemon restarted' };
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
-});
+// PrintDaemon C# runs as a separate process - no IPC handlers needed
+// Status can be checked directly via HTTP: http://127.0.0.1:9100/status
+// Restart must be done manually or via Windows service management

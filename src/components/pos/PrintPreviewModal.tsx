@@ -66,6 +66,7 @@ export function PrintPreviewModal({
       // Format kitchen ticket
       const receiptText = DirectPrinter.formatTextReceipt({
         restaurantName: settings?.restaurantName,
+        logo: undefined, // Pas de logo pour les tickets cuisine
         orderNumber: order.orderNumber,
         date: `${formattedDate} ${formattedTime}`,
         type: order.type === 'dine-in' ? '[SUR PLACE]' : '[A EMPORTER]',
@@ -97,7 +98,7 @@ export function PrintPreviewModal({
       };
 
       const printer = new DirectPrinter(connection);
-      // Use printer type from settings (default to false for regular printers)
+      // Logo seulement pour les reçus clients, pas pour les tickets cuisine
       await printer.print(receiptText, kitchenPrinter.isThermalPrinter ?? false);
       console.log('Kitchen ticket printed successfully');
     } catch (error) {
@@ -147,6 +148,7 @@ export function PrintPreviewModal({
       const isKitchen = type === 'kitchen';
       const receiptText = DirectPrinter.formatTextReceipt({
         restaurantName: settings?.restaurantName,
+        logo: (isKitchen || !customization.showLogo) ? undefined : settings?.logo, // Logo seulement pour les reçus clients si l'option est activée
         address: isKitchen ? undefined : (settings?.showAddress ? settings.address : undefined),
         phone: isKitchen ? undefined : (settings?.showPhone ? settings.phone : undefined),
         header: isKitchen ? undefined : settings?.receiptHeader,
@@ -202,7 +204,8 @@ export function PrintPreviewModal({
             }
 
             try {
-              const daemonUrl = 'http://127.0.0.1:9100/print';
+              // Use DirectPrinter which handles PrintDaemon C# API internally
+              let connection: PrinterConnection;
 
               if (effectiveConnectionType === 'windows') {
                 if (!printerConfig.name) {
@@ -213,94 +216,40 @@ export function PrintPreviewModal({
                   return;
                 }
 
-                const body = {
-                  connectionType: 'windows',
-                  target: { printerName: printerConfig.name },
-                  content: receiptText,
-                  isThermalPrinter: printerConfig.isThermalPrinter ?? true,
-                  role: 'cashier' as const,
+                connection = {
+                  type: 'windows',
+                  name: printerConfig.name,
+                  printerName: printerConfig.name,
                 };
-
-                console.log('[PRINT][Preview][Cashier][Daemon] Payload envoyé =', body);
-
-                const response = await fetch(daemonUrl, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(body),
-                });
-
-                if (!response.ok) {
-                  console.error(
-                    '[PRINT][Preview][Cashier][Daemon] HTTP error =',
-                    response.status
-                  );
-                  return;
-                }
-
-                const result = await response.json().catch(() => null);
-                if (!result || result.success !== true) {
-                  console.error(
-                    '[PRINT][Preview][Cashier][Daemon] Erreur côté daemon:',
-                    result
-                  );
-                  return;
-                }
-
-                console.log(
-                  '✅ Reçu client imprimé via daemon Windows sur',
-                  printerConfig.name
-                );
               } else if (
                 (effectiveConnectionType === 'tcp' ||
                   effectiveConnectionType === 'wifi') &&
                 printerConfig.tcpHost
               ) {
-                const body = {
-                  connectionType: effectiveConnectionType,
-                  target: {
-                    host: printerConfig.tcpHost,
-                    port: printerConfig.tcpPort || 9100,
-                  },
-                  content: receiptText,
-                  isThermalPrinter: printerConfig.isThermalPrinter ?? true,
-                  role: 'cashier' as const,
+                connection = {
+                  type: 'network',
+                  name: printerConfig.name || 'Imprimante réseau',
+                  address: printerConfig.tcpHost,
+                  port: printerConfig.tcpPort || 9100,
                 };
-
-                console.log('[PRINT][Preview][Cashier][Daemon] Payload TCP/WiFi envoyé =', body);
-
-                const response = await fetch(daemonUrl, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(body),
-                });
-
-                if (!response.ok) {
-                  console.error(
-                    '[PRINT][Preview][Cashier][Daemon] HTTP error =',
-                    response.status
-                  );
-                  return;
-                }
-
-                const result = await response.json().catch(() => null);
-                if (!result || result.success !== true) {
-                  console.error(
-                    '[PRINT][Preview][Cashier][Daemon] Erreur côté daemon:',
-                    result
-                  );
-                  return;
-                }
-
-                console.log(
-                  '✅ Reçu client imprimé via daemon Ethernet/Wi‑Fi sur',
-                  printerConfig.name
-                );
               } else {
                 console.warn(
                   '[PRINT][Preview][Cashier] Type de connexion non supporté, ignorée:',
                   effectiveConnectionType
                 );
+                return;
               }
+
+              const printer = new DirectPrinter(connection);
+              // Passer le logo pour les reçus clients uniquement, si l'option est activée
+              const logoBase64 = (type === 'receipt' && customization.showLogo) ? settings?.logo : undefined;
+              const logoSize = (type === 'receipt' && customization.showLogo) ? customization.logoSize : undefined;
+              await printer.print(receiptText, printerConfig.isThermalPrinter ?? true, logoBase64, logoSize);
+
+              console.log(
+                '✅ Reçu client imprimé via PrintDaemon C# sur',
+                printerConfig.name
+              );
             } catch (err) {
               console.error(
                 '[PRINT][Preview][Cashier] Erreur sur une imprimante caisse (non bloquant):',
@@ -331,7 +280,8 @@ export function PrintPreviewModal({
             }
 
             try {
-              const daemonUrl = 'http://127.0.0.1:9100/print';
+              // Use DirectPrinter which handles PrintDaemon C# API internally
+              let connection: PrinterConnection;
 
               if (effectiveConnectionType === 'windows') {
                 if (!printerConfig.name) {
@@ -342,94 +292,40 @@ export function PrintPreviewModal({
                   return;
                 }
 
-                const body = {
-                  connectionType: 'windows',
-                  target: { printerName: printerConfig.name },
-                  content: receiptText,
-                  isThermalPrinter: printerConfig.isThermalPrinter ?? true,
-                  role: 'kitchen' as const,
+                connection = {
+                  type: 'windows',
+                  name: printerConfig.name,
+                  printerName: printerConfig.name,
                 };
-
-                console.log('[PRINT][Preview][Kitchen][Daemon] Payload envoyé =', body);
-
-                const response = await fetch(daemonUrl, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(body),
-                });
-
-                if (!response.ok) {
-                  console.error(
-                    '[PRINT][Preview][Kitchen][Daemon] HTTP error =',
-                    response.status
-                  );
-                  return;
-                }
-
-                const result = await response.json().catch(() => null);
-                if (!result || result.success !== true) {
-                  console.error(
-                    '[PRINT][Preview][Kitchen][Daemon] Erreur côté daemon:',
-                    result
-                  );
-                  return;
-                }
-
-                console.log(
-                  '✅ Ticket cuisine imprimé via daemon Windows sur',
-                  printerConfig.name
-                );
               } else if (
                 (effectiveConnectionType === 'tcp' ||
                   effectiveConnectionType === 'wifi') &&
                 printerConfig.tcpHost
               ) {
-                const body = {
-                  connectionType: effectiveConnectionType,
-                  target: {
-                    host: printerConfig.tcpHost,
-                    port: printerConfig.tcpPort || 9100,
-                  },
-                  content: receiptText,
-                  isThermalPrinter: printerConfig.isThermalPrinter ?? true,
-                  role: 'kitchen' as const,
+                connection = {
+                  type: 'network',
+                  name: printerConfig.name || 'Imprimante cuisine',
+                  address: printerConfig.tcpHost,
+                  port: printerConfig.tcpPort || 9100,
                 };
-
-                console.log('[PRINT][Preview][Kitchen][Daemon] Payload TCP/WiFi envoyé =', body);
-
-                const response = await fetch(daemonUrl, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(body),
-                });
-
-                if (!response.ok) {
-                  console.error(
-                    '[PRINT][Preview][Kitchen][Daemon] HTTP error =',
-                    response.status
-                  );
-                  return;
-                }
-
-                const result = await response.json().catch(() => null);
-                if (!result || result.success !== true) {
-                  console.error(
-                    '[PRINT][Preview][Kitchen][Daemon] Erreur côté daemon:',
-                    result
-                  );
-                  return;
-                }
-
-                console.log(
-                  '✅ Ticket cuisine imprimé via daemon Ethernet/Wi‑Fi sur',
-                  printerConfig.name
-                );
               } else {
                 console.warn(
                   '[PRINT][Preview][Kitchen] Type de connexion non supporté, ignorée:',
                   effectiveConnectionType
                 );
+                return;
               }
+
+              const printer = new DirectPrinter(connection);
+              // Passer le logo pour les reçus clients uniquement, si l'option est activée
+              const logoBase64 = (type === 'receipt' && customization.showLogo) ? settings?.logo : undefined;
+              const logoSize = (type === 'receipt' && customization.showLogo) ? customization.logoSize : undefined;
+              await printer.print(receiptText, printerConfig.isThermalPrinter ?? true, logoBase64, logoSize);
+
+              console.log(
+                '✅ Ticket cuisine imprimé via PrintDaemon C# sur',
+                printerConfig.name
+              );
             } catch (err) {
               console.error(
                 '[PRINT][Preview][Kitchen] Erreur sur une imprimante cuisine (non bloquant):',

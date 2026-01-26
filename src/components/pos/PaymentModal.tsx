@@ -90,6 +90,7 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
       // Format kitchen ticket
       const receiptText = DirectPrinter.formatTextReceipt({
         restaurantName: settings?.restaurantName,
+        logo: settings?.logo,
         orderNumber: order.orderNumber,
         date: `${formattedDate} ${formattedTime}`,
         type: order.type === 'dine-in' ? '[SUR PLACE]' : '[A EMPORTER]',
@@ -132,106 +133,50 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
           }
 
           try {
-            const daemonUrl = 'http://127.0.0.1:9100/print';
+            // Use DirectPrinter which handles PrintDaemon C# API internally
+            let connection: PrinterConnection;
 
-            // Impression via daemon : Windows (spooler), Ethernet, Wi‑Fi
             if (effectiveConnectionType === 'windows') {
               if (!kitchenPrinter.name) {
                 console.error(
-                  "[AUTO-KITCHEN][Daemon] Nom d'imprimante Windows manquant dans la config.",
+                  "[AUTO-KITCHEN] Nom d'imprimante Windows manquant dans la config.",
                   kitchenPrinter
                 );
                 return;
               }
 
-              const body = {
-                connectionType: 'windows',
-                target: { printerName: kitchenPrinter.name },
-                content: receiptText,
-                isThermalPrinter: kitchenPrinter.isThermalPrinter ?? true,
-                role: 'kitchen' as const,
+              connection = {
+                type: 'windows',
+                name: kitchenPrinter.name,
+                printerName: kitchenPrinter.name,
               };
-
-              console.log('[AUTO-KITCHEN][Daemon] Payload envoyé =', body);
-
-              const response = await fetch(daemonUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-              });
-
-              if (!response.ok) {
-                console.error(
-                  '[AUTO-KITCHEN][Daemon] HTTP error =',
-                  response.status
-                );
-                return;
-              }
-
-              const result = await response.json().catch(() => null);
-              if (!result || result.success !== true) {
-                console.error(
-                  '[AUTO-KITCHEN][Daemon] Erreur côté daemon:',
-                  result
-                );
-                return;
-              }
-
-              console.log(
-                '✅ Kitchen ticket printed automatically via Windows daemon sur',
-                kitchenPrinter.name
-              );
             } else if (
               (effectiveConnectionType === 'tcp' ||
                 effectiveConnectionType === 'wifi') &&
               kitchenPrinter.tcpHost
             ) {
-              const body = {
-                connectionType: effectiveConnectionType,
-                target: {
-                  host: kitchenPrinter.tcpHost,
-                  port: kitchenPrinter.tcpPort || 9100,
-                },
-                content: receiptText,
-                isThermalPrinter: kitchenPrinter.isThermalPrinter ?? true,
-                role: 'kitchen' as const,
+              connection = {
+                type: 'network',
+                name: kitchenPrinter.name || 'Imprimante cuisine',
+                address: kitchenPrinter.tcpHost,
+                port: kitchenPrinter.tcpPort || 9100,
               };
-
-              console.log('[AUTO-KITCHEN][Daemon] Payload TCP/WiFi envoyé =', body);
-
-              const response = await fetch(daemonUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body),
-              });
-
-              if (!response.ok) {
-                console.error(
-                  '[AUTO-KITCHEN][Daemon] HTTP error =',
-                  response.status
-                );
-                return;
-              }
-
-              const result = await response.json().catch(() => null);
-              if (!result || result.success !== true) {
-                console.error(
-                  '[AUTO-KITCHEN][Daemon] Erreur côté daemon:',
-                  result
-                );
-                return;
-              }
-
-              console.log(
-                '✅ Kitchen ticket printed automatically via Ethernet/Wi‑Fi sur',
-                kitchenPrinter.name
-              );
             } else {
-              console.log(
-                "[AUTO-KITCHEN] Type de connexion non supporté pour l'auto-impression cuisine:",
+              console.warn(
+                '[AUTO-KITCHEN] Type de connexion non supporté, ignorée:',
                 effectiveConnectionType
               );
+              return;
             }
+
+            const printer = new DirectPrinter(connection);
+            // Logo seulement pour les reçus clients, pas pour les tickets cuisine
+            await printer.print(receiptText, kitchenPrinter.isThermalPrinter ?? true);
+
+            console.log(
+              '✅ Kitchen ticket printed automatically via PrintDaemon C# sur',
+              kitchenPrinter.name
+            );
           } catch (err) {
             console.error(
               '[AUTO-KITCHEN] Erreur sur une imprimante cuisine (non bloquant):',

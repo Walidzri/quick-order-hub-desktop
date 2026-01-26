@@ -1,3 +1,7 @@
+// ⚠️ DEPRECATED - Ce fichier n'est plus utilisé
+// Le PrintDaemon C# (PrintDaemon/PrintDaemon.exe) est maintenant utilisé à la place
+// Ce fichier est conservé pour référence uniquement
+//
 // Integrated print daemon - runs directly in Electron main process
 // No separate process needed
 

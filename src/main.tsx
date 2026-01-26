@@ -39,35 +39,42 @@ setTimeout(() => {
   }
 }, 100);
 
-// Test du système de logging (déféré)
-setTimeout(() => {
-  try {
-    logger.info('Logger test - INFO level', 'Test');
-    logger.warn('Logger test - WARN level', 'Test');
-    logger.error('Logger test - ERROR level', new Error('Test error'), 'Test');
-    
-    // Vérifier que les logs sont sauvegardés (seulement en dev)
-    if (import.meta.env.DEV && typeof window !== 'undefined') {
-      const isElectron = !!window.electronAPI;
-      if (isElectron) {
-        console.log('✅ [Logger] Logs are being saved to files in Electron mode');
-      } else {
-        try {
-          if (logger && typeof logger.getLocalStorageLogs === 'function') {
-            const savedLogs = logger.getLocalStorageLogs();
-            console.log(`✅ [Logger] ${savedLogs.length} logs saved to localStorage (browser mode)`);
-            console.log('📁 [Logger] To view logs:', 'logger.getLocalStorageLogs()');
-            console.log('📄 [Logger] To export logs:', 'logger.exportLocalStorageLogs()');
+// Test du système de logging désactivé par défaut
+// Pour activer le test en développement: localStorage.setItem('enableLoggerTest', 'true') ou ajouter ?testLogger=true à l'URL
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  const enableLoggerTest = localStorage.getItem('enableLoggerTest') === 'true' 
+    || new URLSearchParams(window.location.search).get('testLogger') === 'true';
+  
+  if (enableLoggerTest) {
+    setTimeout(() => {
+      try {
+        logger.info('Logger test - INFO level', 'Test');
+        logger.warn('Logger test - WARN level', 'Test');
+        // Test d'erreur désactivé pour éviter les erreurs dans la console
+        // Pour tester les erreurs manuellement: logger.error('Logger test - ERROR level', new Error('Test error'), 'Test');
+        
+        // Vérifier que les logs sont sauvegardés
+        const isElectron = !!window.electronAPI;
+        if (isElectron) {
+          console.log('✅ [Logger] Logs are being saved to files in Electron mode');
+        } else {
+          try {
+            if (logger && typeof logger.getLocalStorageLogs === 'function') {
+              const savedLogs = logger.getLocalStorageLogs();
+              console.log(`✅ [Logger] ${savedLogs.length} logs saved to localStorage (browser mode)`);
+              console.log('📁 [Logger] To view logs:', 'logger.getLocalStorageLogs()');
+              console.log('📄 [Logger] To export logs:', 'logger.exportLocalStorageLogs()');
+            }
+          } catch (error) {
+            console.warn('[Logger] Could not check localStorage logs:', error);
           }
-        } catch (error) {
-          console.warn('[Logger] Could not check localStorage logs:', error);
         }
+      } catch (error) {
+        console.error('Failed to run logger tests:', error);
       }
-    }
-  } catch (error) {
-    console.error('Failed to run logger tests:', error);
+    }, 2000);
   }
-}, 2000);
+}
 
 // Debug: Check if electronAPI is available (development only)
 const isDev = import.meta.env.DEV;

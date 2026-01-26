@@ -94,61 +94,78 @@ export function SettingsScreen() {
   } | null>(null);
   const [isCheckingDaemon, setIsCheckingDaemon] = useState(false);
 
-  // Check daemon status function (memoized to avoid recreating on each render)
+  // Check PrintDaemon C# status via HTTP
   const checkDaemonStatus = useCallback(async () => {
     try {
-      if (typeof window === 'undefined' || !window.electronAPI || !window.electronAPI.getDaemonStatus) {
-        return;
-      }
-      
       setIsCheckingDaemon(true);
-      const status = await window.electronAPI.getDaemonStatus();
-      setDaemonStatus(status);
-    } catch (error) {
-      console.error('Error checking daemon status:', error);
-      setDaemonStatus({
-        running: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
+      
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      
+      const response = await fetch('http://127.0.0.1:9100/status', {
+        method: 'GET',
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setDaemonStatus({
+          running: data.running === true,
+          status: data.status || 'ok',
+          message: data.message || 'PrintDaemon C# is running',
+          version: data.version || '1.1.0',
+        });
+      } else {
+        setDaemonStatus({
+          running: false,
+          error: `HTTP ${response.status}`,
+        });
+      }
+    } catch (error) {
+      // Silently fail - don't block UI
+      if (error instanceof Error && error.name !== 'AbortError') {
+        setDaemonStatus({
+          running: false,
+          error: error.message || 'PrintDaemon C# non accessible',
+        });
+      } else {
+        setDaemonStatus({
+          running: false,
+          error: 'PrintDaemon C# non accessible',
+        });
+      }
     } finally {
       setIsCheckingDaemon(false);
     }
   }, []);
 
-  // Check daemon status when data section is active
+  // Check PrintDaemon C# status when data section is active
   useEffect(() => {
-    if (activeSection === 'data' && typeof window !== 'undefined' && window.electronAPI && window.electronAPI.getDaemonStatus) {
-      checkDaemonStatus().catch(console.error);
+    if (activeSection === 'data') {
+      checkDaemonStatus().catch(() => {
+        // Silently handle errors
+      });
       // Check every 5 seconds
       const interval = setInterval(() => {
-        checkDaemonStatus().catch(console.error);
+        checkDaemonStatus().catch(() => {
+          // Silently handle errors
+        });
       }, 5000);
       return () => clearInterval(interval);
     }
   }, [activeSection, checkDaemonStatus]);
 
   const handleRestartDaemon = async () => {
-    if (typeof window === 'undefined' || !window.electronAPI || !window.electronAPI.restartDaemon) {
-      await showAlert('L\'API Electron n\'est pas disponible.', 'Erreur');
-      return;
-    }
-    
-    try {
-      const result = await window.electronAPI.restartDaemon();
-      if (result.success) {
-        toast({
-          title: 'Daemon redémarré',
-          description: result.message || 'Le daemon d\'impression a été redémarré avec succès.',
-        });
-        // Recheck status after 1 second
-        setTimeout(checkDaemonStatus, 1000);
-      } else {
-        await showAlert(result.error || 'Erreur lors du redémarrage du daemon', 'Erreur');
-      }
-    } catch (error) {
-      console.error('Error restarting daemon:', error);
-      await showAlert('Erreur lors du redémarrage du daemon', 'Erreur');
-    }
+    // PrintDaemon C# runs as a separate process - just refresh status
+    await showAlert(
+      'PrintDaemon C# est un processus séparé.\n\nPour le redémarrer, arrêtez et relancez PrintDaemon.exe manuellement, ou configurez-le comme service Windows.',
+      'Information'
+    );
+    // Recheck status
+    setTimeout(checkDaemonStatus, 1000);
   };
 
   if (!settings) return null;
@@ -1309,13 +1326,13 @@ export function SettingsScreen() {
                 )}
               </div>
 
-              {/* Print Daemon Status */}
-              {typeof window !== 'undefined' && window.electronAPI && window.electronAPI.getDaemonStatus && (
+              {/* PrintDaemon C# Status */}
+              {(
                 <div className="p-3 sm:p-4 bg-primary/10 border-2 border-primary/20 rounded-xl">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <Server className="w-5 h-5 text-primary" />
-                      <h3 className="font-medium text-primary text-sm sm:text-base">Statut du Daemon d'Impression</h3>
+                      <h3 className="font-medium text-primary text-sm sm:text-base">Statut du PrintDaemon C#</h3>
                     </div>
                     <Button
                       variant="outline"
@@ -1356,7 +1373,7 @@ export function SettingsScreen() {
                               <p><strong>PID:</strong> {daemonStatus.daemonProcess.pid}</p>
                             )}
                             <p className="text-muted-foreground mt-2">
-                              Le daemon écoute sur <code className="bg-background px-1 rounded">http://127.0.0.1:9100</code>
+                              PrintDaemon C# écoute sur <code className="bg-background px-1 rounded">http://127.0.0.1:9100</code>
                             </p>
                           </div>
                         ) : (
@@ -1382,7 +1399,7 @@ export function SettingsScreen() {
                           className="w-full"
                         >
                           <RefreshCw className="w-4 h-4 mr-2" />
-                          Redémarrer le daemon
+                          Vérifier le statut
                         </Button>
                       )}
                     </div>
@@ -2024,68 +2041,115 @@ function PrinterSettings({ printers, updatePrinter, deletePrinter, t, showDialog
     });
 
     try {
-      // Test via daemon
-      const daemonUrl = 'http://127.0.0.1:9100/print';
-      const testContent = '\x1B@'; // ESC @ (initialize printer only, no print)
+      // Test via PrintDaemon C# /test endpoint
+      const daemonUrl = 'http://127.0.0.1:9100/test';
       
-      let body: any;
+      let printerName: string;
+      let printerType: string;
 
       if (effectiveConnectionType === 'windows') {
-        body = {
-          connectionType: 'windows',
-          target: {
-            printerName: printer.name,
-          },
-          content: testContent,
-          isThermalPrinter: printer.isThermalPrinter ?? true,
-          role: printer.role || 'cashier',
-        };
+        if (!printer.name) {
+          throw new Error('Nom d\'imprimante Windows requis');
+        }
+        printerName = printer.name;
+        printerType = 'usb';
       } else if (effectiveConnectionType === 'tcp' || effectiveConnectionType === 'wifi') {
-        body = {
-          connectionType: effectiveConnectionType,
-          target: {
-            host: printer.tcpHost,
-            port: printer.tcpPort || 9100,
-          },
-          content: testContent,
-          isThermalPrinter: printer.isThermalPrinter ?? true,
-          role: printer.role || 'cashier',
-        };
+        if (!printer.tcpHost) {
+          throw new Error('Adresse IP requise');
+        }
+        printerName = `${printer.tcpHost}:${printer.tcpPort || 9100}`;
+        printerType = 'network';
       } else {
         throw new Error('Type de connexion non supporté pour le test');
       }
 
-      console.log('[TEST] Testing printer via daemon:', body);
+      console.log('[TEST] Testing printer via PrintDaemon C#:', { printerName, printerType });
 
       const response = await fetch(daemonUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        headers: {
+          'X-Printer-Name': printerName,
+          'X-Printer-Type': printerType,
+        },
       });
 
       // Try to parse error response even if status is not ok
       const result = await response.json().catch(() => null);
       
       if (!response.ok) {
-        const errorMsg = result?.message || result?.error || `HTTP ${response.status}`;
-        console.error('[TEST] Daemon error response:', result);
+        const errorMsg = result?.error || result?.message || `HTTP ${response.status}`;
+        console.error('[TEST] PrintDaemon C# error response:', result);
         throw new Error(
-          `Daemon d'impression: ${errorMsg} (HTTP ${response.status})`
+          `PrintDaemon C#: ${errorMsg} (HTTP ${response.status})`
         );
       }
       
       if (!result || result.success !== true) {
         throw new Error(
-          result?.message || result?.error || "Erreur lors du test de connexion via le daemon."
+          result?.error || result?.message || "Erreur lors du test de connexion via PrintDaemon C#."
         );
       }
 
-      let successMessage = 'Test réussi';
-      if (effectiveConnectionType === 'windows') {
-        successMessage = `Test réussi sur "${printer.name}"`;
-      } else if (effectiveConnectionType === 'tcp' || effectiveConnectionType === 'wifi') {
-        successMessage = `Connexion réussie à ${printer.tcpHost}:${printer.tcpPort || 9100}`;
+      // Test de connexion réussi, maintenant on fait une impression de test
+      console.log('[TEST] Connexion OK, envoi impression de test...');
+      
+      const printTestUrl = 'http://127.0.0.1:9100/print/text';
+      const testText = `TEST D'IMPRESSION
+================
+
+Date: ${new Date().toLocaleDateString('fr-FR')}
+Heure: ${new Date().toLocaleTimeString('fr-FR')}
+
+Imprimante: ${printer.name || printerName}
+Type: ${effectiveConnectionType}
+
+[OK] Test de connexion reussi
+[OK] Impression de test reussie
+
+Merci d'utiliser Quick Order Hub !
+`;
+
+      let printSuccess = false;
+      let printErrorMsg = '';
+
+      try {
+        const printResponse = await fetch(printTestUrl, {
+          method: 'POST',
+          headers: {
+            'X-Printer-Name': printerName,
+            'X-Printer-Type': printerType,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: testText,
+            cut: true,
+          }),
+        });
+
+        if (!printResponse.ok) {
+          const printError = await printResponse.json().catch(() => null);
+          printErrorMsg = printError?.error || printError?.message || `HTTP ${printResponse.status}`;
+          console.error('[TEST] ❌ Impression de test échouée:', printError);
+        } else {
+          const printResult = await printResponse.json().catch(() => null);
+          if (printResult?.success) {
+            printSuccess = true;
+            console.log('[TEST] ✅ Impression de test réussie');
+          } else {
+            printErrorMsg = printResult?.error || printResult?.message || 'Erreur inconnue';
+            console.error('[TEST] ❌ Impression de test échouée:', printResult);
+          }
+        }
+      } catch (printErr) {
+        printErrorMsg = printErr instanceof Error ? printErr.message : 'Erreur réseau';
+        console.error('[TEST] ❌ Erreur lors de l\'impression de test:', printErr);
       }
+
+      const successMessage = result.message + (printSuccess 
+        ? ' - Impression envoyée ✅'
+        : printErrorMsg 
+          ? ` - Impression échouée: ${printErrorMsg}`
+          : ' - Impression non envoyée');
 
       setTestResults(prev => ({
         ...prev,
@@ -2334,6 +2398,52 @@ function PrinterConfigModal({ printer, onClose, onSave, t }: PrinterConfigModalP
   const [error, setError] = useState('');
   const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  
+  // Liste des imprimantes Windows disponibles
+  const [availablePrinters, setAvailablePrinters] = useState<string[]>([]);
+  const [isLoadingPrinters, setIsLoadingPrinters] = useState(false);
+
+  // Charger la liste des imprimantes Windows quand le type de connexion est "windows"
+  useEffect(() => {
+    const loadWindowsPrinters = async () => {
+      if (connectionType !== 'windows') {
+        setAvailablePrinters([]);
+        return;
+      }
+
+      setIsLoadingPrinters(true);
+      try {
+        const response = await fetch('http://127.0.0.1:9100/printers');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && Array.isArray(data.printers)) {
+            setAvailablePrinters(data.printers);
+            // Si aucune imprimante n'est sélectionnée et qu'il y a des imprimantes disponibles, sélectionner la première
+            // Utiliser une fonction de mise à jour pour éviter les dépendances
+            setName(prevName => {
+              if (!prevName && data.printers.length > 0) {
+                return data.printers[0];
+              }
+              return prevName;
+            });
+          } else {
+            console.warn('[PRINTERS] Invalid response format:', data);
+            setAvailablePrinters([]);
+          }
+        } else {
+          console.error('[PRINTERS] Failed to fetch printers:', response.status);
+          setAvailablePrinters([]);
+        }
+      } catch (error) {
+        console.error('[PRINTERS] Error loading Windows printers:', error);
+        setAvailablePrinters([]);
+      } finally {
+        setIsLoadingPrinters(false);
+      }
+    };
+
+    loadWindowsPrinters();
+  }, [connectionType]); // Recharger quand le type de connexion change
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -2404,32 +2514,23 @@ function PrinterConfigModal({ printer, onClose, onSave, t }: PrinterConfigModalP
     setTestResult(null);
 
     try {
-      // Test via daemon
-      const daemonUrl = 'http://127.0.0.1:9100/print';
-      const testContent = '\x1B@'; // ESC @ (initialize printer only, no print)
-      
-      const body = {
-        connectionType: connectionType === 'wifi' ? 'wifi' : 'tcp',
-        target: {
-          host: tcpHost.trim(),
-          port: parseInt(tcpPort),
-        },
-        content: testContent,
-        isThermalPrinter: isThermalPrinter,
-        role: role || 'cashier',
-      };
+      // Test via PrintDaemon C# /test endpoint
+      const daemonUrl = 'http://127.0.0.1:9100/test';
+      const printerName = `${tcpHost.trim()}:${parseInt(tcpPort)}`;
 
-      console.log('[TEST] Testing printer connection via daemon:', body);
+      console.log('[TEST] Testing printer connection via PrintDaemon C#:', { printerName, type: 'network' });
 
       const response = await fetch(daemonUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        headers: {
+          'X-Printer-Name': printerName,
+          'X-Printer-Type': 'network',
+        },
       });
 
       if (!response.ok) {
         throw new Error(
-          `Daemon d'impression non accessible (HTTP ${response.status}). Vérifiez qu'il est démarré.`
+          `PrintDaemon C# non accessible (HTTP ${response.status}). Vérifiez qu'il est démarré.`
         );
       }
 
@@ -2437,20 +2538,80 @@ function PrinterConfigModal({ printer, onClose, onSave, t }: PrinterConfigModalP
       
       if (!result || result.success !== true) {
         throw new Error(
-          result?.message || "Erreur lors du test de connexion via le daemon."
+          result?.error || result?.message || "Erreur lors du test de connexion via PrintDaemon C#."
         );
+      }
+
+      // Test de connexion réussi, maintenant on fait une impression de test
+      console.log('[TEST] Connexion OK, envoi impression de test...');
+      
+      const printTestUrl = 'http://127.0.0.1:9100/print/text';
+      // printerName déjà déclaré plus haut, on le réutilise
+      const testText = `TEST D'IMPRESSION
+================
+
+Date: ${new Date().toLocaleDateString('fr-FR')}
+Heure: ${new Date().toLocaleTimeString('fr-FR')}
+
+Imprimante: ${printerName}
+Type: Reseau
+
+[OK] Test de connexion reussi
+[OK] Impression de test reussie
+
+Merci d'utiliser Quick Order Hub !
+`;
+
+      let printSuccess = false;
+      let printErrorMsg = '';
+
+      try {
+        const printResponse = await fetch(printTestUrl, {
+          method: 'POST',
+          headers: {
+            'X-Printer-Name': printerName,
+            'X-Printer-Type': 'network',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: testText,
+            cut: true,
+          }),
+        });
+
+        if (!printResponse.ok) {
+          const printError = await printResponse.json().catch(() => null);
+          printErrorMsg = printError?.error || printError?.message || `HTTP ${printResponse.status}`;
+          console.error('[TEST] ❌ Impression de test échouée:', printError);
+        } else {
+          const printResult = await printResponse.json().catch(() => null);
+          if (printResult?.success) {
+            printSuccess = true;
+            console.log('[TEST] ✅ Impression de test réussie');
+          } else {
+            printErrorMsg = printResult?.error || printResult?.message || 'Erreur inconnue';
+            console.error('[TEST] ❌ Impression de test échouée:', printResult);
+          }
+        }
+      } catch (printErr) {
+        printErrorMsg = printErr instanceof Error ? printErr.message : 'Erreur réseau';
+        console.error('[TEST] ❌ Erreur lors de l\'impression de test:', printErr);
       }
 
       setTestResult({
         success: true,
-        message: result.message || `Connexion réussie à ${tcpHost.trim()}:${tcpPort}`
+        message: (result.message || `Connexion réussie à ${tcpHost.trim()}:${tcpPort}`) + (printSuccess 
+          ? ' - Impression envoyée ✅'
+          : printErrorMsg 
+            ? ` - Impression échouée: ${printErrorMsg}`
+            : ' - Impression non envoyée')
       });
     } catch (error) {
       console.error('❌ Test connection error:', error);
       let errorMessage = 'Erreur lors du test de connexion';
       
       if (error instanceof TypeError && error.message.includes('fetch')) {
-        errorMessage = `⚠️ Daemon d'impression non accessible!\n\nAssurez-vous que le daemon est démarré (http://127.0.0.1:9100)`;
+        errorMessage = `⚠️ PrintDaemon C# non accessible!\n\nAssurez-vous que PrintDaemon.exe est démarré (http://127.0.0.1:9100)`;
       } else if (error instanceof Error) {
         errorMessage = error.message || errorMessage;
       }
@@ -2517,22 +2678,79 @@ function PrinterConfigModal({ printer, onClose, onSave, t }: PrinterConfigModalP
 
             {/* Nom et rôle */}
             <div>
-              <label className="text-sm font-medium text-muted-foreground block mb-2">
-                Nom de l'imprimante *
-              </label>
-              <TouchInput
-                type="text"
-                value={name}
-                onChange={(value) => {
-                  setName(value);
-                  setError('');
-                  setTestResult(null);
-                }}
-                placeholder="Imprimante cuisine"
-                className="w-full"
-              />
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-muted-foreground">
+                  {connectionType === 'windows' ? 'Imprimante Windows *' : 'Nom de l\'imprimante *'}
+                </label>
+                {connectionType === 'windows' && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={async () => {
+                      setIsLoadingPrinters(true);
+                      try {
+                        const response = await fetch('http://127.0.0.1:9100/printers');
+                        if (response.ok) {
+                          const data = await response.json();
+                          if (data.success && Array.isArray(data.printers)) {
+                            setAvailablePrinters(data.printers);
+                          }
+                        }
+                      } catch (error) {
+                        console.error('[PRINTERS] Error refreshing printers:', error);
+                      } finally {
+                        setIsLoadingPrinters(false);
+                      }
+                    }}
+                    disabled={isLoadingPrinters}
+                    className="h-6 text-xs gap-1"
+                  >
+                    <RefreshCw className={cn("w-3 h-3", isLoadingPrinters && "animate-spin")} />
+                    Actualiser
+                  </Button>
+                )}
+              </div>
+              {connectionType === 'windows' ? (
+                <Select
+                  value={name || undefined}
+                  onValueChange={(value) => {
+                    setName(value);
+                    setError('');
+                    setTestResult(null);
+                  }}
+                  disabled={isLoadingPrinters || availablePrinters.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={isLoadingPrinters ? "Chargement..." : availablePrinters.length === 0 ? "Aucune imprimante trouvée" : "Sélectionnez une imprimante"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availablePrinters.length > 0 ? (
+                      availablePrinters.map((printerName) => (
+                        <SelectItem key={printerName} value={printerName}>
+                          {printerName}
+                        </SelectItem>
+                      ))
+                    ) : null}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <TouchInput
+                  type="text"
+                  value={name}
+                  onChange={(value) => {
+                    setName(value);
+                    setError('');
+                    setTestResult(null);
+                  }}
+                  placeholder="Imprimante cuisine"
+                  className="w-full"
+                />
+              )}
               <p className="text-xs text-muted-foreground mt-1">
-                Saisissez un nom pour identifier cette imprimante (ex: "Imprimante cuisine", "Caisse principale")
+                {connectionType === 'windows' 
+                  ? 'Sélectionnez une imprimante Windows installée sur ce PC'
+                  : 'Saisissez un nom pour identifier cette imprimante (ex: "Imprimante cuisine", "Caisse principale")'}
               </p>
             </div>
 

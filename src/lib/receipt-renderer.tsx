@@ -88,7 +88,7 @@ export function renderReceiptHTML({
     );
   };
   
-  const typeLabel = order.type === 'dine-in' ? `[SUR PLACE]` : `[A EMPORTER]`;
+  const typeLabel = order.type === 'dine-in' ? `SUR PLACE` : `A EMPORTER`;
   const paymentLabel = order.paymentMethod === 'cash' ? t('print.cash') : t('print.card');
   
   // Use kitchen-specific display options if it's a kitchen ticket
@@ -101,6 +101,7 @@ export function renderReceiptHTML({
   const showProductPrices = isKitchen ? (customization.kitchenShowProductPrices) : customization.showProductPrices;
   const showModifiers = isKitchen ? customization.kitchenShowModifiers : customization.showModifiers;
   const showNotes = isKitchen ? customization.kitchenShowNotes : customization.showNotes;
+  const kitchenShowItemCount = isKitchen ? customization.kitchenShowItemCount : false;
 
   if (isKitchen) {
     return (
@@ -116,18 +117,22 @@ export function renderReceiptHTML({
         {showOrderNumber && (
           <div className="text-center my-4">
             <span style={{ fontSize: '1.75rem', fontWeight: 700 }}>{orderNumberDisplay}</span>
+            {/* Type de commande juste en dessous du numéro */}
+            {showOrderType && (
+              <div className="mt-2">
+                <span style={{ fontSize: '1rem', fontWeight: 700 }}>{typeLabel}</span>
+              </div>
+            )}
           </div>
         )}
         {showOrderNumber && <Separator />}
 
         {/* Order Info - Conditional display based on kitchen customization (no order number here) */}
-        {(showDate || showTime || showOrderType || showCashier) && (
+        {/* Pour le ticket cuisine, le type de commande est déjà affiché sous le numéro de commande */}
+        {(showDate || showTime || showCashier || kitchenShowItemCount) && (
           <>
             <div className="section">
               <div className="order-info">
-                {showOrderType && (
-                  <div><strong>{customization.labelOrderType}:</strong> {typeLabel}</div>
-                )}
                 {showDate && (
                   <div><strong>{customization.labelDate}:</strong> {formattedDate}</div>
                 )}
@@ -136,6 +141,9 @@ export function renderReceiptHTML({
                 )}
                 {showCashier && cashierName && (
                   <div><strong>{customization.labelCashier}:</strong> {cashierName}</div>
+                )}
+                {kitchenShowItemCount && (
+                  <div><strong>{customization.kitchenLabelItemCount || customization.labelItemCount}:</strong> {order.lines.reduce((sum, line) => sum + line.quantity, 0)}</div>
                 )}
               </div>
             </div>
@@ -220,12 +228,16 @@ export function renderReceiptHTML({
     <>
       {/* Restaurant Header - With customizable alignment */}
       <div className={`header mb-4 ${headerAlignClass}`}>
-        {settings?.logo && (
-          <div className="mb-3">
+        {settings?.logo && customization.showLogo && (
+          <div className="mb-3 flex justify-center">
             <img 
               src={settings.logo} 
               alt="Logo" 
-              className="h-20 mx-auto object-contain"
+              style={{ 
+                maxWidth: `${customization.logoSize || 50}%`,
+                height: 'auto',
+                objectFit: 'contain'
+              }}
             />
           </div>
         )}
@@ -240,17 +252,20 @@ export function renderReceiptHTML({
         )}
       </div>
 
-      <Separator />
-
       {/* Receipt Header Message (Bienvenue) */}
       {settings?.receiptHeader && (
         <>
+          {/* Retour à la ligne pour aérer avant "bienvenue" (identique à l'impression) */}
+          <div className="mb-2"></div>
           <div className={`section text-xs mb-3 ${headerAlignClass}`} style={{ whiteSpace: 'pre-line' }}>
             {settings.receiptHeader}
           </div>
+          {/* Séparation entre "bienvenue" et le numéro de commande (identique à l'impression) */}
           <Separator />
         </>
       )}
+      {/* Si pas de bienvenue, garder le séparateur après l'en-tête */}
+      {!settings?.receiptHeader && <Separator />}
 
       {/* Order number #XXX large, centered, right below Bienvenue */}
       {customization.showOrderNumber && (
@@ -297,6 +312,12 @@ export function renderReceiptHTML({
                   <span>{cashierName}</span>
                 </div>
               )}
+              {customization.showItemCount && (
+                <div className="flex justify-between">
+                  <span className="font-semibold">{customization.labelItemCount}:</span>
+                  <span>{order.lines.reduce((sum, line) => sum + line.quantity, 0)}</span>
+                </div>
+              )}
             </div>
           </div>
           <Separator />
@@ -317,7 +338,7 @@ export function renderReceiptHTML({
                   </div>
                   {customization.showModifiers && line.variantSize && (
                     <div className="line-details text-xs ml-3 text-gray-600">
-                      Taille: {line.variantSize}
+                      Variante: {line.variantSize}
                     </div>
                   )}
                   {customization.showModifiers && line.modifiers.length > 0 && (

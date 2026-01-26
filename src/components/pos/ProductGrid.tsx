@@ -71,14 +71,20 @@ export function ProductGrid({ categoryId, onSelectProduct }: ProductGridProps) {
                   </div>
                 </div>
                 
-                <div className="flex items-center justify-between mt-auto">
-                  <span className="text-lg font-bold text-primary">
-                    {variants.length > 1 && t('productGrid.from') + ' '}
-                    {formatCurrency(minPrice, currency)}
-                  </span>
+                <div className="flex items-end justify-between mt-auto gap-2">
+                  <div className="flex flex-col items-start min-w-0 flex-1">
+                    {variants.length > 1 && (
+                      <span className="text-[10px] sm:text-xs text-muted-foreground leading-tight whitespace-nowrap">
+                        {t('productGrid.from')}
+                      </span>
+                    )}
+                    <span className="text-base sm:text-lg font-bold text-primary leading-tight whitespace-nowrap">
+                      {formatCurrency(minPrice, currency)}
+                    </span>
+                  </div>
                   
                   {variants.length > 1 && (
-                    <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                    <span className="text-[10px] sm:text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full whitespace-nowrap flex-shrink-0">
                       {variants.length} {t('productGrid.sizes')}
                     </span>
                   )}

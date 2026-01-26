@@ -126,8 +126,8 @@
         "to": "public"
       },
       {
-        "from": "print-daemon/RawPrinterHelper/RawPrinterHelper.exe",
-        "to": "print-daemon/RawPrinterHelper/RawPrinterHelper.exe"
+        "from": "PrintDaemon/bin/Release/net8.0/win-x64/publish/PrintDaemon.exe",
+        "to": "PrintDaemon/PrintDaemon.exe"
       }
     ],
     "mac": {
