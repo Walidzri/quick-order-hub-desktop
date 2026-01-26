@@ -1,5 +1,8 @@
 /// <reference types="vite/client" />
 
+// App version from package.json (defined in vite.config.ts)
+declare const __APP_VERSION__: string;
+
 interface Window {
   electronAPI?: {
     printDirect: (content: string, printerAddress: string, printerPort: number, isThermalPrinter: boolean) => Promise<{ success: boolean }>;

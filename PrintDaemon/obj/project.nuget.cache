@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "dgSpecHash": "Gbu3TpDYsz8=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\atwal\\Desktop\\doudou-tacos\\quick-order-hub-desktop\\PrintDaemon\\PrintDaemon.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\atwal\\.nuget\\packages\\microsoft.net.illink.tasks\\8.0.12\\microsoft.net.illink.tasks.8.0.12.nupkg.sha512",
+    "C:\\Users\\atwal\\.nuget\\packages\\microsoft.win32.systemevents\\8.0.0\\microsoft.win32.systemevents.8.0.0.nupkg.sha512",
+    "C:\\Users\\atwal\\.nuget\\packages\\system.drawing.common\\8.0.0\\system.drawing.common.8.0.0.nupkg.sha512",
+    "C:\\Users\\atwal\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\8.0.12\\microsoft.netcore.app.runtime.win-x64.8.0.12.nupkg.sha512",
+    "C:\\Users\\atwal\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\8.0.12\\microsoft.windowsdesktop.app.runtime.win-x64.8.0.12.nupkg.sha512",
+    "C:\\Users\\atwal\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\8.0.12\\microsoft.aspnetcore.app.runtime.win-x64.8.0.12.nupkg.sha512",
+    "C:\\Users\\atwal\\.nuget\\packages\\microsoft.netcore.app.crossgen2.win-x64\\8.0.12\\microsoft.netcore.app.crossgen2.win-x64.8.0.12.nupkg.sha512"
+  ],
+  "logs": []
+}

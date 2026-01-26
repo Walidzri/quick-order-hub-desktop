@@ -1,0 +1,12 @@
+{
+  "Version": 1,
+  "Hash": "cKMJAMGxNwv+lKRVmBWhjdMp6t8twEJKubythjK9gLU=",
+  "Source": "PrintDaemon",
+  "BasePath": "_content/PrintDaemon",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": [],
+  "Endpoints": []
+}

@@ -1,9 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
-import { copyFileSync, existsSync } from 'fs';
+import { copyFileSync, existsSync, readFileSync } from 'fs';
 import electron from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
+
+// Read version from package.json
+const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
+const appVersion = packageJson.version;
 
 export default defineConfig(({ mode }) => ({
   server: {
@@ -80,5 +84,8 @@ export default defineConfig(({ mode }) => ({
     emptyOutDir: true,
     // Use relative paths for assets in production (Electron)
     base: './',
+  },
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
   },
 }));

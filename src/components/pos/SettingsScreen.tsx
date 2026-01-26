@@ -485,7 +485,7 @@ export function SettingsScreen() {
                     Quick Order Hub
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Version 3.1.0
+                    Version {__APP_VERSION__}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     Copyright © {new Date().getFullYear()} by WA
