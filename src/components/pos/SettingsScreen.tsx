@@ -237,17 +237,17 @@ export function SettingsScreen() {
 
       // Show save dialog
       const result = await window.electronAPI.showSaveDialog({
-        title: 'Sauvegarder la sauvegarde',
+        title: t('data.saveBackup'),
         defaultPath: fileName,
         filters: [
-          { name: 'Fichiers JSON', extensions: ['json'] },
-          { name: 'Tous les fichiers', extensions: ['*'] },
+          { name: 'JSON', extensions: ['json'] },
+          { name: '*', extensions: ['*'] },
         ],
       });
 
       if (!result.canceled && result.filePath) {
         await window.electronAPI.saveBackup(jsonData, result.filePath);
-        await showAlert('Sauvegarde créée avec succès !', 'Succès');
+        await showAlert(t('data.backupCreated'), t('general.success'));
       }
     } catch (error) {
       console.error('Export error:', error);
@@ -285,10 +285,10 @@ export function SettingsScreen() {
     try {
       // Show open dialog
       const result = await window.electronAPI.showOpenDialog({
-        title: 'Importer une sauvegarde',
+        title: t('data.importBackupTitle'),
         filters: [
-          { name: 'Fichiers JSON', extensions: ['json'] },
-          { name: 'Tous les fichiers', extensions: ['*'] },
+          { name: 'JSON', extensions: ['json'] },
+          { name: '*', extensions: ['*'] },
         ],
         properties: ['openFile'],
       });
@@ -345,7 +345,7 @@ export function SettingsScreen() {
       // Reload page to refresh all data
       window.location.reload();
 
-      await showAlert('Sauvegarde importée avec succès ! L\'application va se recharger.', 'Succès');
+      await showAlert(t('data.backupImported'), t('general.success'));
     } catch (error) {
       console.error('Import error:', error);
       await showAlert('Erreur lors de l\'importation de la sauvegarde: ' + (error instanceof Error ? error.message : 'Erreur inconnue'), 'Erreur');
@@ -831,11 +831,11 @@ export function SettingsScreen() {
                             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-xs text-muted-foreground">
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
-                                <span>Du {startDate.toLocaleDateString('fr-FR')}</span>
+                                <span>{t('promo.from')} {startDate.toLocaleDateString()}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
-                                <span>Au {endDate.toLocaleDateString('fr-FR')}</span>
+                                <span>{t('promo.to')} {endDate.toLocaleDateString()}</span>
                               </div>
                             </div>
                           </div>
@@ -1028,10 +1028,7 @@ export function SettingsScreen() {
               
               {/* Backup & Restore */}
               <div className="p-3 sm:p-4 bg-info/10 border-2 border-info/20 rounded-xl">
-                <h3 className="font-medium text-info mb-2 text-sm sm:text-base">Sauvegarde et Restauration</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                  Créez une sauvegarde complète de toutes vos données ou restaurez une sauvegarde précédente.
-                </p>
+                <h3 className="font-medium text-info mb-2 text-sm sm:text-base">{t('data.backupRestore')}</h3>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Button
                     variant="default"
@@ -1042,12 +1039,12 @@ export function SettingsScreen() {
                     {isExporting ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Export en cours...
+                        {t('data.exporting')}
                       </>
                     ) : (
                       <>
                         <Download className="w-4 h-4 mr-2" />
-                        Exporter la sauvegarde
+                        {t('data.exportBackup')}
                       </>
                     )}
                   </Button>
@@ -1060,12 +1057,12 @@ export function SettingsScreen() {
                     {isImporting ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Import en cours...
+                        {t('data.importing')}
                       </>
                     ) : (
                       <>
                         <Upload className="w-4 h-4 mr-2" />
-                        Importer une sauvegarde
+                        {t('data.importBackup')}
                       </>
                     )}
                   </Button>
@@ -1074,18 +1071,12 @@ export function SettingsScreen() {
 
               {/* Automatic Backup Configuration */}
               <div className="p-3 sm:p-4 bg-primary/10 border-2 border-primary/20 rounded-xl">
-                <h3 className="font-medium text-primary mb-2 text-sm sm:text-base">Sauvegarde automatique</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                  Configurez la sauvegarde automatique de la base de données à intervalles réguliers.
-                </p>
+                <h3 className="font-medium text-primary mb-2 text-sm sm:text-base">{t('data.autoBackup')}</h3>
                 
                 {/* Enable/Disable Automatic Backup */}
                 <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg mb-4">
                   <div className="flex-1 pr-4">
-                    <p className="text-sm font-medium">Activer la sauvegarde automatique</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      La base de données sera sauvegardée automatiquement selon l&apos;intervalle configuré.
-                    </p>
+                    <p className="text-sm font-medium">{t('data.autoBackup')}</p>
                   </div>
                   <Switch
                     checked={settings.backupEnabled || false}
@@ -1097,9 +1088,6 @@ export function SettingsScreen() {
                   <>
                     {/* Backup Schedule Type */}
                     <div className="mb-4">
-                      <label className="text-sm font-medium text-muted-foreground block mb-2">
-                        Type de planification
-                      </label>
                       <Select
                         value={settings.backupScheduleType || 'interval'}
                         onValueChange={(value) => {
@@ -1110,15 +1098,12 @@ export function SettingsScreen() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="interval">À intervalles réguliers</SelectItem>
-                          <SelectItem value="daily">Quotidienne</SelectItem>
-                          <SelectItem value="weekly">Hebdomadaire</SelectItem>
-                          <SelectItem value="monthly">Mensuelle</SelectItem>
+                          <SelectItem value="interval">{t('period.day')}</SelectItem>
+                          <SelectItem value="daily">{t('period.day')}</SelectItem>
+                          <SelectItem value="weekly">{t('period.week')}</SelectItem>
+                          <SelectItem value="monthly">{t('period.month')}</SelectItem>
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Choisissez comment planifier les sauvegardes automatiques
-                      </p>
                     </div>
 
                     {/* Interval Schedule */}
@@ -1948,10 +1933,10 @@ function PrinterSettings({ printers, updatePrinter, deletePrinter, t, showDialog
       case 'wifi':
         return 'Wi-Fi';
       case 'windows':
-        return 'Imprimante Windows (daemon)';
+        return t('printer.windowsDaemon');
       case 'tcp':
       default:
-        return 'Ethernet / Réseau';
+        return t('printer.ethernetNetwork');
     }
   };
 
@@ -1973,10 +1958,10 @@ function PrinterSettings({ printers, updatePrinter, deletePrinter, t, showDialog
 
   const handleDeletePrinter = async (printer: PrinterType) => {
     const confirmed = await showDialog({
-      title: 'Supprimer l\'imprimante',
-      description: `Êtes-vous sûr de vouloir supprimer l'imprimante "${printer.name || 'sans nom'}" ?`,
-      confirmText: 'Supprimer',
-      cancelText: 'Annuler',
+      title: t('general.delete'),
+      description: `${t('general.deleteConfirm')} "${printer.name || t('general.noName')}" ?`,
+      confirmText: t('general.delete'),
+      cancelText: t('general.cancel'),
       variant: 'destructive',
     });
     if (!confirmed) return;
@@ -2209,14 +2194,14 @@ Merci d'utiliser Quick Order Hub !
           onClick={handleAddPrinter}
         >
           <Plus className="w-4 h-4" />
-          Ajouter une imprimante
+          {t('printer.addPrinter')}
         </Button>
       </div>
 
       <div className="space-y-3 sm:space-y-4">
         {printers.length === 0 && (
           <div className="text-center py-8 text-muted-foreground text-sm">
-            Aucune imprimante configurée. Cliquez sur "Ajouter une imprimante" pour commencer.
+            {t('printer.noPrinterConfigured')}
           </div>
         )}
 
@@ -2277,7 +2262,7 @@ Merci d'utiliser Quick Order Hub !
                     "text-xs font-medium whitespace-nowrap",
                     printer.enabled === false ? "text-muted-foreground" : "text-foreground"
                   )}>
-                    {printer.enabled === false ? 'Désactivée' : 'Activée'}
+                    {printer.enabled === false ? t('printer.disabled') : t('printer.enabled')}
                   </span>
                 </div>
                 <Button
@@ -2287,7 +2272,7 @@ Merci d'utiliser Quick Order Hub !
                   className="gap-2"
                 >
                   <Edit className="w-4 h-4" />
-                  <span className="hidden sm:inline">Configurer</span>
+                  <span className="hidden sm:inline">{t('printer.configure')}</span>
                 </Button>
                 <Button
                   onClick={() => handleDeletePrinter(printer)}
@@ -2307,7 +2292,7 @@ Merci d'utiliser Quick Order Hub !
                   {printer.connectionType === 'windows' ? (
                     <>
                       <Printer className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">{printer.name || 'Imprimante Windows'}</span>
+                      <span className="text-muted-foreground">{printer.name || t('printer.windowsPrinter')}</span>
                     </>
                   ) : (printer.connectionType === 'tcp' || printer.connectionType === 'wifi' || !printer.connectionType) && printer.tcpHost ? (
                     <>
@@ -2319,9 +2304,7 @@ Merci d'utiliser Quick Order Hub !
                       <Wifi className="w-4 h-4 text-muted-foreground" />
                       <span className="text-muted-foreground">Bluetooth</span>
                     </>
-                  ) : (
-                    <span className="text-muted-foreground text-xs">Aucune configuration réseau</span>
-                  )}
+                  ) : null}
                 </div>
                 <Button
                   onClick={() => handleTestPrinter(printer)}
@@ -2333,12 +2316,12 @@ Merci d'utiliser Quick Order Hub !
                   {testingPrinters[printer.id] ? (
                     <>
                       <Loader2 className="w-3 h-3 animate-spin" />
-                      Test...
+                      {t('printer.test')}...
                     </>
                   ) : (
                     <>
                       <Activity className="w-3 h-3" />
-                      Tester
+                      {t('printer.test')}
                     </>
                   )}
                 </Button>
@@ -2680,7 +2663,7 @@ Merci d'utiliser Quick Order Hub !
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium text-muted-foreground">
-                  {connectionType === 'windows' ? 'Imprimante Windows *' : 'Nom de l\'imprimante *'}
+                  {connectionType === 'windows' ? t('printer.windowsPrinterName') : t('printer.printerName')}
                 </label>
                 {connectionType === 'windows' && (
                   <Button
@@ -2707,7 +2690,7 @@ Merci d'utiliser Quick Order Hub !
                     className="h-6 text-xs gap-1"
                   >
                     <RefreshCw className={cn("w-3 h-3", isLoadingPrinters && "animate-spin")} />
-                    Actualiser
+                    {t('general.loading').replace('...', '')}
                   </Button>
                 )}
               </div>
@@ -2722,7 +2705,7 @@ Merci d'utiliser Quick Order Hub !
                   disabled={isLoadingPrinters || availablePrinters.length === 0}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={isLoadingPrinters ? "Chargement..." : availablePrinters.length === 0 ? "Aucune imprimante trouvée" : "Sélectionnez une imprimante"} />
+                    <SelectValue placeholder={isLoadingPrinters ? t('printer.loading') : availablePrinters.length === 0 ? t('printer.noPrinterFound') : t('printer.selectPrinter')} />
                   </SelectTrigger>
                   <SelectContent>
                     {availablePrinters.length > 0 ? (
@@ -2743,20 +2726,20 @@ Merci d'utiliser Quick Order Hub !
                     setError('');
                     setTestResult(null);
                   }}
-                  placeholder="Imprimante cuisine"
+                  placeholder={t('printer.kitchenPrinterPlaceholder')}
                   className="w-full"
                 />
               )}
               <p className="text-xs text-muted-foreground mt-1">
                 {connectionType === 'windows' 
-                  ? 'Sélectionnez une imprimante Windows installée sur ce PC'
-                  : 'Saisissez un nom pour identifier cette imprimante (ex: "Imprimante cuisine", "Caisse principale")'}
+                  ? t('printer.selectWindowsPrinter')
+                  : t('printer.enterPrinterName')}
               </p>
             </div>
 
             <div>
               <label className="text-sm font-medium text-muted-foreground block mb-2">
-                Type de ticket
+                {t('printer.ticketType')}
               </label>
               <Select
                 value={role}
@@ -2769,15 +2752,15 @@ Merci d'utiliser Quick Order Hub !
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="kitchen">Ticket cuisine</SelectItem>
-                  <SelectItem value="cashier">Reçu client</SelectItem>
+                  <SelectItem value="kitchen">{t('receipt.kitchenTab')}</SelectItem>
+                  <SelectItem value="cashier">{t('receipt.receiptTab')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
               <label className="text-sm font-medium text-muted-foreground block mb-2">
-                Type de connexion
+                {t('printer.connectionTypeLabel')}
               </label>
               <Select
                 value={connectionType}
@@ -2791,17 +2774,12 @@ Merci d'utiliser Quick Order Hub !
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="tcp">Réseau (Ethernet / Wi-Fi)</SelectItem>
+                  <SelectItem value="tcp">{t('printer.networkEthernet')}</SelectItem>
                   <SelectItem value="bluetooth">Bluetooth</SelectItem>
                   <SelectItem value="wifi">Wi-Fi direct</SelectItem>
-                  <SelectItem value="windows">Imprimante Windows (daemon local)</SelectItem>
+                  <SelectItem value="windows">{t('printer.windowsDaemonLocal')}</SelectItem>
                 </SelectContent>
               </Select>
-              {connectionType !== 'tcp' && connectionType !== 'windows' && connectionType !== 'wifi' && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Pour le moment, seules l&apos;impression réseau (TCP/IP), Wi‑Fi et l&apos;impression Windows via le daemon sont supportées. Bluetooth sera ajouté plus tard.
-                </p>
-              )}
             </div>
 
             {/* Paramètres réseau TCP */}
@@ -2809,7 +2787,7 @@ Merci d'utiliser Quick Order Hub !
               <>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground block mb-2">
-                    Adresse IP de l'imprimante *
+                    {t('printer.ipAddress')}
                   </label>
                   <IPInput
                     value={tcpHost}
@@ -2821,13 +2799,13 @@ Merci d'utiliser Quick Order Hub !
                     placeholder="192.168.1.100"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Adresse IP de l&apos;imprimante sur le réseau
+                    {t('printer.ipAddressDesc')}
                   </p>
                 </div>
 
                 <div>
                   <label className="text-sm font-medium text-muted-foreground block mb-2">
-                    Port *
+                    {t('printer.port')}
                   </label>
                   <NumericInput
                     value={tcpPort}
@@ -2843,7 +2821,7 @@ Merci d'utiliser Quick Order Hub !
                     className="font-mono"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Port TCP (par défaut: 9100 pour l&apos;impression RAW)
+                    {t('printer.portDesc')}
                   </p>
                 </div>
               </>
@@ -2903,12 +2881,12 @@ Merci d'utiliser Quick Order Hub !
                 {isTesting ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Test en cours...
+                    {t('printer.test')}...
                   </>
                 ) : (
                   <>
                     <Activity className="w-4 h-4 mr-2" />
-                    Tester la connexion
+                    {t('printer.testConnection')}
                   </>
                 )}
               </Button>
@@ -2921,14 +2899,14 @@ Merci d'utiliser Quick Order Hub !
               variant="outline"
               className="flex-1"
             >
-              Annuler
+              {t('general.cancel')}
             </Button>
             <Button
               onClick={handleSave}
               className="flex-1"
             >
               <Save className="w-4 h-4 mr-2" />
-              Enregistrer
+              {t('general.save')}
             </Button>
           </div>
         </motion.div>

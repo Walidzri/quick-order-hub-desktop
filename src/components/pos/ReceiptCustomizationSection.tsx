@@ -160,7 +160,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                   <CollapsibleTrigger className="w-full flex items-center justify-between p-4 bg-primary/10 border-2 border-primary/20 rounded-xl hover:bg-primary/15 transition-colors">
                     <div className="flex items-center gap-2">
                       <FileText className="w-5 h-5 text-primary" />
-                      <h3 className="font-semibold text-base text-primary">Reçu client</h3>
+                      <h3 className="font-semibold text-base text-primary">{t('receipt.receiptTab')}</h3>
                     </div>
                     {expandedSections.receipt ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                   </CollapsibleTrigger>
@@ -168,29 +168,29 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                     {/* Options d'affichage - Reçu */}
                     <Collapsible open={expandedSections.receiptDisplay} onOpenChange={() => toggleSection('receiptDisplay')}>
                       <CollapsibleTrigger className="w-full flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
-                        <h4 className="font-medium text-sm">Éléments à afficher</h4>
+                        <h4 className="font-medium text-sm">{t('receipt.elementsToDisplay')}</h4>
                         {expandedSections.receiptDisplay ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </CollapsibleTrigger>
                       <CollapsibleContent className="mt-3 space-y-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <DisplayToggle label="Numéro de commande" checked={customization.showOrderNumber} onChange={(v) => updateCustomization({ showOrderNumber: v })} />
-                          <DisplayToggle label="Date" checked={customization.showDate} onChange={(v) => updateCustomization({ showDate: v })} />
-                          <DisplayToggle label="Heure" checked={customization.showTime} onChange={(v) => updateCustomization({ showTime: v })} />
-                          <DisplayToggle label="Type de commande" checked={customization.showOrderType} onChange={(v) => updateCustomization({ showOrderType: v })} />
-                          <DisplayToggle label="Mode de paiement" checked={customization.showPaymentMethod} onChange={(v) => updateCustomization({ showPaymentMethod: v })} />
-                          <DisplayToggle label="Caissier" checked={customization.showCashier} onChange={(v) => updateCustomization({ showCashier: v })} />
-                          <DisplayToggle label="Produits" checked={customization.showProducts} onChange={(v) => updateCustomization({ showProducts: v })} />
-                          <DisplayToggle label="Prix des produits" checked={customization.showProductPrices} onChange={(v) => updateCustomization({ showProductPrices: v })} />
-                          <DisplayToggle label="Modificateurs" checked={customization.showModifiers} onChange={(v) => updateCustomization({ showModifiers: v })} />
-                          <DisplayToggle label="Notes" checked={customization.showNotes} onChange={(v) => updateCustomization({ showNotes: v })} />
-                          <DisplayToggle label="Sous-total" checked={customization.showSubtotal} onChange={(v) => updateCustomization({ showSubtotal: v })} />
-                          <DisplayToggle label="Remise" checked={customization.showDiscount} onChange={(v) => updateCustomization({ showDiscount: v })} />
-                          <DisplayToggle label="Total" checked={customization.showTotal} onChange={(v) => updateCustomization({ showTotal: v })} />
-                          <DisplayToggle label="Nombre d'articles" checked={customization.showItemCount} onChange={(v) => updateCustomization({ showItemCount: v })} />
-                          <DisplayToggle label="Logo" checked={customization.showLogo} onChange={(v) => updateCustomization({ showLogo: v })} />
+                          <DisplayToggle label={t('receipt.orderNumber')} checked={customization.showOrderNumber} onChange={(v) => updateCustomization({ showOrderNumber: v })} />
+                          <DisplayToggle label={t('receipt.date')} checked={customization.showDate} onChange={(v) => updateCustomization({ showDate: v })} />
+                          <DisplayToggle label={t('receipt.time')} checked={customization.showTime} onChange={(v) => updateCustomization({ showTime: v })} />
+                          <DisplayToggle label={t('receipt.orderType')} checked={customization.showOrderType} onChange={(v) => updateCustomization({ showOrderType: v })} />
+                          <DisplayToggle label={t('receipt.paymentMethod')} checked={customization.showPaymentMethod} onChange={(v) => updateCustomization({ showPaymentMethod: v })} />
+                          <DisplayToggle label={t('receipt.cashier')} checked={customization.showCashier} onChange={(v) => updateCustomization({ showCashier: v })} />
+                          <DisplayToggle label={t('receipt.products')} checked={customization.showProducts} onChange={(v) => updateCustomization({ showProducts: v })} />
+                          <DisplayToggle label={t('receipt.productPrices')} checked={customization.showProductPrices} onChange={(v) => updateCustomization({ showProductPrices: v })} />
+                          <DisplayToggle label={t('receipt.modifiers')} checked={customization.showModifiers} onChange={(v) => updateCustomization({ showModifiers: v })} />
+                          <DisplayToggle label={t('receipt.notes')} checked={customization.showNotes} onChange={(v) => updateCustomization({ showNotes: v })} />
+                          <DisplayToggle label={t('receipt.subtotal')} checked={customization.showSubtotal} onChange={(v) => updateCustomization({ showSubtotal: v })} />
+                          <DisplayToggle label={t('receipt.discount')} checked={customization.showDiscount} onChange={(v) => updateCustomization({ showDiscount: v })} />
+                          <DisplayToggle label={t('receipt.total')} checked={customization.showTotal} onChange={(v) => updateCustomization({ showTotal: v })} />
+                          <DisplayToggle label={t('receipt.itemCount')} checked={customization.showItemCount} onChange={(v) => updateCustomization({ showItemCount: v })} />
+                          <DisplayToggle label={t('receipt.logo')} checked={customization.showLogo} onChange={(v) => updateCustomization({ showLogo: v })} />
                           {customization.showLogo && (
                             <div className="col-span-2">
-                              <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Taille du logo</label>
+                              <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.logoSize')}</label>
                               <Select 
                                 value={String(customization.logoSize || 50)} 
                                 onValueChange={(v) => updateCustomization({ logoSize: parseInt(v) || 50 })}
@@ -199,21 +199,21 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="20">20% (Petit)</SelectItem>
+                                  <SelectItem value="20">20% ({t('receipt.small')})</SelectItem>
                                   <SelectItem value="30">30%</SelectItem>
                                   <SelectItem value="40">40%</SelectItem>
-                                  <SelectItem value="50">50% (Par défaut)</SelectItem>
+                                  <SelectItem value="50">50% ({t('receipt.default')})</SelectItem>
                                   <SelectItem value="60">60%</SelectItem>
                                   <SelectItem value="70">70%</SelectItem>
                                   <SelectItem value="80">80%</SelectItem>
                                   <SelectItem value="90">90%</SelectItem>
-                                  <SelectItem value="100">100% (Grand)</SelectItem>
+                                  <SelectItem value="100">100% ({t('receipt.large')})</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
                           )}
-                          <DisplayToggle label="Montant reçu" checked={customization.showAmountReceived} onChange={(v) => updateCustomization({ showAmountReceived: v })} />
-                          <DisplayToggle label="Monnaie" checked={customization.showChange} onChange={(v) => updateCustomization({ showChange: v })} />
+                          <DisplayToggle label={t('receipt.amountReceived')} checked={customization.showAmountReceived} onChange={(v) => updateCustomization({ showAmountReceived: v })} />
+                          <DisplayToggle label={t('receipt.change')} checked={customization.showChange} onChange={(v) => updateCustomization({ showChange: v })} />
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
@@ -221,16 +221,16 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                     {/* Formatage - Reçu */}
                     <Collapsible open={expandedSections.receiptFormat} onOpenChange={() => toggleSection('receiptFormat')}>
                       <CollapsibleTrigger className="w-full flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
-                        <h4 className="font-medium text-sm">Formatage</h4>
+                        <h4 className="font-medium text-sm">{t('receipt.formatting')}</h4>
                         {expandedSections.receiptFormat ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </CollapsibleTrigger>
                       <CollapsibleContent className="mt-3 space-y-4">
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Padding du numéro (zéros)</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.paddingZeros')}</label>
                         <NumericInput value={customization.orderNumberPadding} onChange={(value) => updateCustomization({ orderNumberPadding: parseInt(value) || 6 })} min={0} max={20} className="w-32" allowDecimal={false} />
                       </div>
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Format de date</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.dateSeparator')}</label>
                         <Select value={customization.dateFormat} onValueChange={(v) => updateCustomization({ dateFormat: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -242,7 +242,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                         </Select>
                       </div>
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Format d&apos;heure</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.timeSeparator')}</label>
                         <Select value={customization.timeFormat} onValueChange={(v) => updateCustomization({ timeFormat: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -257,53 +257,31 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                     {/* Mise en page - Reçu */}
                     <Collapsible open={expandedSections.receiptLayout} onOpenChange={() => toggleSection('receiptLayout')}>
                       <CollapsibleTrigger className="w-full flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
-                        <h4 className="font-medium text-sm">Mise en page</h4>
+                        <h4 className="font-medium text-sm">{t('receipt.layout')}</h4>
                         {expandedSections.receiptLayout ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </CollapsibleTrigger>
                       <CollapsibleContent className="mt-3 space-y-4">
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Alignement de l&apos;en-tête</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.headerAlignment')}</label>
                         <div className="flex gap-2">
-                          <Button variant={customization.headerAlignment === 'left' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'left' })}><AlignLeft className="w-4 h-4 mr-2" />Gauche</Button>
-                          <Button variant={customization.headerAlignment === 'center' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'center' })}><AlignCenter className="w-4 h-4 mr-2" />Centre</Button>
-                          <Button variant={customization.headerAlignment === 'right' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'right' })}><AlignRight className="w-4 h-4 mr-2" />Droite</Button>
+                          <Button variant={customization.headerAlignment === 'left' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'left' })}><AlignLeft className="w-4 h-4 mr-2" />{t('receipt.left')}</Button>
+                          <Button variant={customization.headerAlignment === 'center' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'center' })}><AlignCenter className="w-4 h-4 mr-2" />{t('receipt.center')}</Button>
+                          <Button variant={customization.headerAlignment === 'right' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'right' })}><AlignRight className="w-4 h-4 mr-2" />{t('receipt.right')}</Button>
                         </div>
                       </div>
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Style du nom du restaurant</label>
-                        <Select value={customization.restaurantNameStyle} onValueChange={(v: 'normal'|'uppercase'|'lowercase') => updateCustomization({ restaurantNameStyle: v })}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="normal">Normal</SelectItem>
-                            <SelectItem value="uppercase">MAJUSCULES</SelectItem>
-                            <SelectItem value="lowercase">minuscules</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Style du nom des produits</label>
-                        <Select value={customization.productNameStyle} onValueChange={(v: 'normal'|'uppercase'|'lowercase') => updateCustomization({ productNameStyle: v })}>
-                          <SelectTrigger><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="normal">Normal</SelectItem>
-                            <SelectItem value="uppercase">MAJUSCULES</SelectItem>
-                            <SelectItem value="lowercase">minuscules</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Style des séparateurs</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.separator')}</label>
                         <Select value={customization.separatorStyle} onValueChange={(v: 'dashes'|'dots'|'equals'|'line'|'none') => {
                           const chars: Record<string, string> = { dashes: '─', dots: '·', equals: '═', line: '─', none: ' ' };
                           updateCustomization({ separatorStyle: v, separatorChar: chars[v] });
                         }}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="dashes">Tirets (─)</SelectItem>
-                            <SelectItem value="dots">Points (·)</SelectItem>
-                            <SelectItem value="equals">Double traits (═)</SelectItem>
-                            <SelectItem value="line">Ligne simple</SelectItem>
-                            <SelectItem value="none">Aucun</SelectItem>
+                            <SelectItem value="dashes">{t('receipt.dashed')} (─)</SelectItem>
+                            <SelectItem value="dots">{t('receipt.dots')} (·)</SelectItem>
+                            <SelectItem value="equals">{t('receipt.equals')} (═)</SelectItem>
+                            <SelectItem value="line">{t('receipt.line')}</SelectItem>
+                            <SelectItem value="none">{t('receipt.none')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -341,24 +319,23 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                     {/* Libellés - Reçu */}
                     <Collapsible open={expandedSections.receiptLabels} onOpenChange={() => toggleSection('receiptLabels')}>
                       <CollapsibleTrigger className="w-full flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
-                        <h4 className="font-medium text-sm">Libellés personnalisés</h4>
+                        <h4 className="font-medium text-sm">{t('receipt.labels')}</h4>
                         {expandedSections.receiptLabels ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </CollapsibleTrigger>
                       <CollapsibleContent className="mt-3 space-y-3">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <LabelInput label="Numéro de commande" value={customization.labelOrderNumber} onChange={(v) => updateCustomization({ labelOrderNumber: v })} />
-                        <LabelInput label="Date" value={customization.labelDate} onChange={(v) => updateCustomization({ labelDate: v })} />
-                        <LabelInput label="Heure" value={customization.labelTime} onChange={(v) => updateCustomization({ labelTime: v })} />
-                        <LabelInput label="Type de commande" value={customization.labelOrderType} onChange={(v) => updateCustomization({ labelOrderType: v })} />
-                        <LabelInput label="Mode de paiement" value={customization.labelPaymentMethod} onChange={(v) => updateCustomization({ labelPaymentMethod: v })} />
-                        <LabelInput label="Caissier" value={customization.labelCashier} onChange={(v) => updateCustomization({ labelCashier: v })} />
-                        <LabelInput label="Sous-total" value={customization.labelSubtotal} onChange={(v) => updateCustomization({ labelSubtotal: v })} />
-                        <LabelInput label="Remise" value={customization.labelDiscount} onChange={(v) => updateCustomization({ labelDiscount: v })} />
-                        <LabelInput label="Total" value={customization.labelTotal} onChange={(v) => updateCustomization({ labelTotal: v })} />
-                        <LabelInput label="Nombre d'articles" value={customization.labelItemCount} onChange={(v) => updateCustomization({ labelItemCount: v })} />
-                        <LabelInput label="Montant reçu" value={customization.labelAmountReceived} onChange={(v) => updateCustomization({ labelAmountReceived: v })} />
-                        <LabelInput label="Monnaie" value={customization.labelChange} onChange={(v) => updateCustomization({ labelChange: v })} />
-                        <LabelInput label="Message de remerciement" value={customization.labelThankYou} onChange={(v) => updateCustomization({ labelThankYou: v })} />
+                        <LabelInput label={t('receipt.orderNumber')} value={customization.labelOrderNumber} onChange={(v) => updateCustomization({ labelOrderNumber: v })} />
+                        <LabelInput label={t('receipt.date')} value={customization.labelDate} onChange={(v) => updateCustomization({ labelDate: v })} />
+                        <LabelInput label={t('receipt.time')} value={customization.labelTime} onChange={(v) => updateCustomization({ labelTime: v })} />
+                        <LabelInput label={t('receipt.orderType')} value={customization.labelOrderType} onChange={(v) => updateCustomization({ labelOrderType: v })} />
+                        <LabelInput label={t('receipt.paymentMethod')} value={customization.labelPaymentMethod} onChange={(v) => updateCustomization({ labelPaymentMethod: v })} />
+                        <LabelInput label={t('receipt.cashier')} value={customization.labelCashier} onChange={(v) => updateCustomization({ labelCashier: v })} />
+                        <LabelInput label={t('receipt.subtotal')} value={customization.labelSubtotal} onChange={(v) => updateCustomization({ labelSubtotal: v })} />
+                        <LabelInput label={t('receipt.discount')} value={customization.labelDiscount} onChange={(v) => updateCustomization({ labelDiscount: v })} />
+                        <LabelInput label={t('receipt.total')} value={customization.labelTotal} onChange={(v) => updateCustomization({ labelTotal: v })} />
+                        <LabelInput label={t('receipt.itemCount')} value={customization.labelItemCount} onChange={(v) => updateCustomization({ labelItemCount: v })} />
+                        <LabelInput label={t('receipt.amountReceived')} value={customization.labelAmountReceived} onChange={(v) => updateCustomization({ labelAmountReceived: v })} />
+                        <LabelInput label={t('receipt.change')} value={customization.labelChange} onChange={(v) => updateCustomization({ labelChange: v })} />
                       </div>
                       </CollapsibleContent>
                     </Collapsible>
@@ -370,7 +347,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                   <CollapsibleTrigger className="w-full flex items-center justify-between p-4 bg-orange-500/10 border-2 border-orange-500/20 rounded-xl hover:bg-orange-500/15 transition-colors">
                     <div className="flex items-center gap-2">
                       <SeparatorHorizontal className="w-5 h-5 text-orange-600" />
-                      <h3 className="font-semibold text-base text-orange-600">Ticket Cuisine</h3>
+                      <h3 className="font-semibold text-base text-orange-600">{t('receipt.kitchenTab')}</h3>
                     </div>
                     {expandedSections.kitchen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                   </CollapsibleTrigger>
@@ -378,21 +355,21 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                     {/* Options d'affichage - Cuisine */}
                     <Collapsible open={expandedSections.kitchenDisplay} onOpenChange={() => toggleSection('kitchenDisplay')}>
                       <CollapsibleTrigger className="w-full flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
-                        <h4 className="font-medium text-sm">Éléments à afficher</h4>
+                        <h4 className="font-medium text-sm">{t('receipt.elementsToDisplay')}</h4>
                         {expandedSections.kitchenDisplay ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </CollapsibleTrigger>
                       <CollapsibleContent className="mt-3 space-y-3">
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <DisplayToggle label="Numéro de commande" checked={customization.kitchenShowOrderNumber} onChange={(v) => updateCustomization({ kitchenShowOrderNumber: v })} />
-                          <DisplayToggle label="Date" checked={customization.kitchenShowDate} onChange={(v) => updateCustomization({ kitchenShowDate: v })} />
-                          <DisplayToggle label="Heure" checked={customization.kitchenShowTime} onChange={(v) => updateCustomization({ kitchenShowTime: v })} />
-                          <DisplayToggle label="Type de commande" checked={customization.kitchenShowOrderType} onChange={(v) => updateCustomization({ kitchenShowOrderType: v })} />
-                          <DisplayToggle label="Caissier" checked={customization.kitchenShowCashier} onChange={(v) => updateCustomization({ kitchenShowCashier: v })} />
-                          <DisplayToggle label="Produits" checked={customization.kitchenShowProducts} onChange={(v) => updateCustomization({ kitchenShowProducts: v })} />
-                          <DisplayToggle label="Prix des produits" checked={customization.kitchenShowProductPrices} onChange={(v) => updateCustomization({ kitchenShowProductPrices: v })} />
-                          <DisplayToggle label="Modificateurs" checked={customization.kitchenShowModifiers} onChange={(v) => updateCustomization({ kitchenShowModifiers: v })} />
-                          <DisplayToggle label="Notes" checked={customization.kitchenShowNotes} onChange={(v) => updateCustomization({ kitchenShowNotes: v })} />
-                          <DisplayToggle label="Nombre d'articles" checked={customization.kitchenShowItemCount} onChange={(v) => updateCustomization({ kitchenShowItemCount: v })} />
+                          <DisplayToggle label={t('receipt.orderNumber')} checked={customization.kitchenShowOrderNumber} onChange={(v) => updateCustomization({ kitchenShowOrderNumber: v })} />
+                          <DisplayToggle label={t('receipt.date')} checked={customization.kitchenShowDate} onChange={(v) => updateCustomization({ kitchenShowDate: v })} />
+                          <DisplayToggle label={t('receipt.time')} checked={customization.kitchenShowTime} onChange={(v) => updateCustomization({ kitchenShowTime: v })} />
+                          <DisplayToggle label={t('receipt.orderType')} checked={customization.kitchenShowOrderType} onChange={(v) => updateCustomization({ kitchenShowOrderType: v })} />
+                          <DisplayToggle label={t('receipt.cashier')} checked={customization.kitchenShowCashier} onChange={(v) => updateCustomization({ kitchenShowCashier: v })} />
+                          <DisplayToggle label={t('receipt.products')} checked={customization.kitchenShowProducts} onChange={(v) => updateCustomization({ kitchenShowProducts: v })} />
+                          <DisplayToggle label={t('receipt.productPrices')} checked={customization.kitchenShowProductPrices} onChange={(v) => updateCustomization({ kitchenShowProductPrices: v })} />
+                          <DisplayToggle label={t('receipt.modifiers')} checked={customization.kitchenShowModifiers} onChange={(v) => updateCustomization({ kitchenShowModifiers: v })} />
+                          <DisplayToggle label={t('receipt.notes')} checked={customization.kitchenShowNotes} onChange={(v) => updateCustomization({ kitchenShowNotes: v })} />
+                          <DisplayToggle label={t('receipt.itemCount')} checked={customization.kitchenShowItemCount} onChange={(v) => updateCustomization({ kitchenShowItemCount: v })} />
                         </div>
                       </CollapsibleContent>
                     </Collapsible>
@@ -526,7 +503,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
 
             <div className="pt-4 border-t border-border">
               <Button variant="outline" className="w-full" onClick={async () => {
-                const ok = await showDialog({ title: 'Réinitialiser', description: t('receipt.resetConfirm'), confirmText: 'Confirmer', cancelText: 'Annuler', variant: 'default' });
+                const ok = await showDialog({ title: t('receipt.reset'), description: t('receipt.resetConfirm'), confirmText: t('receipt.confirm'), cancelText: t('general.cancel'), variant: 'default' });
                 if (ok) await updateSettings({ receiptCustomization: DirectPrinter.getDefaultCustomization() });
               }}>
                 {t('receipt.resetCustomizations')}

@@ -27,7 +27,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 type PeriodType = 'day' | 'week' | 'month' | 'year';
 
 export function ReportsScreen() {
-  const { loadOrdersByDateRange, currency, t } = usePOS();
+  const { loadOrdersByDateRange, currency, t, language } = usePOS();
   const { users, hasPermission } = useAuth();
   const [period, setPeriod] = useState<PeriodType>('day');
   const [userSessions, setUserSessions] = useState<UserSession[]>([]);
@@ -317,18 +317,30 @@ export function ReportsScreen() {
   
   const totalCategoryRevenue = categoryData.reduce((sum, c) => sum + c.value, 0);
 
+  // Get locale based on language
+  const getLocale = (): string => {
+    switch (language) {
+      case 'en-US': return 'en-US';
+      case 'ar-DZ': return 'ar-DZ';
+      default: return 'fr-FR';
+    }
+  };
+
   // Get period label
   const getPeriodLabel = (): string => {
     const now = new Date();
+    const locale = getLocale();
     switch (period) {
       case 'day':
-        return now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+        return now.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
       case 'week':
         const weekEnd = new Date(startDate);
         weekEnd.setDate(weekEnd.getDate() + 6);
-        return `Semaine du ${startDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} au ${weekEnd.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`;
+        const startStr = startDate.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
+        const endStr = weekEnd.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
+        return t('period.weekOf').replace('{start}', startStr).replace('{end}', endStr);
       case 'month':
-        return now.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+        return now.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
       case 'year':
         return now.getFullYear().toString();
       default:
@@ -448,10 +460,10 @@ export function ReportsScreen() {
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  {p === 'day' && 'Jour'}
-                  {p === 'week' && 'Semaine'}
-                  {p === 'month' && 'Mois'}
-                  {p === 'year' && 'Année'}
+                  {p === 'day' && t('period.day')}
+                  {p === 'week' && t('period.week')}
+                  {p === 'month' && t('period.month')}
+                  {p === 'year' && t('period.year')}
                 </button>
               ))}
             </div>
@@ -726,7 +738,7 @@ export function ReportsScreen() {
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm sm:text-base">{order.orderNumber}</div>
                       <div className="text-xs sm:text-sm text-muted-foreground">
-                        {new Date(order.paidAt || order.createdAt).toLocaleString('fr-FR', {
+                        {new Date(order.paidAt || order.createdAt).toLocaleString(getLocale(), {
                           day: 'numeric',
                           month: 'short',
                           year: period === 'year' ? 'numeric' : undefined,

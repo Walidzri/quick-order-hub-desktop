@@ -470,7 +470,7 @@ export function PrintPreviewModal({
                 size="lg"
               >
                 <Download className="w-5 h-5 mr-2" />
-                Télécharger en PDF
+                {t('pdf.download')}
               </Button>
               <Button
                 onClick={handleDirectPrint}
