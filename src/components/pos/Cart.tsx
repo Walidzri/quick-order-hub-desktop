@@ -23,7 +23,7 @@ import { PrintPreviewModal } from './PrintPreviewModal';
 import { EditCartItemModal } from './EditCartItemModal';
 
 export function Cart() {
-  const { user } = useAuth();
+  const { user, users } = useAuth();
   const {
     orderDrafts,
     activeOrderId,
@@ -421,7 +421,11 @@ export function Cart() {
           settings={settings}
           currency={currency}
           type="receipt"
-          cashierName={user?.name || ''}
+          cashierName={
+            paidOrder.order?.createdBy
+              ? (users.find((u) => u.id === paidOrder.order.createdBy)?.name ?? user?.name ?? '')
+              : (user?.name ?? '')
+          }
           amountReceived={paidOrder.amountReceived}
           change={paidOrder.change}
           printers={printers || []}

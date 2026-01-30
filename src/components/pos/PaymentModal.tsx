@@ -29,7 +29,7 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
     settings,
     printers
   } = usePOS();
-  const { user } = useAuth();
+  const { user, users } = useAuth();
   
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [amountReceived, setAmountReceived] = useState('');
@@ -93,8 +93,11 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
         ? DirectPrinter.formatDate(dateObj, customization.timeFormat)
         : dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
-      // Get cashier name
-      const cashierName = user?.name || '';
+      // Nom du caissier : toujours résolu depuis order.createdBy (créateur de la commande)
+      // pour éviter tout affichage incorrect après changement de compte
+      const cashierName = order.createdBy
+        ? (users.find((u) => u.id === order.createdBy)?.name ?? user?.name ?? '')
+        : (user?.name ?? '');
 
       // Format kitchen ticket
       const receiptText = DirectPrinter.formatTextReceipt({
