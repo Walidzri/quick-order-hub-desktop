@@ -75,6 +75,7 @@ const createWindow = (): void => {
   mainWindow = new BrowserWindow({
     width: 1920,
     height: 1080,
+    fullscreen: true, // Afficher en plein écran au lancement (POS/kiosque)
     webPreferences: {
       preload: preloadPath,
       nodeIntegration: false,
@@ -614,6 +615,27 @@ ipcMain.handle('app:getUserDataPath', () => {
 // IPC Handler for getting IndexedDB path
 ipcMain.handle('app:getIndexedDBPath', () => {
   return getIndexedDBPath();
+});
+
+// Shutdown PC (Windows: shutdown /s /t 5, macOS/Linux: shutdown -h now or equivalent)
+ipcMain.handle('app:shutdownPC', async () => {
+  const platform = process.platform;
+  try {
+    if (platform === 'win32') {
+      const child = spawn('shutdown', ['/s', '/t', '5'], { shell: true, detached: true, stdio: 'ignore' });
+      child.unref();
+    } else if (platform === 'darwin') {
+      const child = spawn('osascript', ['-e', 'tell application "System Events" to shut down'], { detached: true, stdio: 'ignore' });
+      child.unref();
+    } else {
+      const child = spawn('shutdown', ['-h', 'now'], { shell: true, detached: true, stdio: 'ignore' });
+      child.unref();
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Shutdown PC error:', error);
+    return { success: false, error: String(error) };
+  }
 });
 
 // Get logs directory path

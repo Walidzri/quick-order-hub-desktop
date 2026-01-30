@@ -36,6 +36,7 @@ try {
     // App paths
     getUserDataPath: () => ipcRenderer.invoke('app:getUserDataPath'),
     getIndexedDBPath: () => ipcRenderer.invoke('app:getIndexedDBPath'),
+    shutdownPC: () => ipcRenderer.invoke('app:shutdownPC'),
   });
   
   if (process.env.NODE_ENV === 'development') {

@@ -79,8 +79,11 @@ export function PrintPreviewModal({
             name: line.productName,
             size: line.variantSize,
             modifiers: line.modifiers.map(m => m.optionName),
+            modifierPrices: line.modifiers.map(m => (m.priceAdjustment >= 0 ? '+' : '') + formatCurrency(m.priceAdjustment, currency)),
             note: line.note,
             price: customization?.kitchenShowProductPrices ? formatCurrency(lineTotal, currency) : undefined,
+            unitPrice: customization?.kitchenShowProductPrices ? formatCurrency(line.unitPrice, currency) : undefined,
+            unitPriceSubtotal: customization?.kitchenShowProductPrices && line.quantity > 1 ? formatCurrency(line.unitPrice * line.quantity, currency) : undefined,
           };
         }),
         subtotal: '',
@@ -160,16 +163,19 @@ export function PrintPreviewModal({
         cashier: cashierName,
         lines: order.lines.map(line => {
           const lineTotal = (line.unitPrice + line.modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0)) * line.quantity;
+          const showPrices = isKitchen ? customization?.kitchenShowProductPrices : true;
           return {
             quantity: line.quantity,
             name: line.productName,
             size: line.variantSize,
             modifiers: line.modifiers.map(m => m.optionName),
+            modifierPrices: line.modifiers.map(m => (m.priceAdjustment >= 0 ? '+' : '') + formatCurrency(m.priceAdjustment, currency)),
             note: line.note,
-            // For kitchen tickets, only show price if enabled in customization
             price: isKitchen 
               ? (customization?.kitchenShowProductPrices ? formatCurrency(lineTotal, currency) : undefined)
               : formatCurrency(lineTotal, currency),
+            unitPrice: showPrices ? formatCurrency(line.unitPrice, currency) : undefined,
+            unitPriceSubtotal: showPrices && line.quantity > 1 ? formatCurrency(line.unitPrice * line.quantity, currency) : undefined,
           };
         }),
         subtotal: isKitchen ? '' : formatCurrency(order.subtotal, currency),
@@ -422,6 +428,24 @@ export function PrintPreviewModal({
               <X className="w-6 h-6" />
             </button>
           </div>
+
+          {/* Encadré Monnaie à rendre (cadre du modal, pas le reçu) - visible pour le caissier */}
+          {type === 'receipt' && order.paymentMethod === 'cash' && (amountReceived != null || change != null) && (
+            <div className="px-4 py-3 bg-primary/10 border-y border-border no-print">
+              <div className="flex flex-wrap items-center justify-center gap-6 text-base font-semibold">
+                {amountReceived != null && (
+                  <span>
+                    {t('receipt.amountReceived')}: {formatCurrency(amountReceived, currency)}
+                  </span>
+                )}
+                {change != null && (
+                  <span className="text-primary">
+                    {t('receipt.change')}: {formatCurrency(change, currency)}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Print Content - Scrollable */}
           <div className="flex-1 overflow-y-auto p-4">

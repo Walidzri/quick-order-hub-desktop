@@ -581,13 +581,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setOrderDrafts(prev => prev.map(d => d.id === activeOrderId ? { ...d, appliedPromo: null } : d));
   }, [activeOrderId]);
 
-  // Generate order number: single incremental #001, #002, ...
+  // Generate order number: remise à zéro chaque jour → #001, #002, ... (nouveau jour → re-#001)
   const generateOrderNumber = useCallback(async (): Promise<string> => {
     const db = await getDB();
     const counterId = 'counter-global';
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     let counter = await db.get('numberingCounters', counterId);
     if (!counter) {
-      counter = { id: counterId, date: '', counter: 0 };
+      counter = { id: counterId, date: today, counter: 0 };
+    }
+    if (counter.date !== today) {
+      counter.date = today;
+      counter.counter = 0;
     }
     counter.counter += 1;
     await db.put('numberingCounters', counter);

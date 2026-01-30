@@ -3,6 +3,7 @@ import { usePOS } from '@/contexts/POSContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Language, Currency, LANGUAGES, CURRENCIES } from '@/lib/i18n';
 import { Promotion, PromoType, Product, ProductVariant, User, UserRole, Printer as PrinterType, PrinterRole, PrinterMode, PrinterConnectionType, ReceiptCustomization } from '@/lib/database';
+import { DirectPrinter, PrinterConnection } from '@/lib/printer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateUUID } from '@/lib/utils';
 import { 
@@ -36,7 +37,9 @@ import {
   Database,
   FolderOpen,
   RefreshCw,
-  Server
+  Server,
+  Banknote,
+  PowerOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -93,6 +96,7 @@ export function SettingsScreen() {
     daemonProcess?: { pid: number | undefined; killed: boolean };
   } | null>(null);
   const [isCheckingDaemon, setIsCheckingDaemon] = useState(false);
+  const [isOpeningDrawer, setIsOpeningDrawer] = useState(false);
 
   // Check PrintDaemon C# status via HTTP
   const checkDaemonStatus = useCallback(async () => {
@@ -166,6 +170,52 @@ export function SettingsScreen() {
     );
     // Recheck status
     setTimeout(checkDaemonStatus, 1000);
+  };
+
+  const handleOpenDrawer = async () => {
+    const receiptPrinters = printers?.filter(
+      (p) => p.role === 'cashier' && p.enabled !== false
+    );
+    if (!receiptPrinters?.length) {
+      toast({ title: t('general.error'), description: 'Aucune imprimante reçu client configurée', variant: 'destructive' });
+      return;
+    }
+    const printer = receiptPrinters[0];
+    const effectiveConnectionType: PrinterConnectionType =
+      printer.connectionType || 'tcp';
+    let connection: PrinterConnection;
+    if (effectiveConnectionType === 'windows') {
+      if (!printer.name) return;
+      connection = {
+        type: 'windows',
+        name: printer.name,
+        printerName: printer.name,
+      };
+    } else if (
+      (effectiveConnectionType === 'tcp' || effectiveConnectionType === 'wifi') &&
+      printer.tcpHost
+    ) {
+      connection = {
+        type: 'network',
+        name: printer.name || 'Reçu client',
+        address: printer.tcpHost,
+        port: printer.tcpPort || 9100,
+      };
+    } else {
+      toast({ title: t('general.error'), description: 'Imprimante reçu client non configurée (IP ou nom manquant)', variant: 'destructive' });
+      return;
+    }
+    setIsOpeningDrawer(true);
+    try {
+      const directPrinter = new DirectPrinter(connection);
+      await directPrinter.openDrawer();
+      toast({ title: t('general.success'), description: t('order.openDrawer') });
+    } catch (err) {
+      console.error('[DRAWER] Ouverture tiroir caisse:', err);
+      toast({ title: t('general.error'), description: err instanceof Error ? err.message : 'Erreur ouverture tiroir', variant: 'destructive' });
+    } finally {
+      setIsOpeningDrawer(false);
+    }
   };
 
   if (!settings) return null;
@@ -494,6 +544,66 @@ export function SettingsScreen() {
                   />
                 </div>
               </div>
+
+              {/* Tiroir caisse */}
+              <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                <label className="text-sm font-medium block mb-1">
+                  {t('order.openDrawer')}
+                </label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Ouvre le tiroir caisse connecté en RJ12 à l'imprimante reçu client
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleOpenDrawer}
+                  disabled={isOpeningDrawer || !printers?.some((p) => p.role === 'cashier' && p.enabled !== false)}
+                  className="gap-2"
+                >
+                  <Banknote className="w-4 h-4" />
+                  {isOpeningDrawer ? t('general.processing') : t('order.openDrawer')}
+                </Button>
+              </div>
+
+              {/* Éteindre le PC (Electron uniquement) */}
+              {typeof window !== 'undefined' && window.electronAPI && (
+                <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                  <label className="text-sm font-medium block mb-1">
+                    {t('general.shutdownPC')}
+                  </label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Arrête l’ordinateur après confirmation (Windows : arrêt dans 5 secondes).
+                  </p>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    className="gap-2"
+                    onClick={async () => {
+                      const confirmed = await showDialog({
+                        title: t('general.shutdownPC'),
+                        description: t('general.shutdownPCConfirm'),
+                        confirmText: t('general.confirm'),
+                        cancelText: t('general.cancel'),
+                        variant: 'destructive',
+                      });
+                      if (!confirmed) return;
+                      try {
+                        const result = await window.electronAPI.shutdownPC();
+                        if (result?.success) {
+                          toast({ title: t('general.success'), description: t('general.shutdownPC') });
+                        } else {
+                          toast({ title: t('general.error'), description: result?.error ?? 'Erreur', variant: 'destructive' });
+                        }
+                      } catch (err) {
+                        toast({ title: t('general.error'), description: err instanceof Error ? err.message : 'Erreur', variant: 'destructive' });
+                      }
+                    }}
+                  >
+                    <PowerOff className="w-4 h-4" />
+                    {t('general.shutdownPC')}
+                  </Button>
+                </div>
+              )}
 
               {/* Version & Copyright */}
               <div className="pt-6 mt-6 border-t border-border">

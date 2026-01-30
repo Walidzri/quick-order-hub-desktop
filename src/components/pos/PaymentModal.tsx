@@ -61,8 +61,17 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
   };
 
   // Print kitchen ticket automatically after payment
-  const printKitchenTicketAutomatically = async (order: Order) => {
+  // onOpenDrawerIfCash: appelé au lancement du ticket cuisine si paiement espèces (impulsion tiroir RJ12)
+  const printKitchenTicketAutomatically = async (
+    order: Order,
+    onOpenDrawerIfCash?: () => Promise<void>
+  ) => {
     try {
+      // Ouvrir le tiroir caisse au moment où le ticket cuisine est lancé (si paiement espèces)
+      if (order.paymentMethod === 'cash' && onOpenDrawerIfCash) {
+        await onOpenDrawerIfCash();
+      }
+
       console.log('[AUTO-KITCHEN] Imprimantes disponibles =', printers);
       // Toutes les imprimantes cuisine actives
       const kitchenPrinters = printers?.filter(
@@ -103,8 +112,11 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
             name: line.productName,
             size: line.variantSize,
             modifiers: line.modifiers.map(m => m.optionName),
+            modifierPrices: line.modifiers.map(m => (m.priceAdjustment >= 0 ? '+' : '') + formatCurrency(m.priceAdjustment, currency)),
             note: line.note,
             price: customization?.kitchenShowProductPrices ? formatCurrency(lineTotal, currency) : undefined,
+            unitPrice: customization?.kitchenShowProductPrices ? formatCurrency(line.unitPrice, currency) : undefined,
+            unitPriceSubtotal: customization?.kitchenShowProductPrices && line.quantity > 1 ? formatCurrency(line.unitPrice * line.quantity, currency) : undefined,
           };
         }),
         subtotal: '',
@@ -191,6 +203,48 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
     }
   };
 
+  // Open cash drawer (RJ12) when paying cash - uses first receipt printer
+  const openCashDrawerIfNeeded = async () => {
+    if (method !== 'cash') return;
+    const receiptPrinters = printers?.filter(
+      (p) => p.role === 'cashier' && p.enabled !== false
+    );
+    if (!receiptPrinters?.length) return;
+
+    const printer = receiptPrinters[0];
+    const effectiveConnectionType: PrinterConnectionType =
+      printer.connectionType || 'tcp';
+
+    let connection: PrinterConnection;
+    if (effectiveConnectionType === 'windows') {
+      if (!printer.name) return;
+      connection = {
+        type: 'windows',
+        name: printer.name,
+        printerName: printer.name,
+      };
+    } else if (
+      (effectiveConnectionType === 'tcp' || effectiveConnectionType === 'wifi') &&
+      printer.tcpHost
+    ) {
+      connection = {
+        type: 'network',
+        name: printer.name || 'Reçu client',
+        address: printer.tcpHost,
+        port: printer.tcpPort || 9100,
+      };
+    } else {
+      return;
+    }
+
+    try {
+      const directPrinter = new DirectPrinter(connection);
+      await directPrinter.openDrawer();
+    } catch (err) {
+      console.error('[DRAWER] Ouverture tiroir caisse (non bloquant):', err);
+    }
+  };
+
   const handlePayment = async () => {
     setIsProcessing(true);
     setStep('processing');
@@ -213,18 +267,17 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
       // Mark as paid
       const paidOrderData = await markAsPaid(order.id, method);
       
-      // Automatically print kitchen ticket after payment
-      // This is non-blocking - if it fails, payment still succeeds
-      printKitchenTicketAutomatically(paidOrderData).catch(err => {
+      // Automatically print kitchen ticket after payment (l'impulsion tiroir est lancée au début du ticket cuisine)
+      printKitchenTicketAutomatically(paidOrderData, openCashDrawerIfNeeded).catch(err => {
         console.error('Kitchen ticket print failed (non-blocking):', err);
       });
       
       setStep('done');
       
-      // Notify parent and close payment modal after short delay
+      // Notify parent and close payment modal after short delay (pass computed values, not state - state update is async)
       setTimeout(() => {
         if (onPaymentSuccess) {
-          onPaymentSuccess(paidOrderData, paymentAmountReceived, paymentChange);
+          onPaymentSuccess(paidOrderData, received, change);
         }
         onClose(); // Close payment modal
       }, 500);
@@ -378,152 +431,63 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
             )}
 
             {step === 'cash' && (
-              <div className="p-4 space-y-4 overflow-y-auto flex-1 min-h-0 overscroll-contain">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">
-                    {t('payment.amountReceived')}
-                  </label>
-                  {/* Amount Display */}
-                  <div className="mt-1 h-20 rounded-xl bg-muted border-2 border-border flex items-center justify-center">
-                    <span className="text-4xl font-bold text-primary">
+              <div className="p-3 flex flex-col flex-1 min-h-0 overflow-hidden">
+                {/* Montant reçu + Monnaie à rendre sur une seule ligne (tout visible sans scroll) */}
+                <div className="grid grid-cols-2 gap-2 flex-shrink-0 mb-2">
+                  <div className="rounded-lg bg-muted border border-border p-2 flex flex-col justify-center min-h-[3.5rem]">
+                    <span className="text-xs text-muted-foreground">{t('payment.amountReceived')}</span>
+                    <span className="text-lg font-bold text-primary truncate">
                       {formatCurrency(parseFloat(amountReceived) || 0, currency)}
+                    </span>
+                  </div>
+                  <div className="rounded-lg bg-success/10 border border-success/20 p-2 flex flex-col justify-center min-h-[3.5rem]">
+                    <span className="text-xs text-muted-foreground">{t('payment.change')}</span>
+                    <span className="text-lg font-bold text-success truncate">
+                      {amountReceived && !isNaN(parseFloat(amountReceived)) && parseFloat(amountReceived) >= total
+                        ? formatCurrency(Math.max(0, change), currency)
+                        : '—'}
                     </span>
                   </div>
                 </div>
 
-                {/* Quick amounts */}
-                <div className="grid grid-cols-4 gap-2">
+                {/* Raccourcis montants */}
+                <div className="grid grid-cols-4 gap-1 flex-shrink-0 mb-2">
                   {quickAmounts.map((amount) => (
                     <button
                       key={amount}
                       onClick={() => setAmountReceived(amount.toString())}
-                      className="py-3 rounded-lg bg-secondary hover:bg-secondary/80 font-medium transition-colors text-sm"
+                      className="py-1.5 rounded-md bg-secondary hover:bg-secondary/80 font-medium text-xs transition-colors touch-target"
                     >
                       {formatCurrency(amount, currency)}
                     </button>
                   ))}
                 </div>
 
-                {/* Numeric Keypad */}
-                <div className="grid grid-cols-3 gap-2">
-                  {/* Row 1 */}
-                  <button
-                    onClick={() => handleNumberInput('7')}
-                    className="h-16 text-2xl font-bold bg-background border-2 border-border rounded-xl hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors touch-target"
-                    type="button"
-                  >
-                    7
+                {/* Clavier numérique compact */}
+                <div className="grid grid-cols-3 gap-1 flex-shrink-0 mb-2">
+                  {[7, 8, 9, 4, 5, 6, 1, 2, 3].map((n) => (
+                    <button key={n} onClick={() => handleNumberInput(String(n))} type="button"
+                      className="h-11 text-lg font-bold bg-background border border-border rounded-lg hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors touch-target"
+                    >{n}</button>
+                  ))}
+                  <button onClick={handleClear} type="button" className="h-11 flex items-center justify-center rounded-lg bg-destructive/10 border border-destructive/20 hover:bg-destructive/20 active:bg-destructive text-destructive touch-target">
+                    <Trash2 className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={() => handleNumberInput('8')}
-                    className="h-16 text-2xl font-bold bg-background border-2 border-border rounded-xl hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors touch-target"
-                    type="button"
-                  >
-                    8
-                  </button>
-                  <button
-                    onClick={() => handleNumberInput('9')}
-                    className="h-16 text-2xl font-bold bg-background border-2 border-border rounded-xl hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors touch-target"
-                    type="button"
-                  >
-                    9
-                  </button>
-
-                  {/* Row 2 */}
-                  <button
-                    onClick={() => handleNumberInput('4')}
-                    className="h-16 text-2xl font-bold bg-background border-2 border-border rounded-xl hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors touch-target"
-                    type="button"
-                  >
-                    4
-                  </button>
-                  <button
-                    onClick={() => handleNumberInput('5')}
-                    className="h-16 text-2xl font-bold bg-background border-2 border-border rounded-xl hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors touch-target"
-                    type="button"
-                  >
-                    5
-                  </button>
-                  <button
-                    onClick={() => handleNumberInput('6')}
-                    className="h-16 text-2xl font-bold bg-background border-2 border-border rounded-xl hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors touch-target"
-                    type="button"
-                  >
-                    6
-                  </button>
-
-                  {/* Row 3 */}
-                  <button
-                    onClick={() => handleNumberInput('1')}
-                    className="h-16 text-2xl font-bold bg-background border-2 border-border rounded-xl hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors touch-target"
-                    type="button"
-                  >
-                    1
-                  </button>
-                  <button
-                    onClick={() => handleNumberInput('2')}
-                    className="h-16 text-2xl font-bold bg-background border-2 border-border rounded-xl hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors touch-target"
-                    type="button"
-                  >
-                    2
-                  </button>
-                  <button
-                    onClick={() => handleNumberInput('3')}
-                    className="h-16 text-2xl font-bold bg-background border-2 border-border rounded-xl hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors touch-target"
-                    type="button"
-                  >
-                    3
-                  </button>
-
-                  {/* Row 4 */}
-                  <button
-                    onClick={handleClear}
-                    className="h-16 text-lg font-bold bg-destructive/10 border-2 border-destructive/20 rounded-xl hover:bg-destructive/20 active:bg-destructive text-destructive transition-colors touch-target flex items-center justify-center"
-                    type="button"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => handleNumberInput('0')}
-                    className="h-16 text-2xl font-bold bg-background border-2 border-border rounded-xl hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors touch-target"
-                    type="button"
-                  >
-                    0
-                  </button>
-                  <button
-                    onClick={handleBackspace}
-                    className="h-16 text-lg font-bold bg-secondary border-2 border-border rounded-xl hover:bg-secondary/80 active:bg-secondary/60 transition-colors touch-target flex items-center justify-center"
-                    type="button"
-                  >
-                    <ArrowLeft className="w-5 h-5" />
+                  <button onClick={() => handleNumberInput('0')} type="button" className="h-11 text-lg font-bold bg-background border border-border rounded-lg hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors touch-target">0</button>
+                  <button onClick={handleBackspace} type="button" className="h-11 flex items-center justify-center rounded-lg bg-secondary border border-border hover:bg-secondary/80 touch-target">
+                    <ArrowLeft className="w-4 h-4" />
                   </button>
                 </div>
 
-                {amountReceived && !isNaN(parseFloat(amountReceived)) && parseFloat(amountReceived) >= total && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-4 bg-success/10 border border-success/20 rounded-xl text-center"
-                  >
-                    <span className="text-sm text-muted-foreground">{t('payment.change')}</span>
-                    <div className="text-3xl font-bold text-success">
-                      {formatCurrency(Math.max(0, change), currency)}
-                    </div>
-                  </motion.div>
-                )}
-
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => setStep('method')}
-                    variant="outline"
-                    className="flex-1 h-14"
-                  >
+                {/* Annuler / Valider */}
+                <div className="flex gap-2 flex-shrink-0">
+                  <Button onClick={() => setStep('method')} variant="outline" className="flex-1 h-12 text-base font-medium">
                     {t('general.cancel')}
                   </Button>
                   <Button
                     onClick={handlePayment}
                     disabled={!amountReceived || isNaN(parseFloat(amountReceived)) || parseFloat(amountReceived) < total}
-                    className="flex-1 h-14 text-lg font-bold gradient-primary border-0"
+                    className="flex-1 h-12 text-base font-bold gradient-primary border-0"
                   >
                     {t('payment.confirm')}
                   </Button>

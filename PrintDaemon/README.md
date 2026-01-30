@@ -25,6 +25,8 @@ Service HTTP local pour l'impression directe sur imprimantes thermiques (USB et 
 │                                    RawPrinterHelper          │
 │                                    .SendBytesToPrinter()     │
 │                                    (Win32 API)               │
+│   POST /open-drawer ► Envoie ESC p 0 (tiroir caisse RJ12)   │
+│                      via la même queue d'impression          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -57,6 +59,7 @@ C'est le "cerveau" du daemon - il démarre le serveur web et définit les endpoi
 | `app.MapGet("/status", ...)` | Endpoint pour vérifier si le daemon tourne |
 | `app.MapGet("/printers", ...)` | Liste les imprimantes USB Windows |
 | `app.MapPost("/print", ...)` | Reçoit les bytes ESC/POS et les imprime |
+| `app.MapPost("/open-drawer", ...)` | Ouvre le tiroir caisse (RJ12 connecté à l'imprimante) |
 | `app.MapPost("/test", ...)` | Teste la connexion à une imprimante |
 | `app.Run()` | Démarre le serveur et reste en écoute |
 
@@ -197,6 +200,38 @@ curl -X POST http://127.0.0.1:9100/print \
 
 ---
 
+### `POST /open-drawer`
+Ouvre le tiroir caisse connecté en RJ12 à l'imprimante (commande ESC/POS `ESC p 0`).
+
+**Headers:**
+- `X-Printer-Name` (requis): Nom de l'imprimante USB ou `IP:Port` pour réseau (même format que `/print`)
+- `X-Printer-Type` (optionnel): `"usb"` ou `"network"`
+
+**Body:** Aucun (la commande est générée côté serveur)
+
+**Exemple cURL:**
+```bash
+# Imprimante réseau (tiroir branché sur l'imprimante)
+curl -X POST http://127.0.0.1:9100/open-drawer \
+  -H "X-Printer-Name: 192.168.1.100:9100" \
+  -H "X-Printer-Type: network"
+
+# Imprimante USB
+curl -X POST http://127.0.0.1:9100/open-drawer \
+  -H "X-Printer-Name: EPSON TM-T20II" \
+  -H "X-Printer-Type: usb"
+```
+
+**Réponse:**
+```json
+{
+  "success": true,
+  "message": "Tiroir caisse ouvert"
+}
+```
+
+---
+
 ### `POST /test`
 Teste la connexion à une imprimante.
 
@@ -255,6 +290,19 @@ async function printEscPos(data: Uint8Array, printer: string): Promise<boolean> 
       'X-Printer-Name': printer,
     },
     body: data,
+  });
+  const result = await res.json();
+  return result.success;
+}
+
+// Ouvrir le tiroir caisse (RJ12)
+async function openCashDrawer(printer: string, type: 'usb' | 'network' = 'network'): Promise<boolean> {
+  const res = await fetch(`${DAEMON_URL}/open-drawer`, {
+    method: 'POST',
+    headers: {
+      'X-Printer-Name': printer,
+      'X-Printer-Type': type,
+    },
   });
   const result = await res.json();
   return result.success;

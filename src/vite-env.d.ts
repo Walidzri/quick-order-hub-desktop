@@ -17,6 +17,7 @@ interface Window {
     platform: string;
     getUserDataPath: () => Promise<string>;
     getIndexedDBPath: () => Promise<string>;
+    shutdownPC: () => Promise<{ success: boolean; error?: string }>;
     writeLog: (logLine: string) => Promise<{ success: boolean; error?: string }>;
     getDaemonStatus: () => Promise<{
       running: boolean;

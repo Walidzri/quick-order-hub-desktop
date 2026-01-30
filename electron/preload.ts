@@ -37,6 +37,9 @@ try {
     getUserDataPath: () => ipcRenderer.invoke('app:getUserDataPath'),
     getIndexedDBPath: () => ipcRenderer.invoke('app:getIndexedDBPath'),
     
+    // System: shutdown PC (Windows / macOS / Linux)
+    shutdownPC: () => ipcRenderer.invoke('app:shutdownPC'),
+    
     // Logging API
     writeLog: (logLine: string) => ipcRenderer.invoke('log:write', logLine),
     

@@ -176,71 +176,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Load session from localStorage on mount
+  // Au redémarrage du PC ou du logiciel : déconnexion (ne pas restaurer la session)
   useEffect(() => {
     const loadSavedSession = async () => {
-      // First check if setup is required
       const needsSetup = await checkSetupRequired();
       if (needsSetup) {
         return;
       }
-
-      const savedUser = localStorage.getItem('pos_user');
-      if (savedUser) {
-        try {
-          const userData = JSON.parse(savedUser);
-          
-          // Verify user still exists in database
-          const db = await getDB();
-          const dbUser = await db.get('users', userData.id);
-          if (!dbUser) {
-            localStorage.removeItem('pos_user');
-            localStorage.removeItem('pos_session_id');
-            return;
-          }
-          
-          setUser(dbUser);
-          setIsAuthenticated(true);
-          
-          // Restore active session if exists
-          const sessionId = localStorage.getItem('pos_session_id');
-          if (sessionId) {
-            try {
-              const session = await db.get('userSessions', sessionId);
-              if (session && session.isActive && session.userId === userData.id) {
-                // Session is still active, continue tracking
-                return;
-              }
-            } catch (error) {
-              // Session doesn't exist, create a new one
-              const newSession: UserSession = {
-                id: generateUUID(),
-                userId: userData.id,
-                loginAt: new Date(),
-                isActive: true,
-              };
-              await db.put('userSessions', newSession);
-              localStorage.setItem('pos_session_id', newSession.id);
-            }
-          } else {
-            // No session ID, create a new one
-            const newSession: UserSession = {
-              id: generateUUID(),
-              userId: dbUser.id,
-              loginAt: new Date(),
-              isActive: true,
-            };
-            await db.put('userSessions', newSession);
-            localStorage.setItem('pos_session_id', newSession.id);
-          }
-        } catch (error) {
-          console.error('Failed to load user session:', error);
-          localStorage.removeItem('pos_user');
-          localStorage.removeItem('pos_session_id');
-        }
-      }
+      // Déconnexion systématique au démarrage de l'app
+      localStorage.removeItem('pos_user');
+      localStorage.removeItem('pos_session_id');
     };
-    
     loadSavedSession();
   }, [checkSetupRequired]);
 

@@ -120,7 +120,7 @@ export function renderReceiptHTML({
             {/* Type de commande juste en dessous du numéro */}
             {showOrderType && (
               <div className="mt-2">
-                <span style={{ fontSize: '1rem', fontWeight: 700 }}>{typeLabel}</span>
+                <span style={{ fontSize: '2.00rem', fontWeight: 700 }}>{typeLabel}</span>
               </div>
             )}
           </div>
@@ -167,7 +167,14 @@ export function renderReceiptHTML({
                     {showModifiers && line.modifiers.length > 0 && (
                       <div className="line-details">
                         {line.modifiers.map((mod, modIndex) => (
-                          <div key={modIndex}>+ (S) {mod.optionName}</div>
+                          <div key={modIndex}>
+                            + (S) {mod.optionName}
+                            {showProductPrices && (
+                              <span className="ml-1 opacity-90">
+                                {mod.priceAdjustment >= 0 ? '+' : ''}{formatCurrency(mod.priceAdjustment, currency)}
+                              </span>
+                            )}
+                          </div>
                         ))}
                       </div>
                     )}
@@ -177,8 +184,17 @@ export function renderReceiptHTML({
                       </div>
                     )}
                     {showProductPrices && (
-                      <div className="text-right mt-1 text-sm font-semibold">
-                        {formatCurrency(lineTotal, currency)}
+                      <div className="mt-1 text-sm">
+                        <div className="flex justify-between items-baseline text-xs opacity-90">
+                          <span>{t('receipt.unitPrice')}</span>
+                          <span>
+                            {formatCurrency(line.unitPrice, currency)}
+                            {line.quantity > 1 && ` × ${line.quantity} = ${formatCurrency(line.unitPrice * line.quantity, currency)}`}
+                          </span>
+                        </div>
+                        <div className="text-right font-semibold mt-0.5">
+                          {formatCurrency(lineTotal, currency)}
+                        </div>
                       </div>
                     )}
                     {index < order.lines.length - 1 && customization.separatorStyle !== 'none' && (
@@ -329,7 +345,8 @@ export function renderReceiptHTML({
         <>
           <div className="section mb-4 space-y-3">
             {order.lines.map((line, index) => {
-              const lineTotal = (line.unitPrice + line.modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0)) * line.quantity;
+              const unitPriceWithModifiers = line.unitPrice + line.modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0);
+              const lineTotal = unitPriceWithModifiers * line.quantity;
               const productName = DirectPrinter.applyTextStyle(line.productName, customization.productNameStyle);
               return (
                 <div key={index} className="order-line">
@@ -344,7 +361,14 @@ export function renderReceiptHTML({
                   {customization.showModifiers && line.modifiers.length > 0 && (
                     <div className="line-details text-xs ml-3 text-gray-600 space-y-0.5">
                       {line.modifiers.map((mod, modIndex) => (
-                        <div key={modIndex}>+ (S) {mod.optionName}</div>
+                        <div key={modIndex}>
+                          + (S) {mod.optionName}
+                          {customization.showProductPrices && (
+                            <span className="ml-1 text-muted-foreground">
+                              {mod.priceAdjustment >= 0 ? '+' : ''}{formatCurrency(mod.priceAdjustment, currency)}
+                            </span>
+                          )}
+                        </div>
                       ))}
                     </div>
                   )}
@@ -354,8 +378,17 @@ export function renderReceiptHTML({
                     </div>
                   )}
                   {customization.showProductPrices && (
-                    <div className="text-right mt-1 text-sm font-semibold">
-                      {formatCurrency(lineTotal, currency)}
+                    <div className="mt-1 text-sm">
+                      <div className="flex justify-between items-baseline text-xs text-muted-foreground">
+                        <span>{t('receipt.unitPrice')}</span>
+                        <span>
+                          {formatCurrency(line.unitPrice, currency)}
+                          {line.quantity > 1 && ` × ${line.quantity} = ${formatCurrency(line.unitPrice * line.quantity, currency)}`}
+                        </span>
+                      </div>
+                      <div className="text-right font-semibold mt-0.5">
+                        {formatCurrency(lineTotal, currency)}
+                      </div>
                     </div>
                   )}
                   {index < order.lines.length - 1 && customization.separatorStyle !== 'none' && (

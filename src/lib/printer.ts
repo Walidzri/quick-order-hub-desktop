@@ -315,6 +315,67 @@ export class DirectPrinter {
     }
   }
 
+  /**
+   * Ouvre le tiroir caisse (connecté en RJ12 à l'imprimante).
+   * Utilise l'endpoint dédié du PrintDaemon POST /open-drawer.
+   */
+  async openDrawer(): Promise<void> {
+    if (!this.connection) {
+      throw new Error('Aucune connexion imprimante configurée');
+    }
+    if (this.connection.type === 'bluetooth') {
+      throw new Error('Tiroir caisse non supporté en Bluetooth');
+    }
+
+    const daemonUrl = 'http://127.0.0.1:9100/open-drawer';
+    let printerName: string;
+    let printerType: string;
+
+    if (this.connection.type === 'network') {
+      const address = this.connection.address;
+      if (!address || address.startsWith('ws://') || address.startsWith('wss://')) {
+        throw new Error('Adresse réseau non configurée ou WebSocket (tiroir non supporté)');
+      }
+      const port = this.connection.port || 9100;
+      printerName = `${address}:${port}`;
+      printerType = 'network';
+    } else {
+      if (!this.connection.printerName) {
+        throw new Error('Nom d\'imprimante Windows non configuré');
+      }
+      printerName = this.connection.printerName;
+      printerType = 'usb';
+    }
+
+    const response = await fetch(daemonUrl, {
+      method: 'POST',
+      headers: {
+        'X-Printer-Name': printerName,
+        'X-Printer-Type': printerType,
+      },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error(
+          'PrintDaemon ne propose pas l\'endpoint /open-drawer. Recompilez et redémarrez le PrintDaemon (voir README du dossier PrintDaemon).'
+        );
+      }
+      const result = await response.json().catch(() => null);
+      const errorMsg = result?.error || result?.message || `HTTP ${response.status}`;
+      throw new Error(`Erreur PrintDaemon: ${errorMsg}`);
+    }
+
+    const result = await response.json();
+    if (!result || result.success !== true) {
+      throw new Error(result?.error || result?.message || 'Erreur ouverture tiroir');
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[PRINTER] ✅ Tiroir caisse ouvert');
+    }
+  }
+
   // Main print method - tries different methods
   // isThermalPrinter: true for ESC/POS thermal printers, false for regular printers
   // logoBase64: optional logo image in base64 format (will be printed before content)
@@ -521,8 +582,11 @@ export class DirectPrinter {
       name: string;
       size?: string;
       modifiers?: string[];
+      modifierPrices?: string[]; // Prix par supplément, même ordre que modifiers (ex: "+1,00 €")
       note?: string;
       price?: string;
+      unitPrice?: string; // Prix unitaire du produit (sans suppléments)
+      unitPriceSubtotal?: string; // Prix unitaire × quantité (pour afficher "5,00 € x 2 = 10,00 €")
     }>;
     subtotal: string;
     discount?: string;
@@ -604,7 +668,9 @@ export class DirectPrinter {
         receipt += '\n'; // Retour à la ligne pour le type
         receipt += '\x1B\x61\x01'; // ESC a 1 = center alignment
         receipt += '\x1B\x45\x01'; // ESC E 1 = bold on
+        receipt += '\x1B\x21\x10'; // ESC ! 0x10 = double height
         receipt += cleanedType;
+        receipt += '\x1B\x21\x00'; // ESC ! 0x00 = normal size
         receipt += '\n'; // Retour à la ligne après le type
         receipt += '\x1B\x45\x00'; // ESC E 0x00 = bold off
       }
@@ -759,8 +825,9 @@ export class DirectPrinter {
         }
         
         if (showModifiers && line.modifiers && line.modifiers.length > 0) {
-          line.modifiers.forEach(mod => {
-            receipt += `   + (S) ${this.cleanTextForPrinter(mod)}\n`;
+          line.modifiers.forEach((mod, modIdx) => {
+            const modPrice = line.modifierPrices && line.modifierPrices[modIdx];
+            receipt += `   + (S) ${this.cleanTextForPrinter(mod)}${showProductPrices && modPrice ? ' ' + modPrice : ''}\n`;
           });
         }
         
@@ -768,10 +835,22 @@ export class DirectPrinter {
           receipt += `   NOTE: ${this.cleanTextForPrinter(line.note)}\n`;
         }
         
-        if (showProductPrices && line.price) {
-          const priceText = this.cleanTextForPrinter(line.price);
-          const padding = Math.max(0, width - priceText.length);
-          receipt += ' '.repeat(padding) + priceText + '\n';
+        if (showProductPrices) {
+          if (line.unitPrice) {
+            const unitLabel = 'Prix unit.:';
+            const unitValue = line.quantity > 1 && line.unitPriceSubtotal
+              ? `${line.unitPrice} x ${line.quantity} = ${line.unitPriceSubtotal}`
+              : line.quantity > 1
+                ? `${line.unitPrice} x ${line.quantity}`
+                : line.unitPrice;
+            const unitPadding = Math.max(1, width - unitLabel.length - this.cleanTextForPrinter(unitValue).length);
+            receipt += unitLabel + ' '.repeat(unitPadding) + unitValue + '\n';
+          }
+          if (line.price) {
+            const priceText = this.cleanTextForPrinter(line.price);
+            const padding = Math.max(0, width - priceText.length);
+            receipt += ' '.repeat(padding) + priceText + '\n';
+          }
         }
         
         if (index < data.lines.length - 1 && custom.separatorStyle !== 'none') {

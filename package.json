@@ -1,6 +1,6 @@
 {
   "name": "quick-order-hub-desktop",
-  "version": "3.3.2",
+  "version": "3.4.2",
   "description": "Quick Order Hub - Desktop Application",
   "author": "Doudou Tacos",
   "main": "dist-electron/main.js",

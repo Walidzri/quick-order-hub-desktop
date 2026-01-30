@@ -114,6 +114,48 @@ app.MapPost("/print", async (HttpContext ctx) =>
 });
 
 /// <summary>
+/// POST /open-drawer - Ouvre le tiroir caisse (RJ12 connecté à l'imprimante)
+/// Headers requis:
+///   - X-Printer-Name: nom ou adresse IP:port de l'imprimante
+///   - X-Printer-Type: "usb" ou "network" (optionnel, auto-détecté)
+/// Envoie la commande ESC/POS ESC p 0 (impulsion sur pin tiroir).
+/// </summary>
+app.MapPost("/open-drawer", async (HttpContext ctx) =>
+{
+    try
+    {
+        var printerName = ctx.Request.Headers["X-Printer-Name"].ToString();
+        var printerType = ctx.Request.Headers["X-Printer-Type"].ToString();
+
+        if (string.IsNullOrEmpty(printerName))
+        {
+            return Results.BadRequest(new { success = false, error = "X-Printer-Name header is required" });
+        }
+
+        // Commande ESC/POS: ESC p 0 n1 n2 = ouvrir tiroir (pin 2: n1*2ms, pin 5: n2*2ms)
+        // n1=25 (50ms), n2=250 (500ms) = valeurs courantes pour tiroirs RJ12
+        byte[] drawerCommand = new byte[] { 0x1B, 0x70, 0x00, 0x19, 0xFA };
+
+        bool isNetwork = PrinterService.IsNetworkPrinter(printerName, printerType);
+        var result = await printerService.EnqueuePrintAsync(printerName, drawerCommand, isNetwork);
+
+        if (result.Success)
+        {
+            return Results.Ok(new { success = true, message = "Tiroir caisse ouvert" });
+        }
+        else
+        {
+            return Results.Ok(new { success = false, error = result.Error ?? "Unknown error" });
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[ERROR] /open-drawer: {ex.Message}");
+        return Results.Ok(new { success = false, error = ex.Message });
+    }
+});
+
+/// <summary>
 /// POST /print/with-logo - Impression avec logo (JSON dans le body)
 /// Headers requis:
 ///   - X-Printer-Name: nom ou adresse IP:port de l'imprimante
@@ -421,9 +463,10 @@ Console.WriteLine("║  Listening on: http://127.0.0.1:9100       ║");
 Console.WriteLine("║  Endpoints:                                ║");
 Console.WriteLine("║    GET  /status   - Check daemon status    ║");
 Console.WriteLine("║    GET  /printers - List USB printers      ║");
-Console.WriteLine("║    POST /print    - Print ESC/POS (queued) ║");
-Console.WriteLine("║    POST /print/with-logo - Print with logo ║");
-Console.WriteLine("║    POST /test     - Test printer conn.     ║");
+Console.WriteLine("║    POST /print       - Print ESC/POS (queued) ║");
+Console.WriteLine("║    POST /open-drawer - Open cash drawer RJ12  ║");
+Console.WriteLine("║    POST /print/with-logo - Print with logo   ║");
+Console.WriteLine("║    POST /test        - Test printer conn.    ║");
 Console.WriteLine("╚════════════════════════════════════════════╝");
 
 app.Run();
