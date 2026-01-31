@@ -88,7 +88,7 @@ export function renderReceiptHTML({
     );
   };
   
-  const typeLabel = order.type === 'dine-in' ? `SUR PLACE` : `A EMPORTER`;
+  const typeLabel = order.type === 'dine-in' ? `SUR PLACE` : order.type === 'delivery' ? `LIVRAISON` : `A EMPORTER`;
   const paymentLabel = order.paymentMethod === 'cash' ? t('print.cash') : t('print.card');
   
   // Use kitchen-specific display options if it's a kitchen ticket
@@ -227,6 +227,26 @@ export function renderReceiptHTML({
                   </div>
                 );
               })}
+            </div>
+            <Separator />
+          </>
+        )}
+
+        {/* Infos livraison - après les lignes, avant le pied de page (Bon appétit) */}
+        {order.type === 'delivery' && (order.deliveryCustomerName || order.deliveryPhone || order.deliveryAddress) && (
+          <>
+            <div className="section">
+              <div className="order-info">
+                {order.deliveryCustomerName && (
+                  <div><strong>Client:</strong> {order.deliveryCustomerName}</div>
+                )}
+                {order.deliveryPhone && (
+                  <div><strong>Tél:</strong> {order.deliveryPhone}</div>
+                )}
+                {order.deliveryAddress && (
+                  <div><strong>Adresse:</strong> {order.deliveryAddress}</div>
+                )}
+              </div>
             </div>
             <Separator />
           </>
@@ -468,6 +488,35 @@ export function renderReceiptHTML({
                 )}
               </>
             )}
+          </div>
+          <Separator />
+        </>
+      )}
+
+      {/* Infos livraison - après le total, avant le pied de page */}
+      {order.type === 'delivery' && (order.deliveryCustomerName || order.deliveryPhone || order.deliveryAddress) && (
+        <>
+          <div className="section mb-4">
+            <div className="order-info text-xs space-y-1">
+              {order.deliveryCustomerName && (
+                <div className="flex justify-between">
+                  <span className="font-semibold">Client:</span>
+                  <span>{order.deliveryCustomerName}</span>
+                </div>
+              )}
+              {order.deliveryPhone && (
+                <div className="flex justify-between">
+                  <span className="font-semibold">Tél:</span>
+                  <span>{order.deliveryPhone}</span>
+                </div>
+              )}
+              {order.deliveryAddress && (
+                <div className="flex justify-between">
+                  <span className="font-semibold">Adresse:</span>
+                  <span>{order.deliveryAddress}</span>
+                </div>
+              )}
+            </div>
           </div>
           <Separator />
         </>

@@ -41,10 +41,14 @@ interface CartItem extends OrderLine {}
 export interface OrderDraft {
   id: string;
   name: string;
-  type: OrderType; // 'dine-in' or 'takeaway'
+  type: OrderType; // 'dine-in' | 'takeaway' | 'delivery'
   cart: CartItem[];
   appliedPromo: Promotion | null;
   createdAt: number;
+  /** Infos livraison (si type === 'delivery') */
+  deliveryAddress?: string;
+  deliveryPhone?: string;
+  deliveryCustomerName?: string;
 }
 
 interface POSContextType {
@@ -75,7 +79,7 @@ interface POSContextType {
   orderDrafts: OrderDraft[];
   activeOrderId: string | null;
   setActiveOrderId: (id: string | null) => void;
-  createNewDraft: (name?: string, type?: OrderType) => OrderDraft;
+  createNewDraft: (name?: string, type?: OrderType, deliveryInfo?: { address: string; phone: string; customerName: string }) => OrderDraft;
   deleteDraft: (draftId: string) => void;
   addToCart: (item: CartItem) => void;
   updateCartItem: (itemId: string, updates: Partial<CartItem>) => void;
@@ -138,8 +142,8 @@ interface POSContextType {
   toggleKioskMode: () => void;
   pendingCartItem: CartItem | null;
   setPendingCartItem: (item: CartItem | null) => void;
-  createDraftWithType: (type: OrderType, item?: CartItem) => OrderDraft;
-  updateDraftType: (draftId: string, type: OrderType) => void;
+  createDraftWithType: (type: OrderType, item?: CartItem, deliveryInfo?: { address: string; phone: string; customerName: string }) => OrderDraft;
+  updateDraftType: (draftId: string, type: OrderType, deliveryInfo?: { address: string; phone: string; customerName: string }) => void;
 }
 
 const POSContext = createContext<POSContextType | null>(null);
@@ -444,8 +448,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     });
   }, [activeOrderId]);
 
-  const createNewDraft = useCallback((name?: string, type: OrderType = 'dine-in'): OrderDraft => {
-    // Calculate next number based on existing drafts, not the counter
+  const createNewDraft = useCallback((name?: string, type: OrderType = 'dine-in', deliveryInfo?: { address: string; phone: string; customerName: string }): OrderDraft => {
     const maxNum = orderDrafts.reduce((max, draft) => {
       const match = draft.name.match(/Commande (\d+)/);
       return match ? Math.max(max, parseInt(match[1], 10)) : max;
@@ -459,13 +462,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
       cart: [],
       appliedPromo: null,
       createdAt: Date.now(),
+      ...(type === 'delivery' && deliveryInfo && {
+        deliveryAddress: deliveryInfo.address,
+        deliveryPhone: deliveryInfo.phone,
+        deliveryCustomerName: deliveryInfo.customerName,
+      }),
     };
     setOrderDrafts(prevDrafts => [...prevDrafts, newDraft]);
     setActiveOrderId(newDraft.id);
     return newDraft;
   }, [orderDrafts]);
 
-  const createDraftWithType = useCallback((type: OrderType, item?: CartItem): OrderDraft => {
+  const createDraftWithType = useCallback((type: OrderType, item?: CartItem, deliveryInfo?: { address: string; phone: string; customerName: string }): OrderDraft => {
     const maxNum = orderDrafts.reduce((max, draft) => {
       const match = draft.name.match(/Commande (\d+)/);
       return match ? Math.max(max, parseInt(match[1], 10)) : max;
@@ -479,6 +487,11 @@ export function POSProvider({ children }: { children: ReactNode }) {
       cart: item ? [{ ...item, id: generateUUID() }] : [],
       appliedPromo: null,
       createdAt: Date.now(),
+      ...(type === 'delivery' && deliveryInfo && {
+        deliveryAddress: deliveryInfo.address,
+        deliveryPhone: deliveryInfo.phone,
+        deliveryCustomerName: deliveryInfo.customerName,
+      }),
     };
     setOrderDrafts(prevDrafts => [...prevDrafts, newDraft]);
     setActiveOrderId(newDraft.id);
@@ -486,10 +499,21 @@ export function POSProvider({ children }: { children: ReactNode }) {
     return newDraft;
   }, [orderDrafts]);
 
-  const updateDraftType = useCallback((draftId: string, type: OrderType) => {
-    setOrderDrafts(prev => prev.map(draft => 
-      draft.id === draftId ? { ...draft, type } : draft
-    ));
+  const updateDraftType = useCallback((draftId: string, type: OrderType, deliveryInfo?: { address: string; phone: string; customerName: string }) => {
+    setOrderDrafts(prev => prev.map(draft => {
+      if (draft.id !== draftId) return draft;
+      const updates: Partial<OrderDraft> = { type };
+      if (type === 'delivery' && deliveryInfo) {
+        updates.deliveryAddress = deliveryInfo.address;
+        updates.deliveryPhone = deliveryInfo.phone;
+        updates.deliveryCustomerName = deliveryInfo.customerName;
+      } else if (type !== 'delivery') {
+        updates.deliveryAddress = undefined;
+        updates.deliveryPhone = undefined;
+        updates.deliveryCustomerName = undefined;
+      }
+      return { ...draft, ...updates };
+    }));
   }, []);
 
   const updateCartItem = useCallback((itemId: string, updates: Partial<CartItem>) => {
@@ -618,9 +642,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
       promoCode: draftPromo?.code,
       promoName: draftPromo?.name,
       total,
-      createdBy: user?.id, // Associate order with current user
+      createdBy: user?.id,
       createdAt: now,
       updatedAt: now,
+      ...(draft?.type === 'delivery' && {
+        deliveryAddress: draft.deliveryAddress,
+        deliveryPhone: draft.deliveryPhone,
+        deliveryCustomerName: draft.deliveryCustomerName,
+      }),
     };
 
     const db = await getDB();

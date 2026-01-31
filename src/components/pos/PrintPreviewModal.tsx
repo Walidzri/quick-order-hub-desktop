@@ -66,12 +66,15 @@ export function PrintPreviewModal({
       // Format kitchen ticket
       const receiptText = DirectPrinter.formatTextReceipt({
         restaurantName: settings?.restaurantName,
-        logo: undefined, // Pas de logo pour les tickets cuisine
+        logo: undefined,
         orderNumber: order.orderNumber,
         date: `${formattedDate} ${formattedTime}`,
-        type: order.type === 'dine-in' ? '[SUR PLACE]' : '[A EMPORTER]',
+        type: order.type,
         paymentMethod: order.paymentMethod === 'cash' ? 'Especes' : 'Carte',
         cashier: cashierName,
+        deliveryCustomerName: order.deliveryCustomerName,
+        deliveryPhone: order.deliveryPhone,
+        deliveryAddress: order.deliveryAddress,
         lines: order.lines.map(line => {
           const lineTotal = (line.unitPrice + line.modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0)) * line.quantity;
           return {
@@ -151,16 +154,19 @@ export function PrintPreviewModal({
       const isKitchen = type === 'kitchen';
       const receiptText = DirectPrinter.formatTextReceipt({
         restaurantName: settings?.restaurantName,
-        logo: (isKitchen || !customization.showLogo) ? undefined : settings?.logo, // Logo seulement pour les reçus clients si l'option est activée
+        logo: (isKitchen || !customization.showLogo) ? undefined : settings?.logo,
         address: isKitchen ? undefined : (settings?.showAddress ? settings.address : undefined),
         phone: isKitchen ? undefined : (settings?.showPhone ? settings.phone : undefined),
         header: isKitchen ? undefined : settings?.receiptHeader,
         footer: isKitchen ? undefined : settings?.receiptFooter,
         orderNumber: order.orderNumber,
         date: `${formattedDate} ${formattedTime}`,
-        type: order.type === 'dine-in' ? '[SUR PLACE]' : '[A EMPORTER]',
+        type: order.type,
         paymentMethod: order.paymentMethod === 'cash' ? 'Especes' : 'Carte',
         cashier: cashierName,
+        deliveryCustomerName: order.deliveryCustomerName,
+        deliveryPhone: order.deliveryPhone,
+        deliveryAddress: order.deliveryAddress,
         lines: order.lines.map(line => {
           const lineTotal = (line.unitPrice + line.modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0)) * line.quantity;
           const showPrices = isKitchen ? customization?.kitchenShowProductPrices : true;

@@ -247,6 +247,11 @@ function createSchema(db: Database): void {
   db.run(`CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)`);
   db.run(`CREATE INDEX IF NOT EXISTS idx_orders_date ON orders(createdAt)`);
   
+  // Migration: add delivery columns (ignore if already exist)
+  try { db.run('ALTER TABLE orders ADD COLUMN deliveryAddress TEXT'); } catch (_e) { /* column exists */ }
+  try { db.run('ALTER TABLE orders ADD COLUMN deliveryPhone TEXT'); } catch (_e) { /* column exists */ }
+  try { db.run('ALTER TABLE orders ADD COLUMN deliveryCustomerName TEXT'); } catch (_e) { /* column exists */ }
+  
   // Printers
   db.run(`
     CREATE TABLE IF NOT EXISTS printers (
@@ -1600,6 +1605,9 @@ export class SQLiteDB {
         updatedAt: isoToDate(row.updatedAt as string),
         paidAt: row.paidAt ? isoToDate(row.paidAt as string) : undefined,
         sentToKitchenAt: row.sentToKitchenAt ? isoToDate(row.sentToKitchenAt as string) : undefined,
+        deliveryAddress: row.deliveryAddress as string | undefined,
+        deliveryPhone: row.deliveryPhone as string | undefined,
+        deliveryCustomerName: row.deliveryCustomerName as string | undefined,
       });
     }
     stmt.free();
@@ -1658,6 +1666,9 @@ export class SQLiteDB {
         updatedAt: isoToDate(row.updatedAt as string),
         paidAt: row.paidAt ? isoToDate(row.paidAt as string) : undefined,
         sentToKitchenAt: row.sentToKitchenAt ? isoToDate(row.sentToKitchenAt as string) : undefined,
+        deliveryAddress: row.deliveryAddress as string | undefined,
+        deliveryPhone: row.deliveryPhone as string | undefined,
+        deliveryCustomerName: row.deliveryCustomerName as string | undefined,
       });
     }
     stmt.free();
@@ -1687,6 +1698,9 @@ export class SQLiteDB {
         updatedAt: isoToDate(row.updatedAt as string),
         paidAt: row.paidAt ? isoToDate(row.paidAt as string) : undefined,
         sentToKitchenAt: row.sentToKitchenAt ? isoToDate(row.sentToKitchenAt as string) : undefined,
+        deliveryAddress: row.deliveryAddress as string | undefined,
+        deliveryPhone: row.deliveryPhone as string | undefined,
+        deliveryCustomerName: row.deliveryCustomerName as string | undefined,
       });
     }
     stmt.free();
@@ -1723,6 +1737,9 @@ export class SQLiteDB {
         updatedAt: isoToDate(row.updatedAt as string),
         paidAt: row.paidAt ? isoToDate(row.paidAt as string) : undefined,
         sentToKitchenAt: row.sentToKitchenAt ? isoToDate(row.sentToKitchenAt as string) : undefined,
+        deliveryAddress: row.deliveryAddress as string | undefined,
+        deliveryPhone: row.deliveryPhone as string | undefined,
+        deliveryCustomerName: row.deliveryCustomerName as string | undefined,
       });
     }
     stmt.free();
@@ -1741,8 +1758,9 @@ export class SQLiteDB {
     const stmt = this.db.prepare(`
       INSERT OR REPLACE INTO orders (
         id, orderNumber, status, type, lines, subtotal, discount, promoCode, promoName,
-        total, paymentMethod, createdBy, createdAt, updatedAt, paidAt, sentToKitchenAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        total, paymentMethod, createdBy, createdAt, updatedAt, paidAt, sentToKitchenAt,
+        deliveryAddress, deliveryPhone, deliveryCustomerName
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run([
       order.id,
@@ -1761,6 +1779,9 @@ export class SQLiteDB {
       dateToISO(order.updatedAt),
       order.paidAt ? dateToISO(order.paidAt) : null,
       order.sentToKitchenAt ? dateToISO(order.sentToKitchenAt) : null,
+      order.deliveryAddress || null,
+      order.deliveryPhone || null,
+      order.deliveryCustomerName || null,
     ]);
     stmt.free();
     saveDatabase();

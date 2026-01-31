@@ -577,6 +577,9 @@ export class DirectPrinter {
     type: string;
     paymentMethod: string;
     cashier?: string;
+    deliveryCustomerName?: string;
+    deliveryPhone?: string;
+    deliveryAddress?: string;
     lines: Array<{
       quantity: number;
       name: string;
@@ -663,7 +666,7 @@ export class DirectPrinter {
       receipt += '\x1B\x45\x00'; // ESC E 0x00 = bold off
       // Pour le ticket cuisine, ajouter le type de commande juste en dessous du numéro
       if (isKitchen && showOrderType && data.type) {
-        const orderTypeText = data.type === 'dine-in' ? 'SUR PLACE' : 'A EMPORTER';
+        const orderTypeText = data.type === 'dine-in' ? 'SUR PLACE' : data.type === 'delivery' ? 'LIVRAISON' : 'A EMPORTER';
         const cleanedType = this.cleanTextForPrinter(orderTypeText);
         receipt += '\n'; // Retour à la ligne pour le type
         receipt += '\x1B\x61\x01'; // ESC a 1 = center alignment
@@ -784,7 +787,8 @@ export class DirectPrinter {
     }
     // Ne pas afficher le type de commande dans la section INFOS pour le ticket cuisine (déjà affiché sous le numéro)
     if (showOrderType && !isKitchen) {
-      receipt += formatLabelValue(custom.labelOrderType, data.type);
+      const typeDisplay = data.type === 'dine-in' ? 'SUR PLACE' : data.type === 'delivery' ? 'LIVRAISON' : 'A EMPORTER';
+      receipt += formatLabelValue(custom.labelOrderType, typeDisplay);
     }
     if (!isKitchen && custom.showPaymentMethod) {
       receipt += formatLabelValue(custom.labelPaymentMethod, data.paymentMethod);
@@ -897,6 +901,26 @@ export class DirectPrinter {
         receipt += changeLabel + ' '.repeat(changePadding) + changeValue + '\n';
         receipt += separator + '\n';
       }
+
+      // Infos livraison - après le total, avant le pied de page
+      if (data.deliveryCustomerName || data.deliveryPhone || data.deliveryAddress) {
+        receipt += '\n';
+        if (data.deliveryCustomerName) receipt += formatLabelValue('Client', data.deliveryCustomerName);
+        if (data.deliveryPhone) receipt += formatLabelValue('Tel', data.deliveryPhone);
+        if (data.deliveryAddress) receipt += formatLabelValue('Adresse', data.deliveryAddress);
+        receipt += separator + '\n';
+      }
+    }
+    
+    receipt += '\n';
+    
+    // Infos livraison pour ticket cuisine - après les lignes, avant le pied de page
+    if (isKitchen && (data.deliveryCustomerName || data.deliveryPhone || data.deliveryAddress)) {
+      receipt += '\n';
+      if (data.deliveryCustomerName) receipt += formatLabelValue('Client', data.deliveryCustomerName);
+      if (data.deliveryPhone) receipt += formatLabelValue('Tel', data.deliveryPhone);
+      if (data.deliveryAddress) receipt += formatLabelValue('Adresse', data.deliveryAddress);
+      receipt += separator + '\n';
     }
     
     receipt += '\n';

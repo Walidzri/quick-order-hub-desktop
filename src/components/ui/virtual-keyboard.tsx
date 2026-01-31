@@ -42,8 +42,12 @@ const UPPER_CASE_AZERTY = [
   ['W', 'X', 'C', 'V', 'B', 'N'],
 ];
 
-const NUMBERS = [
+// Chiffres + symboles et ponctuation regroupés
+const NUMBERS_AND_SYMBOLS = [
   ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+  ['.', ',', "'", '"', '-', '_', '/', '(', ')'],
+  ['@', '&', '*', '!', '?', ':', ';', '°', '€'],
+  ['é', 'è', 'ê', 'à', 'â', 'ù', 'û', 'ô', 'î', 'ï', 'ç'],
 ];
 
 const DEFAULT_QUICK_SUGGESTIONS = [
@@ -81,7 +85,7 @@ export function VirtualKeyboard({
   const LOWER_CASE = isFrench ? LOWER_CASE_AZERTY : LOWER_CASE_QWERTY;
   const UPPER_CASE = isFrench ? UPPER_CASE_AZERTY : UPPER_CASE_QWERTY;
 
-  const currentLayout = isNumbers ? NUMBERS : (isUpperCase ? UPPER_CASE : LOWER_CASE);
+  const currentLayout = isNumbers ? NUMBERS_AND_SYMBOLS : (isUpperCase ? UPPER_CASE : LOWER_CASE);
 
   // Simple handler: always append to end
   const handleKeyPress = (key: string) => {
@@ -172,13 +176,18 @@ export function VirtualKeyboard({
 
         {/* Bottom Row */}
         <div className="flex justify-center gap-2 items-center">
-          {/* Numbers/ABC Toggle */}
+          {/* Numbers+Symbols / ABC Toggle */}
           <button
             onClick={() => {
               setIsNumbers(!isNumbers);
               setIsUpperCase(false);
             }}
-            className="min-w-[90px] h-16 text-base font-bold bg-background hover:bg-primary hover:text-primary-foreground active:scale-95 rounded-xl border-2 border-border transition-all shadow-md touch-target"
+            className={cn(
+              "min-w-[90px] h-16 text-sm font-bold rounded-xl border-2 border-border transition-all shadow-md touch-target active:scale-95",
+              isNumbers
+                ? "bg-primary text-primary-foreground"
+                : "bg-background hover:bg-primary hover:text-primary-foreground"
+            )}
           >
             {isNumbers ? 'ABC' : '123'}
           </button>
@@ -201,7 +210,7 @@ export function VirtualKeyboard({
           {/* Space */}
           <button
             onClick={handleSpace}
-            className="flex-1 max-w-[300px] h-16 text-lg font-semibold bg-background hover:bg-primary hover:text-primary-foreground active:scale-95 rounded-xl border-2 border-border transition-all shadow-md touch-target"
+            className="flex-1 max-w-[200px] h-16 text-lg font-semibold bg-background hover:bg-primary hover:text-primary-foreground active:scale-95 rounded-xl border-2 border-border transition-all shadow-md touch-target"
           >
             {t('keyboard.space')}
           </button>
@@ -209,7 +218,7 @@ export function VirtualKeyboard({
           {/* Enter */}
           <button
             onClick={handleEnter}
-            className="min-w-[90px] h-16 text-base font-semibold bg-background hover:bg-primary hover:text-primary-foreground active:scale-95 rounded-xl border-2 border-border transition-all shadow-md touch-target"
+            className="min-w-[80px] h-16 text-sm font-semibold bg-background hover:bg-primary hover:text-primary-foreground active:scale-95 rounded-xl border-2 border-border transition-all shadow-md touch-target"
           >
             {t('keyboard.enter')}
           </button>

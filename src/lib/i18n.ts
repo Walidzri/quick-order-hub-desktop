@@ -47,6 +47,11 @@ export const translations: Record<Language, Record<string, string>> = {
     'order.dineInDesc': 'À manger sur place',
     'order.takeaway': 'À emporter',
     'order.takeawayDesc': 'À emporter',
+    'order.delivery': 'Livraison',
+    'order.deliveryDesc': 'À livrer à domicile',
+    'order.deliveryAddress': 'Adresse',
+    'order.deliveryPhone': 'Téléphone',
+    'order.deliveryCustomerName': 'Nom du client',
     
     // Order Status
     'status.draft': 'Brouillon',
@@ -214,6 +219,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'keyboard.numericInput': 'Saisie numérique',
     'keyboard.hide': 'Masquer le clavier',
     'keyboard.show': 'Afficher le clavier virtuel',
+    'keyboard.symbols': 'Symboles',
     
     // Products Management
     'products.title': 'Gestion des Articles',
@@ -397,6 +403,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'print.cash': 'Espèces',
     'print.card': 'Carte',
     'print.dineIn': 'Sur Place',
+    'print.delivery': 'Livraison',
     'print.takeaway': 'À Emporter',
     'print.restaurant': 'Restaurant',
     
@@ -662,6 +669,11 @@ export const translations: Record<Language, Record<string, string>> = {
     'order.dineInDesc': 'To eat here',
     'order.takeaway': 'Takeaway',
     'order.takeawayDesc': 'To take away',
+    'order.delivery': 'Delivery',
+    'order.deliveryDesc': 'To be delivered',
+    'order.deliveryAddress': 'Address',
+    'order.deliveryPhone': 'Phone',
+    'order.deliveryCustomerName': 'Customer name',
     
     // Order Status
     'status.draft': 'Draft',
@@ -806,6 +818,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'keyboard.numericInput': 'Numeric Input',
     'keyboard.hide': 'Hide keyboard',
     'keyboard.show': 'Show virtual keyboard',
+    'keyboard.symbols': 'Symbols',
     
     // Products Management
     'products.title': 'Products Management',
@@ -1015,6 +1028,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'print.cash': 'Cash',
     'print.card': 'Card',
     'print.dineIn': 'Dine In',
+    'print.delivery': 'Delivery',
     'print.takeaway': 'Takeaway',
     'print.restaurant': 'Restaurant',
     
@@ -1272,6 +1286,11 @@ export const translations: Record<Language, Record<string, string>> = {
     'order.dineInDesc': 'للأكل هنا',
     'order.takeaway': 'للأخذ',
     'order.takeawayDesc': 'للأخذ معك',
+    'order.delivery': 'توصيل',
+    'order.deliveryDesc': 'توصيل للمنزل',
+    'order.deliveryAddress': 'العنوان',
+    'order.deliveryPhone': 'الهاتف',
+    'order.deliveryCustomerName': 'اسم العميل',
     
     // Order Status
     'status.draft': 'مسودة',
@@ -1472,6 +1491,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'keyboard.numericInput': 'إدخال رقمي',
     'keyboard.hide': 'إخفاء لوحة المفاتيح',
     'keyboard.show': 'إظهار لوحة المفاتيح الافتراضية',
+    'keyboard.symbols': 'رموز',
     
     // Products Management
     'products.title': 'إدارة المنتجات',
@@ -1680,6 +1700,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'print.cash': 'نقدي',
     'print.card': 'بطاقة',
     'print.dineIn': 'تناول هنا',
+    'print.delivery': 'توصيل',
     'print.takeaway': 'للأخذ',
     'print.restaurant': 'مطعم',
     

@@ -283,7 +283,7 @@ export function OrdersScreen() {
         date.toLocaleDateString('fr-FR'),
         date.toLocaleTimeString('fr-FR'),
         t(`status.${order.status}`),
-        order.type === 'dine-in' ? t('print.dineIn') : t('print.takeaway'),
+        order.type === 'dine-in' ? t('print.dineIn') : order.type === 'delivery' ? t('print.delivery') : t('print.takeaway'),
         order.paymentMethod === 'cash' ? t('print.cash') : t('print.card'),
         cashierName,
         formatCurrency(order.subtotal, currency),

@@ -94,19 +94,19 @@ export function Cart() {
     setShowOrderType(true);
   };
 
-  const handleOrderTypeSelect = (type: OrderType) => {
+  const handleOrderTypeSelect = (type: OrderType, deliveryInfo?: { address: string; phone: string; customerName: string }) => {
     if (pendingCartItem) {
-      createDraftWithType(type, pendingCartItem);
+      createDraftWithType(type, pendingCartItem, deliveryInfo);
       setShowOrderType(false);
     } else {
-      createNewDraft(undefined, type);
+      createNewDraft(undefined, type, deliveryInfo);
       setShowOrderType(false);
     }
   };
 
-  const handleChangeType = (type: OrderType) => {
+  const handleChangeType = (type: OrderType, deliveryInfo?: { address: string; phone: string; customerName: string }) => {
     if (activeDraft) {
-      updateDraftType(activeDraft.id, type);
+      updateDraftType(activeDraft.id, type, deliveryInfo);
       setShowEditType(false);
     }
   };
@@ -161,10 +161,10 @@ export function Cart() {
                 variant="default"
               >
                 <span className="text-base sm:text-lg">
-                  {activeDraft.type === 'dine-in' ? '🍽️' : '📦'}
+                  {activeDraft.type === 'dine-in' ? '🍽️' : activeDraft.type === 'delivery' ? '🚚' : '📦'}
                 </span>
                 <span className="truncate">
-                  {activeDraft.type === 'dine-in' ? t('order.dineIn') : t('order.takeaway')}
+                  {activeDraft.type === 'dine-in' ? t('order.dineIn') : activeDraft.type === 'delivery' ? t('order.delivery') : t('order.takeaway')}
                 </span>
               </Button>
               <span className="text-xs text-muted-foreground hidden lg:block">{activeDraft?.name}</span>
@@ -436,7 +436,6 @@ export function Cart() {
         isOpen={showOrderType} 
         onClose={() => {
           setShowOrderType(false);
-          // Clear pending item if user closes modal without selecting
           if (pendingCartItem) {
             setPendingCartItem(null);
           }
@@ -448,6 +447,11 @@ export function Cart() {
         isOpen={showEditType} 
         onClose={() => setShowEditType(false)} 
         onSelect={handleChangeType}
+        initialDeliveryInfo={activeDraft?.type === 'delivery' ? {
+          address: activeDraft.deliveryAddress ?? '',
+          phone: activeDraft.deliveryPhone ?? '',
+          customerName: activeDraft.deliveryCustomerName ?? '',
+        } : undefined}
       />
 
       <AnimatePresence>

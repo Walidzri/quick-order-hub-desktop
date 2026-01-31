@@ -7,7 +7,7 @@ import { openDB, DBSchema, IDBPDatabase, deleteDB } from 'idb';
 // Re-export all types and interfaces
 export type OrderStatus = 'draft' | 'sentToKitchen' | 'paid' | 'cancelled';
 export type PaymentMethod = 'cash' | 'card';
-export type OrderType = 'dine-in' | 'takeaway';
+export type OrderType = 'dine-in' | 'takeaway' | 'delivery';
 export type PrinterMode = 'queue' | 'tcp';
 // Type de connexion physique de l'imprimante
 // - 'tcp' / 'wifi' / 'bluetooth' : gérés via daemon
@@ -101,6 +101,10 @@ export interface Order {
   updatedAt: Date;
   paidAt?: Date;
   sentToKitchenAt?: Date;
+  /** Infos livraison (si type === 'delivery') */
+  deliveryAddress?: string;
+  deliveryPhone?: string;
+  deliveryCustomerName?: string;
 }
 
 export interface Printer {

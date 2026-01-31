@@ -105,9 +105,12 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
         logo: settings?.logo,
         orderNumber: order.orderNumber,
         date: `${formattedDate} ${formattedTime}`,
-        type: order.type === 'dine-in' ? '[SUR PLACE]' : '[A EMPORTER]',
+        type: order.type,
         paymentMethod: order.paymentMethod === 'cash' ? 'Especes' : 'Carte',
         cashier: cashierName,
+        deliveryCustomerName: order.deliveryCustomerName,
+        deliveryPhone: order.deliveryPhone,
+        deliveryAddress: order.deliveryAddress,
         lines: order.lines.map(line => {
           const lineTotal = (line.unitPrice + line.modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0)) * line.quantity;
           return {
