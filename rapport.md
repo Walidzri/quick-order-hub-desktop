@@ -915,3 +915,69 @@ packages/shared/types/
 - `tsc -p tsconfig.server.json --noEmit` ✅ 0 erreur
 
 *Dernière mise à jour : Étape 1.2 terminée — serveur Fastify créé*
+
+---
+
+### Étape 1.3 — Couche services frontend
+
+**Fichiers créés dans `src/services/` :**
+
+| Fichier | Rôle |
+|---|---|
+| `api.ts` | Config base URL (`http://127.0.0.1:3001`) + helpers `get/post/patch/put/delete` typés |
+| `orderService.ts` | `getAll`, `getByStatus`, `getById`, `create`, `update`, `updateStatus`, `delete` |
+| `productService.ts` | Produits + catégories CRUD + variantes + modifier groups/options |
+| `settingsService.ts` | `get/update` settings + CRUD imprimantes |
+| `printerService.ts` | `printReceipt`, `printKitchenTicket`, `openDrawer`, `testConnection` |
+
+**Résultat :**
+- `tsc --noEmit` ✅ 0 erreur
+
+---
+
+### Étape 1.4 — Éclater POSContext
+
+**Stratégie :** 5 contextes indépendants + shim de compatibilité `usePOS()` → zéro changement dans les composants.
+
+**Architecture des providers :**
+```
+SettingsProvider > CatalogProvider > PrinterProvider > CartProvider > OrderProvider
+```
+
+**Fichiers créés :**
+
+| Fichier | Responsabilité |
+|---|---|
+| `src/contexts/SettingsContext.tsx` | settings, kioskMode, isLoading, t(), language, currency, direction, toggleKioskMode, backup useEffect |
+| `src/contexts/CatalogContext.tsx` | categories, products, variants, promotions + CRUD complet + exportTemplate/importTemplate/resetDB |
+| `src/contexts/PrinterContext.tsx` | printers, updatePrinter, deletePrinter |
+| `src/contexts/CartContext.tsx` | orderDrafts, activeOrderId, pendingCartItem, subtotal/discount/total, createOrder, generateOrderNumber, applyPromoCode, toutes opérations cart |
+| `src/contexts/OrderContext.tsx` | orders, sendToKitchen, markAsPaid, cancelOrder, updateOrderStatus, delete*, loadOrders, pagination |
+
+**Fichier réécrit :**
+
+| Fichier | Changement |
+|---|---|
+| `src/contexts/POSContext.tsx` | Shim de compatibilité : `usePOS()` assemble les 5 contextes, `POSProvider` imbrique les 5 providers |
+
+**Résultat :**
+- `tsc --noEmit` ✅ 0 erreur
+- 22 composants utilisant `usePOS()` → **aucun changement requis**
+
+| Contexte | Statut |
+|---|---|
+| `SettingsContext.tsx` | ✅ |
+| `CatalogContext.tsx` | ✅ |
+| `PrinterContext.tsx` | ✅ |
+| `CartContext.tsx` | ✅ |
+| `OrderContext.tsx` | ✅ |
+| `POSContext.tsx` → shim | ✅ |
+
+#### Statut mis à jour
+- [x] Étape 1.1 — Extraire les types partagés ✅
+- [x] Étape 1.2 — Créer le serveur Fastify ✅
+- [x] Étape 1.3 — Créer la couche services frontend ✅
+- [x] Étape 1.4 — Éclater POSContext ✅
+- [ ] Étape 1.5 — Déplacer la logique métier vers server/services
+
+*Dernière mise à jour : Étape 1.4 terminée — POSContext éclaté en 5 contextes*
