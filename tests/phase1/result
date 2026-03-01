@@ -1,0 +1,56 @@
+
+============================================================
+  Tests API Phase 1 — Fastify http://10.8.0.2:3001         
+============================================================
+
+✅ Serveur joignable — GET /api/health → 200
+
+--- HEALTH ---
+✅ PASS [200] GET /api/health
+
+--- ORDERS ---
+✅ PASS [200] GET /api/orders (tableau ou 501)
+✅ PASS [200] GET /api/orders?status=paid
+✅ PASS [404] GET /api/orders/:id (id inexistant → 404 ou stub 501)
+❌ FAIL [500] POST /api/orders
+❌ FAIL [500] PATCH /api/orders/:id
+❌ FAIL [500] PATCH /api/orders/:id/status
+❌ FAIL [400] DELETE /api/orders/:id
+
+--- PRODUCTS ---
+✅ PASS [200] GET /api/products
+✅ PASS [404] GET /api/products/:id
+❌ FAIL [500] POST /api/products
+❌ FAIL [500] PATCH /api/products/:id
+❌ FAIL [400] DELETE /api/products/:id
+✅ PASS [200] GET /api/products/:id/variants
+✅ PASS [200] GET /api/modifier-groups
+✅ PASS [200] GET /api/modifier-options
+
+--- CATEGORIES ---
+✅ PASS [200] GET /api/categories
+✅ PASS [404] GET /api/categories/:id
+❌ FAIL [500] POST /api/categories
+❌ FAIL [500] PATCH /api/categories/:id
+❌ FAIL [400] DELETE /api/categories/:id
+
+--- SETTINGS & PRINTERS ---
+✅ PASS [200] GET /api/settings
+❌ FAIL [500] PATCH /api/settings
+✅ PASS [200] GET /api/printers
+❌ FAIL [500] PUT /api/printers/:id
+❌ FAIL [400] DELETE /api/printers/:id
+
+--- PRINT ---
+❌ FAIL [500] POST /api/print/receipt
+❌ FAIL [500] POST /api/print/kitchen
+❌ FAIL [500] POST /api/print/drawer
+✅ PASS [200] GET /api/print/test
+
+============================================================
+  Résultats : 14 PASS / 16 FAIL / 0 SKIP (total: 30)
+============================================================
+
+Note Phase 1 : Les routes en stub renvoient 501 — c'est attendu.
+  Un FAIL réel = route absente (404) ou crash serveur (500).
+

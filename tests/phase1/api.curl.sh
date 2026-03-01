@@ -7,7 +7,7 @@
 #   bash tests/phase1/api.curl.sh
 #
 # Prérequis :
-#   - L'app Electron est lancée (le serveur Fastify tourne sur http://127.0.0.1:3001)
+#   - L'app Electron est lancée (le serveur Fastify tourne sur http://10.8.0.2:3001)
 #   - curl et jq sont installés
 #     Windows : scoop install curl jq  |  choco install curl jq
 #
@@ -15,7 +15,7 @@
 # Le test vérifie que la route répond correctement (pas de 404/500 inattendu).
 # =============================================================================
 
-BASE="http://127.0.0.1:3001"
+BASE="http://10.8.0.2:3001"
 PASS=0
 FAIL=0
 SKIP=0
@@ -80,7 +80,7 @@ parse_body()   { echo "$1" | head -n -1; }
 
 echo ""
 echo -e "${CYAN}============================================================${RESET}"
-echo -e "${CYAN}  Tests API Phase 1 — Fastify http://127.0.0.1:3001         ${RESET}"
+echo -e "${CYAN}  Tests API Phase 1 — Fastify http://10.8.0.2:3001         ${RESET}"
 echo -e "${CYAN}============================================================${RESET}"
 echo ""
 
@@ -237,7 +237,7 @@ echo ""
 echo -e "${CYAN}--- PRINT ---${RESET}"
 
 ORDER_STUB='{"id":"test-order","orderNumber":"#001","status":"paid","type":"dine-in","lines":[],"subtotal":0,"discount":0,"total":0,"createdAt":"2024-01-01T00:00:00Z","updatedAt":"2024-01-01T00:00:00Z"}'
-PRINTER_STUB='{"id":"test-printer","name":"Caisse","host":"127.0.0.1","port":9100,"role":"cashier","connectionType":"network","enabled":true}'
+PRINTER_STUB='{"id":"test-printer","name":"Caisse","host":"10.8.0.2","port":9100,"role":"cashier","connectionType":"network","enabled":true}'
 
 R=$(req POST /api/print/receipt "{\"order\":$ORDER_STUB,\"printer\":$PRINTER_STUB}"); S=$(parse_status "$R")
 [ "$S" = "200" ] || [ "$S" = "501" ] || [ "$S" = "503" ] && { echo -e "${GREEN}✅ PASS${RESET} [$S] POST /api/print/receipt"; PASS=$((PASS+1)); } || \
@@ -251,7 +251,7 @@ R=$(req POST /api/print/drawer "{\"printer\":$PRINTER_STUB}"); S=$(parse_status 
 [ "$S" = "200" ] || [ "$S" = "501" ] || [ "$S" = "503" ] && { echo -e "${GREEN}✅ PASS${RESET} [$S] POST /api/print/drawer"; PASS=$((PASS+1)); } || \
   { echo -e "${RED}❌ FAIL${RESET} [$S] POST /api/print/drawer"; FAIL=$((FAIL+1)); }
 
-R=$(req GET "/api/print/test?host=127.0.0.1&port=9100"); S=$(parse_status "$R")
+R=$(req GET "/api/print/test?host=10.8.0.2&port=9100"); S=$(parse_status "$R")
 [ "$S" = "200" ] || [ "$S" = "501" ] && { echo -e "${GREEN}✅ PASS${RESET} [$S] GET /api/print/test"; PASS=$((PASS+1)); } || \
   { echo -e "${RED}❌ FAIL${RESET} [$S] GET /api/print/test"; FAIL=$((FAIL+1)); }
 
