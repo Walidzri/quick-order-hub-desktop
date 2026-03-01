@@ -38,6 +38,13 @@ export default defineConfig(({ mode }) => ({
           options.startup();
         },
         vite: {
+          resolve: {
+            alias: {
+              // L'alias @shared doit être déclaré ici car le build du main process
+              // n'hérite pas automatiquement du resolve.alias du config racine
+              '@shared': path.resolve(__dirname, './packages/shared'),
+            },
+          },
           build: {
             sourcemap: mode === 'development', // Only sourcemaps in dev
             minify: mode === 'production',
