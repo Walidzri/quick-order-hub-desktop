@@ -880,9 +880,38 @@ packages/shared/types/
 
 #### Statut
 - [x] Étape 1.1 — Extraire les types partagés ✅
-- [ ] Étape 1.2 — Créer le serveur Fastify
+- [x] Étape 1.2 — Créer le serveur Fastify ✅
 - [ ] Étape 1.3 — Créer la couche services frontend
 - [ ] Étape 1.4 — Éclater POSContext
 - [ ] Étape 1.5 — Déplacer la logique métier vers server/services
 
-*Dernière mise à jour : Étape 1.1 terminée — 0 erreur TypeScript*
+### Étape 1.2 — Créer le serveur Fastify
+
+**Fichiers créés :**
+
+| Fichier | Rôle |
+|---|---|
+| `server/src/index.ts` | Entry point Fastify (port 3001) + `startServer()` / `stopServer()` |
+| `server/src/routes/orders.ts` | GET/POST/PATCH/DELETE `/api/orders` |
+| `server/src/routes/products.ts` | GET/POST/PATCH/DELETE `/api/products` + variants + modifiers |
+| `server/src/routes/categories.ts` | GET/POST/PATCH/DELETE `/api/categories` |
+| `server/src/routes/settings.ts` | GET/PATCH `/api/settings` + printers |
+| `server/src/routes/print.ts` | POST `/api/print/receipt\|kitchen\|drawer` |
+| `server/src/services/orderService.ts` | Stub — sera SQLite en Phase 2 |
+| `server/src/services/productService.ts` | Stub — sera SQLite en Phase 2 |
+| `server/src/services/settingsService.ts` | Stub — sera SQLite en Phase 2 |
+| `server/src/services/printService.ts` | Stub — délègue au PrintDaemon C# |
+| `tsconfig.server.json` | TypeScript config pour server/ |
+
+**Fichiers modifiés :**
+
+| Fichier | Changement |
+|---|---|
+| `tsconfig.electron.json` | Supprimé `rootDir`, ajouté `server/` dans `include`, alias `@shared/*` |
+| `electron/main.ts` | Import + appel `startServer(3001)` au démarrage, `stopServer()` au quit |
+
+**Résultat :**
+- `tsc --noEmit` ✅ 0 erreur (tsconfig global)
+- `tsc -p tsconfig.server.json --noEmit` ✅ 0 erreur
+
+*Dernière mise à jour : Étape 1.2 terminée — serveur Fastify créé*

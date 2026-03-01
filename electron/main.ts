@@ -7,6 +7,7 @@ import { Socket, createConnection } from 'net';
 import { request } from 'http';
 import { createRequire } from 'module';
 import { spawn, ChildProcess } from 'child_process';
+import { startServer, stopServer } from '../server/src/index';
 // PrintDaemon C# is now used instead of integrated Node.js daemon
 // import { createPrintDaemonServer } from './print-daemon-integrated';
 
@@ -344,10 +345,19 @@ function stopPrintDaemon(): void {
 }
 
 // This method will be called when Electron has finished initialization
-app.on('ready', () => {
+app.on('ready', async () => {
   // Remove the menu bar completely
   Menu.setApplicationMenu(null);
+
+  // Start Fastify backend server
+  try {
+    await startServer(3001);
+  } catch (error) {
+    console.error('[MAIN] Failed to start Fastify server:', error);
+  }
+
   createWindow();
+
   // Start PrintDaemon C# after a short delay to ensure everything is ready
   setTimeout(() => {
     startPrintDaemon().catch((error) => {
@@ -360,6 +370,7 @@ app.on('ready', () => {
 app.on('before-quit', () => {
   isQuitting = true;
   stopPrintDaemon();
+  stopServer().catch((err) => console.error('[MAIN] Error stopping Fastify:', err));
 });
 
 app.on('window-all-closed', () => {
