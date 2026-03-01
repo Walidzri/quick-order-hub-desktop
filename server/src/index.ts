@@ -28,6 +28,19 @@ export async function startServer(port = 3001): Promise<typeof fastify> {
   await fastify.register(cors, { origin: true });
   await fastify.register(websocket);
 
+  // Parser JSON permissif : accepte un body vide (utile pour DELETE avec Content-Type: application/json)
+  fastify.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    if (!body || (body as string).trim() === '') {
+      done(null, null);
+      return;
+    }
+    try {
+      done(null, JSON.parse(body as string));
+    } catch {
+      done(new Error('Invalid JSON body'));
+    }
+  });
+
   await fastify.register(ordersRoutes);
   await fastify.register(productsRoutes);
   await fastify.register(categoriesRoutes);
