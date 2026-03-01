@@ -391,15 +391,15 @@ Cette section peut amender le plan d'action si l'analyse révèle des surprises.
 ### 🔄 PHASE 2 — Migration IndexedDB → SQLite
 **Statut : EN COURS**
 
-#### Étape 2.1 — Setup SQLite
-- [ ] Installer `better-sqlite3` + types
-- [ ] Créer `server/src/db/connection.ts`
-- [ ] Créer `server/src/db/schema.ts`
-- [ ] Créer les migrations SQL
+#### Étape 2.1 — Setup SQLite ✅ VALIDÉE
+- [x] Installer `better-sqlite3` + types
+- [x] Créer `server/src/db/connection.ts`
+- [x] Créer `server/src/db/schema.ts`
+- [x] Créer les migrations SQL
 
-#### Étape 2.2 — Script de migration des données
-- [ ] Script one-shot : IndexedDB → SQLite
-- [ ] Tester la migration sur une copie
+#### Étape 2.2 — Script de migration des données ✅ VALIDÉE
+- [x] Script one-shot : IndexedDB → SQLite
+- [x] Tester la migration — succès confirmé en prod
 
 #### Étape 2.3 — Brancher SQLite dans les services
 - [ ] Remplacer les appels IndexedDB par SQLite service par service
@@ -529,9 +529,9 @@ export const orderService = {
 > Mettre à jour cette section à chaque session de travail.
 > Ne jamais modifier cette section sans validation du développeur.
 
-**Dernière session :** Phase 1 validée (30/30 tests curl + checklist 83/83) — démarrage Phase 2
-**Phase active :** Phase 2 — Migration IndexedDB → SQLite
-**Prochaine tâche :** Étape 2.1 — Setup SQLite (better-sqlite3, connection, schema, migrations)
+**Dernière session :** Phase 2.1 + 2.2 validées — migration IDB→SQLite testée et fonctionnelle
+**Phase active :** Phase 2 — Étape 2.3 — Brancher SQLite dans les services Fastify
+**Prochaine tâche :** Implémenter le vrai CRUD SQLite dans server/src/services/ (orders, products, categories, settings, printers)
 **Blockers :** Aucun
 
 ---
