@@ -2,8 +2,22 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
 import { copyFileSync, existsSync, readFileSync } from 'fs';
+import { builtinModules } from 'module';
 import electron from 'vite-plugin-electron';
 import renderer from 'vite-plugin-electron-renderer';
+
+// Tous les modules Node.js natifs + packages npm du main process
+// doivent être externalisés (non bundlés) pour Electron main process.
+const electronExternals = [
+  'electron',
+  ...builtinModules,
+  ...builtinModules.map(m => `node:${m}`),
+  'fastify',
+  '@fastify/cors',
+  '@fastify/websocket',
+  '@fastify/websocket/types',
+  'ws',
+];
 
 // Read version from package.json
 const packageJson = JSON.parse(readFileSync('./package.json', 'utf-8'));
@@ -29,7 +43,9 @@ export default defineConfig(({ mode }) => ({
             minify: mode === 'production',
             outDir: 'dist-electron',
             rollupOptions: {
-              external: ['electron'],
+              // Externaliser electron + tous les builtins Node.js + packages Fastify
+              // Les imports relatifs (./) et les chemins absolus (alias résolus) sont bundlés
+              external: electronExternals,
             },
           },
         },
