@@ -1,5 +1,6 @@
 // Direct printing utilities without browser dialog
 import { ReceiptCustomization } from './database';
+import { defaultReceiptCustomization } from '@shared/types';
 
 export interface PrinterConnection {
   type: 'network' | 'bluetooth' | 'windows';
@@ -417,64 +418,9 @@ export class DirectPrinter {
   private static escBoldOn = '\x1BE' + String.fromCharCode(0x01);
   private static escBoldOff = '\x1BE' + String.fromCharCode(0x00);
 
-  // Get default customization
+  // Get default customization — délègue à la constante partagée (source de vérité unique)
   static getDefaultCustomization(): ReceiptCustomization {
-    return {
-      showOrderNumber: true,
-      showDate: true,
-      showTime: true,
-      showOrderType: true,
-      showPaymentMethod: true,
-      showCashier: true,
-      showProducts: true,
-      showProductPrices: true,
-      showModifiers: true,
-      showNotes: true,
-      showSubtotal: true,
-      showDiscount: true,
-      showTotal: true,
-      showItemCount: true,
-      showAmountReceived: true,
-      showChange: true,
-      showLogo: true,
-      logoSize: 50, // 50% de la largeur de l'imprimante (288px par défaut)
-      dateFormat: 'DD/MM/YYYY',
-      timeFormat: 'HH:mm',
-      headerAlignment: 'center',
-      restaurantNameStyle: 'uppercase',
-      productNameStyle: 'uppercase',
-      separatorStyle: 'dashes',
-      separatorChar: '-',
-      fontSize: 'normal',
-      fontFamily: 'monospace',
-      labelOrderNumber: 'COMMANDE No',
-      labelDate: 'DATE',
-      labelTime: 'HEURE',
-      labelOrderType: 'TYPE',
-      labelPaymentMethod: 'PAIEMENT',
-      labelCashier: 'CAISSIER',
-      labelSubtotal: 'SOUS-TOTAL',
-      labelDiscount: 'REMISE',
-      labelTotal: 'TOTAL',
-      labelItemCount: 'ARTICLES',
-      showLogo: true,
-      labelAmountReceived: 'MONTANT REÇU',
-      labelChange: 'MONNAIE',
-      labelThankYou: 'MERCI DE VOTRE VISITE !',
-      labelKitchenTicket: 'TICKET CUISINE',
-      labelBonAppetit: 'Bon appétit !',
-      kitchenLabelItemCount: 'ARTICLES',
-      kitchenShowItemCount: true,
-      kitchenShowOrderNumber: true,
-      kitchenShowDate: true,
-      kitchenShowTime: true,
-      kitchenShowOrderType: true,
-      kitchenShowCashier: true,
-      kitchenShowProducts: true,
-      kitchenShowProductPrices: false,
-      kitchenShowModifiers: true,
-      kitchenShowNotes: true,
-    };
+    return defaultReceiptCustomization;
   }
 
   // Format date according to format string

@@ -4,335 +4,33 @@
 
 import { openDB, DBSchema, IDBPDatabase, deleteDB } from 'idb';
 
-// Re-export all types and interfaces
-export type OrderStatus = 'draft' | 'sentToKitchen' | 'paid' | 'cancelled';
-export type PaymentMethod = 'cash' | 'card';
-export type OrderType = 'dine-in' | 'takeaway' | 'delivery';
-export type PrinterMode = 'queue' | 'tcp';
-// Type de connexion physique de l'imprimante
-// - 'tcp' / 'wifi' / 'bluetooth' : gérés via daemon
-// - 'windows' : impression via PrintDaemon C# + spooler Windows (appels directs Win32)
-export type PrinterConnectionType = 'tcp' | 'bluetooth' | 'wifi' | 'windows';
-export type PrinterRole = 'kitchen' | 'cashier';
-export type PrintJobStatus = 'pending' | 'printed' | 'failed';
-export type PromoType = 'percent' | 'fixed' | 'freeItem';
-export type UserRole = 'admin' | 'caissier' | 'chef';
-export type Size = 'L' | 'XL' | 'XXL' | 'XXXL' | 'petite' | 'grande' | 'Simple' | 'Cheddar' | 'Classique' | 'Double';
+// Types importés depuis @shared/types (source de vérité unique)
+import type {
+  Category, ProductVariant, ModifierGroup, ModifierOption, Product,
+  OrderStatus, PaymentMethod, OrderType, PromoType,
+  OrderLineModifier, OrderLine, Order, Promotion,
+  PrinterMode, PrinterConnectionType, PrinterRole, PrintJobStatus,
+  Printer, PrintJob,
+  ReceiptCustomization, SavedReceiptTemplate, Settings, NumberingCounter,
+  UserRole, User, UserSession,
+  Supplier, InventoryItem, InvoiceLine, Invoice,
+  Size,
+} from '@shared/types';
+import { defaultReceiptCustomization } from '@shared/types';
 
-export interface Category {
-  id: string;
-  name: string;
-  sortOrder: number;
-  icon?: string;
-  image?: string; // Base64 image data
-  supplementIds?: string[]; // IDs of supplements available for all products in this category
-}
-
-export interface ProductVariant {
-  id: string;
-  productId: string;
-  size: string;
-  price: number;
-}
-
-export interface ModifierGroup {
-  id: string;
-  name: string;
-  required: boolean;
-  multiSelect: boolean;
-}
-
-export interface ModifierOption {
-  id: string;
-  groupId: string;
-  name: string;
-  priceAdjustment: number;
-  sizeBasedPrices?: Record<string, number>;
-}
-
-export interface Product {
-  id: string;
-  categoryId: string;
-  name: string;
-  basePrice?: number;
-  variants?: ProductVariant[];
-  modifierGroupIds?: string[];
-  sortOrder: number;
-  description?: string;
-  available?: boolean;
-  image?: string; // Base64 image data
-  supplementIds?: string[]; // IDs of supplements that can be added to this product
-}
-
-export interface OrderLineModifier {
-  optionId: string;
-  optionName: string;
-  priceAdjustment: number;
-}
-
-export interface OrderLine {
-  id: string;
-  productId?: string;
-  productName: string;
-  categoryId?: string; // For category breakdown in reports
-  variantId?: string;
-  variantSize?: string;
-  quantity: number;
-  unitPrice: number;
-  modifiers: OrderLineModifier[];
-  note?: string;
-  isManual: boolean;
-}
-
-export interface Order {
-  id: string;
-  orderNumber: string;
-  status: OrderStatus;
-  type: OrderType;
-  lines: OrderLine[];
-  subtotal: number;
-  discount: number;
-  promoCode?: string;
-  promoName?: string;
-  total: number;
-  paymentMethod?: PaymentMethod;
-  createdBy?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  paidAt?: Date;
-  sentToKitchenAt?: Date;
-  /** Infos livraison (si type === 'delivery') */
-  deliveryAddress?: string;
-  deliveryPhone?: string;
-  deliveryCustomerName?: string;
-}
-
-export interface Printer {
-  id: string;
-  /** Rôle principal de l'imprimante (pour quel ticket elle sert) */
-  role: PrinterRole;
-  /** Mode interne (hérité de l'ancienne implémentation) */
-  mode: PrinterMode;
-  /** Type de connexion physique de l'imprimante */
-  connectionType?: PrinterConnectionType;
-  /** Nom lisible de l'imprimante (ex: Cuisine 1, Caisse 2) */
-  name?: string;
-  queueName?: string;
-  tcpHost?: string;
-  tcpPort?: number;
-  isThermalPrinter?: boolean; // true for ESC/POS thermal printers, false for regular printers
-  /** Imprimante active ou désactivée (true par défaut si non défini) */
-  enabled?: boolean;
-}
-
-export interface PrintJob {
-  id: string;
-  orderId: string;
-  printerRole: PrinterRole;
-  status: PrintJobStatus;
-  errorMessage?: string;
-  createdAt: Date;
-  printedAt?: Date;
-}
-
-export interface Promotion {
-  id: string;
-  code: string;
-  name: string;
-  type: PromoType;
-  value: number;
-  startDate: Date;
-  endDate: Date;
-  active: boolean;
-  minOrderTotal?: number;
-  freeItemId?: string;
-}
-
-export interface ReceiptCustomization {
-  // Display options
-  showOrderNumber: boolean;
-  showDate: boolean;
-  showTime: boolean;
-  showOrderType: boolean;
-  showPaymentMethod: boolean;
-  showCashier: boolean;
-  showProducts: boolean;
-  showProductPrices: boolean;
-  showModifiers: boolean;
-  showNotes: boolean;
-  showSubtotal: boolean;
-  showDiscount: boolean;
-  showTotal: boolean;
-  showItemCount: boolean; // Afficher le nombre d'articles à côté du total
-  showAmountReceived: boolean;
-  showChange: boolean;
-  showLogo: boolean; // Afficher le logo sur les reçus
-  logoSize: number; // Taille du logo en pourcentage de la largeur de l'imprimante (50 = 50%, par défaut 50% = 288px)
-  
-  // Formatting options
-  dateFormat: string; // "DD/MM/YYYY", "MM/DD/YYYY", etc.
-  timeFormat: string; // "HH:mm", "hh:mm A", etc.
-  
-  // Layout options
-  headerAlignment: 'left' | 'center' | 'right';
-  restaurantNameStyle: 'normal' | 'uppercase' | 'lowercase';
-  productNameStyle: 'normal' | 'uppercase' | 'lowercase';
-  separatorStyle: 'dashes' | 'dots' | 'equals' | 'line' | 'none';
-  separatorChar: string; // Custom separator character
-  
-  // Text options
-  fontSize: 'small' | 'normal' | 'large';
-  fontFamily: 'monospace' | 'sans-serif' | 'serif';
-  
-  // Custom labels
-  labelOrderNumber: string;
-  labelDate: string;
-  labelTime: string;
-  labelOrderType: string;
-  labelPaymentMethod: string;
-  labelCashier: string;
-  labelSubtotal: string;
-  labelDiscount: string;
-  labelTotal: string;
-  labelItemCount: string; // Libellé pour le nombre d'articles
-  labelAmountReceived: string;
-  labelChange: string;
-  labelThankYou: string;
-  
-  // Kitchen ticket specific
-  labelKitchenTicket: string;
-  labelBonAppetit: string;
-  kitchenLabelItemCount: string; // Libellé personnalisé pour le nombre d'articles sur le ticket cuisine
-  kitchenShowItemCount: boolean; // Afficher le nombre d'articles sur le ticket cuisine
-  kitchenShowOrderNumber: boolean;
-  kitchenShowDate: boolean;
-  kitchenShowTime: boolean;
-  kitchenShowOrderType: boolean;
-  kitchenShowCashier: boolean;
-  kitchenShowProducts: boolean;
-  kitchenShowProductPrices: boolean;
-  kitchenShowModifiers: boolean;
-  kitchenShowNotes: boolean;
-}
-
-export interface SavedReceiptTemplate {
-  id: string;
-  name: string;
-  customization: ReceiptCustomization;
-}
-
-export interface Settings {
-  id: string;
-  language: string;
-  currency: string;
-  restaurantName: string;
-  address: string;
-  phone: string;
-  logo?: string;
-  receiptHeader: string;
-  receiptFooter: string;
-  showAddress: boolean;
-  showPhone: boolean;
-  darkMode: boolean;
-  primaryColor: string;
-  kioskMode: boolean;
-  uiScale?: number; // UI scale factor (0.5 to 2.0, default: 1.0)
-  receiptCustomization?: ReceiptCustomization;
-  /** Modèles de ticket sauvegardés (mode rapide) */
-  savedReceiptTemplates?: SavedReceiptTemplate[];
-  /** Configuration de la sauvegarde automatique */
-  backupEnabled?: boolean; // Activer/désactiver la sauvegarde automatique
-  backupScheduleType?: 'interval' | 'daily' | 'weekly' | 'monthly'; // Type de planification
-  backupInterval?: number; // Intervalle en minutes (pour type 'interval')
-  backupDailyTime?: string; // Heure au format HH:MM (pour type 'daily', ex: "02:00")
-  backupWeeklyDay?: number; // Jour de la semaine 0-6 (0=dimanche, pour type 'weekly')
-  backupWeeklyTime?: string; // Heure au format HH:MM (pour type 'weekly')
-  backupMonthlyDay?: number; // Jour du mois 1-31 (pour type 'monthly')
-  backupMonthlyTime?: string; // Heure au format HH:MM (pour type 'monthly')
-  backupDirectory?: string; // Répertoire de sauvegarde
-  /** Paiement par carte */
-  cardPaymentEnabled?: boolean; // Activer/désactiver le paiement par carte (défaut: false)
-}
-
-export interface NumberingCounter {
-  id: string;
-  date: string;
-  counter: number;
-}
-
-export interface User {
-  id: string;
-  username: string;
-  password: string;
-  pin?: string; // 4-6 digit PIN for quick login
-  role: UserRole;
-  name: string;
-  avatar?: string; // Emoji or initials for quick selection
-  createdAt: Date;
-  lastLogin?: Date;
-  failedAttempts?: number; // Track failed login attempts
-  lockedUntil?: Date; // Account lockout time
-}
-
-export interface UserSession {
-  id: string;
-  userId: string;
-  loginAt: Date;
-  logoutAt?: Date;
-  isActive: boolean;
-}
-
-// Inventory Management
-export interface Supplier {
-  id: string;
-  name: string;
-  contact?: string;
-  phone?: string;
-  email?: string;
-  address?: string;
-  notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface InventoryItem {
-  id: string;
-  name: string;
-  category: 'food' | 'beverage' | 'supplies' | 'other';
-  unit: string; // 'kg', 'L', 'piece', 'box', etc.
-  currentStock: number;
-  minStock?: number; // Alert when stock is below this
-  unitPrice: number; // Purchase price per unit
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-export interface InvoiceLine {
-  id: string;
-  inventoryItemId?: string; // Link to inventory item if exists
-  itemName: string;
-  quantity: number;
-  unit: string;
-  unitPrice: number;
-  total: number;
-}
-
-export interface Invoice {
-  id: string;
-  invoiceNumber: string;
-  supplierId: string;
-  supplierName: string;
-  date: Date;
-  lines: InvoiceLine[];
-  subtotal: number;
-  tax?: number;
-  discount?: number;
-  total: number;
-  notes?: string;
-  createdBy?: string;
-  createdAt: Date;
-  updatedAt: Date;
-}
+// Re-exports pour la rétrocompatibilité — tous les imports existants depuis '@/lib/database' continuent de fonctionner
+export type {
+  Category, ProductVariant, ModifierGroup, ModifierOption, Product,
+  OrderStatus, PaymentMethod, OrderType, PromoType,
+  OrderLineModifier, OrderLine, Order, Promotion,
+  PrinterMode, PrinterConnectionType, PrinterRole, PrintJobStatus,
+  Printer, PrintJob,
+  ReceiptCustomization, SavedReceiptTemplate, Settings, NumberingCounter,
+  UserRole, User, UserSession,
+  Supplier, InventoryItem, InvoiceLine, Invoice,
+  Size,
+} from '@shared/types';
+export { defaultReceiptCustomization } from '@shared/types';
 
 interface POSDBSchema extends DBSchema {
   categories: {
@@ -426,24 +124,24 @@ export async function getDB(): Promise<IDBPDatabase<POSDBSchema>> {
       if (oldVersion < 4) {
         const supplierStore = db.createObjectStore('suppliers', { keyPath: 'id' });
         supplierStore.createIndex('by-name', 'name');
-        
+
         const inventoryStore = db.createObjectStore('inventoryItems', { keyPath: 'id' });
         inventoryStore.createIndex('by-category', 'category');
         inventoryStore.createIndex('by-name', 'name');
-        
+
         const invoiceStore = db.createObjectStore('invoices', { keyPath: 'id' });
         invoiceStore.createIndex('by-supplier', 'supplierId');
         invoiceStore.createIndex('by-date', 'date');
         invoiceStore.createIndex('by-number', 'invoiceNumber');
       }
-      
+
       // Version 2 -> 3: Add userSessions store
       if (oldVersion < 3) {
         const sessionStore = db.createObjectStore('userSessions', { keyPath: 'id' });
         sessionStore.createIndex('by-user', 'userId');
         sessionStore.createIndex('by-date', 'loginAt');
       }
-      
+
       // Version 1 -> 2: Add users store
       if (oldVersion < 2) {
         const userStore = db.createObjectStore('users', { keyPath: 'id' });
@@ -536,60 +234,6 @@ export async function initializeDatabase(): Promise<void> {
 
   // Initialize only basic settings and printers (no products/categories)
   // This makes the software start completely empty and ready for customization
-  const defaultReceiptCustomization: ReceiptCustomization = {
-    showOrderNumber: true,
-    showDate: true,
-    showTime: true,
-    showOrderType: true,
-    showPaymentMethod: true,
-    showCashier: true,
-    showProducts: true,
-    showProductPrices: true,
-    showModifiers: true,
-    showNotes: true,
-    showSubtotal: true,
-    showDiscount: true,
-    showTotal: true,
-    showItemCount: true,
-    showAmountReceived: true,
-    showChange: true,
-    showLogo: true,
-    logoSize: 50, // 50% de la largeur de l'imprimante (288px par défaut)
-    dateFormat: 'DD/MM/YYYY',
-    timeFormat: 'HH:mm',
-    headerAlignment: 'center',
-    restaurantNameStyle: 'uppercase',
-    productNameStyle: 'uppercase',
-    separatorStyle: 'dashes',
-    separatorChar: '─',
-    fontSize: 'normal',
-    fontFamily: 'monospace',
-    labelOrderNumber: 'COMMANDE N°',
-    labelDate: 'DATE',
-    labelTime: 'HEURE',
-    labelOrderType: 'TYPE',
-    labelPaymentMethod: 'PAIEMENT',
-    labelCashier: 'CAISSIER',
-    labelSubtotal: 'SOUS-TOTAL',
-    labelDiscount: 'REMISE',
-    labelTotal: 'TOTAL',
-    labelItemCount: 'ARTICLES',
-    labelAmountReceived: 'MONTANT REÇU',
-    labelChange: 'MONNAIE',
-    labelThankYou: 'MERCI DE VOTRE VISITE !',
-    labelKitchenTicket: 'TICKET CUISINE',
-    labelBonAppetit: 'Bon appétit !',
-    kitchenLabelItemCount: 'ARTICLES',
-    kitchenShowOrderNumber: true,
-    kitchenShowDate: true,
-    kitchenShowTime: true,
-    kitchenShowOrderType: true,
-    kitchenShowCashier: true,
-    kitchenShowProducts: true,
-    kitchenShowProductPrices: false,
-    kitchenShowModifiers: true,
-    kitchenShowNotes: true,
-  };
 
   // Create default settings
   await db.put('settings', {
@@ -625,7 +269,7 @@ export async function exportProductsTemplate(): Promise<{
   modifierOptions: ModifierOption[];
 }> {
   const db = await getDB();
-  
+
   return {
     categories: await db.getAll('categories'),
     products: await db.getAll('products'),
@@ -713,68 +357,13 @@ export async function resetDatabase(): Promise<void> {
 
   // Reinitialize (but don't seed products - keep it empty)
   const db = await getDB();
-  
+
   // Restaurer l'administrateur s'il existait
   if (adminUser) {
     await db.put('users', adminUser);
   }
-  
-  // Create default settings (but no products/categories)
-  const defaultReceiptCustomization: ReceiptCustomization = {
-    showOrderNumber: true,
-    showDate: true,
-    showTime: true,
-    showOrderType: true,
-    showPaymentMethod: true,
-    showCashier: true,
-    showProducts: true,
-    showProductPrices: true,
-    showModifiers: true,
-    showNotes: true,
-    showSubtotal: true,
-    showDiscount: true,
-    showTotal: true,
-    showItemCount: true,
-    showAmountReceived: true,
-    showChange: true,
-    showLogo: true,
-    logoSize: 50, // 50% de la largeur de l'imprimante (288px par défaut)
-    dateFormat: 'DD/MM/YYYY',
-    timeFormat: 'HH:mm',
-    headerAlignment: 'center',
-    restaurantNameStyle: 'uppercase',
-    productNameStyle: 'uppercase',
-    separatorStyle: 'dashes',
-    separatorChar: '─',
-    fontSize: 'normal',
-    fontFamily: 'monospace',
-    labelOrderNumber: 'COMMANDE N°',
-    labelDate: 'DATE',
-    labelTime: 'HEURE',
-    labelOrderType: 'TYPE',
-    labelPaymentMethod: 'PAIEMENT',
-    labelCashier: 'CAISSIER',
-    labelSubtotal: 'SOUS-TOTAL',
-    labelDiscount: 'REMISE',
-    labelTotal: 'TOTAL',
-    labelItemCount: 'ARTICLES',
-    labelAmountReceived: 'MONTANT REÇU',
-    labelChange: 'MONNAIE',
-    labelThankYou: 'MERCI DE VOTRE VISITE !',
-    labelKitchenTicket: 'TICKET CUISINE',
-    labelBonAppetit: 'Bon appétit !',
-    kitchenLabelItemCount: 'ARTICLES',
-    kitchenShowOrderNumber: true,
-    kitchenShowDate: true,
-    kitchenShowTime: true,
-    kitchenShowOrderType: true,
-    kitchenShowCashier: true,
-    kitchenShowProducts: true,
-    kitchenShowProductPrices: false,
-    kitchenShowModifiers: true,
-    kitchenShowNotes: true,
-  };
 
+  // Create default settings (but no products/categories)
   await db.put('settings', {
     id: 'main',
     language: 'fr-FR',
@@ -790,7 +379,7 @@ export async function resetDatabase(): Promise<void> {
     primaryColor: '#f97316',
     kioskMode: false,
   });
-  
+
   // Aucune imprimante par défaut - la base est vide (pas de produits, catégories, commandes, imprimantes, etc.)
 }
 
@@ -800,7 +389,7 @@ export async function resetDatabase(): Promise<void> {
  */
 export async function updateSupplements(): Promise<void> {
   const db = await getDB();
-  
+
   // Check if supplements category exists - if not, don't create anything
   // This function should only update supplements if the category already exists
   const supplementsCategory = await db.get('categories', 'supplements');
@@ -809,10 +398,10 @@ export async function updateSupplements(): Promise<void> {
     // User must create categories and products manually
     return;
   }
-  
+
   // Get all existing supplements to determine the highest sortOrder
   const existingSupplements = await db.getAllFromIndex('products', 'by-category', 'supplements');
-  const maxSortOrder = existingSupplements.length > 0 
+  const maxSortOrder = existingSupplements.length > 0
     ? Math.max(...existingSupplements.map(p => p.sortOrder || 0))
     : 0;
 
@@ -836,7 +425,7 @@ export async function updateSupplements(): Promise<void> {
   // Add or update each supplement
   for (const supplement of newSupplements) {
     const productId = `supplements-${supplement.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`;
-    
+
     // Check if product already exists
     const existingProduct = await db.get('products', productId);
     if (existingProduct) {
@@ -876,73 +465,6 @@ export async function updateSupplements(): Promise<void> {
 }
 
 async function seedDatabase(db: IDBPDatabase<POSDBSchema>): Promise<void> {
-  // Default receipt customization
-  const defaultReceiptCustomization: ReceiptCustomization = {
-    // Display options
-    showOrderNumber: true,
-    showDate: true,
-    showTime: true,
-    showOrderType: true,
-    showPaymentMethod: true,
-    showCashier: true,
-    showProducts: true,
-    showProductPrices: true,
-    showModifiers: true,
-    showNotes: true,
-    showSubtotal: true,
-    showDiscount: true,
-    showTotal: true,
-    showItemCount: true,
-    showAmountReceived: true,
-    showChange: true,
-    showLogo: true,
-    
-    // Formatting options
-    dateFormat: 'DD/MM/YYYY',
-    timeFormat: 'HH:mm',
-    
-    // Layout options
-    headerAlignment: 'center',
-    restaurantNameStyle: 'uppercase',
-    productNameStyle: 'uppercase',
-    separatorStyle: 'dashes',
-    separatorChar: '─',
-    
-    // Text options
-    fontSize: 'normal',
-    fontFamily: 'monospace',
-    
-    // Custom labels
-    labelOrderNumber: 'COMMANDE N°',
-    labelDate: 'DATE',
-    labelTime: 'HEURE',
-    labelOrderType: 'TYPE',
-    labelPaymentMethod: 'PAIEMENT',
-    labelCashier: 'CAISSIER',
-    labelSubtotal: 'SOUS-TOTAL',
-    labelDiscount: 'REMISE',
-    labelTotal: 'TOTAL',
-    labelItemCount: 'ARTICLES',
-    labelAmountReceived: 'MONTANT REÇU',
-    labelChange: 'MONNAIE',
-    labelThankYou: 'MERCI DE VOTRE VISITE !',
-    
-    // Kitchen ticket specific
-    labelKitchenTicket: 'TICKET CUISINE',
-    labelBonAppetit: 'Bon appétit !',
-    kitchenLabelItemCount: 'ARTICLES',
-    kitchenShowItemCount: true,
-    kitchenShowOrderNumber: true,
-    kitchenShowDate: true,
-    kitchenShowTime: true,
-    kitchenShowOrderType: true,
-    kitchenShowCashier: true,
-    kitchenShowProducts: true,
-    kitchenShowProductPrices: false,
-    kitchenShowModifiers: true,
-    kitchenShowNotes: true,
-  };
-
   // Default settings
   await db.put('settings', {
     id: 'main',
@@ -1005,7 +527,7 @@ async function seedDatabase(db: IDBPDatabase<POSDBSchema>): Promise<void> {
     sortOrder: number
   ) => {
     const productId = `${categoryId}-${name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`;
-    
+
     await db.put('products', {
       id: productId,
       categoryId,
