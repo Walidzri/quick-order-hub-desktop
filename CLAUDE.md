@@ -529,9 +529,9 @@ export const orderService = {
 > Mettre à jour cette section à chaque session de travail.
 > Ne jamais modifier cette section sans validation du développeur.
 
-**Dernière session :** Phase 0 terminée — 36 fichiers analysés, conclusions rédigées dans ce fichier et dans `rapport.md`
-**Phase active :** Phase 1 — Séparation Frontend / Backend
-**Prochaine tâche :** Étape 1.1 — Extraire les types partagés vers `packages/shared/types/`
+**Dernière session :** Phase 1 complète — toutes les étapes (1.1 → 1.5) + tests créés
+**Phase active :** Phase 1 — EN ATTENTE VALIDATION (checklist.md 83 items + api.curl.sh)
+**Prochaine tâche :** Valider manuellement `tests/phase1/checklist.md`, puis démarrer Phase 2
 **Blockers :** Aucun
 
 ---

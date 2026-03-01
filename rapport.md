@@ -1014,3 +1014,30 @@ En Phase 2, `backupService.start(config, dbPath)` remplacera ce useEffect.
 - `tsc -p tsconfig.server.json --noEmit` ✅ 0 erreur
 
 *Dernière mise à jour : Étape 1.5 terminée — backupService + syncService créés*
+
+---
+
+### Tests Phase 1
+
+**Fichiers créés :**
+
+| Fichier | Contenu |
+|---|---|
+| `tests/phase1/api.curl.sh` | 29 routes testées + `/api/health`. PASS = 200/201/501, FAIL = 404/500 inattendu |
+| `tests/phase1/checklist.md` | 83 items de vérification manuelle (démarrage, auth, caisse, paiement, impression, rapports, catalogue, settings, kiosk, inventaire, robustesse) |
+
+**Usage :**
+```bash
+# Lancer l'app Electron d'abord, puis :
+bash tests/phase1/api.curl.sh
+```
+
+**Statut Phase 1 — TOUS les items cochés :**
+- [x] Étape 1.1 — Extraire les types partagés ✅
+- [x] Étape 1.2 — Créer le serveur Fastify ✅
+- [x] Étape 1.3 — Créer la couche services frontend ✅
+- [x] Étape 1.4 — Éclater POSContext ✅
+- [x] Étape 1.5 — backupService + syncService ✅
+- [x] Tests Phase 1 — api.curl.sh + checklist.md ✅
+
+> ⚠️ Avant de passer à la Phase 2, exécuter `api.curl.sh` et valider `checklist.md` (83/83 items).
