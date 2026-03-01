@@ -25,9 +25,20 @@ export interface MigrationResult {
 
 /** Vérifie si la migration est nécessaire (SQLite côté serveur est-il vide ?). */
 export async function checkMigrationStatus(): Promise<MigrationStatus> {
-  const res = await fetch(`${API_BASE}/api/migrate/status`);
-  if (!res.ok) throw new Error(`Impossible de vérifier le statut : ${res.status}`);
-  return res.json();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(`${API_BASE}/api/migrate/status`, { signal: controller.signal });
+    if (!res.ok) throw new Error(`Erreur serveur : ${res.status}`);
+    return res.json();
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('Timeout : Fastify ne répond pas sur 127.0.0.1:3001');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**
