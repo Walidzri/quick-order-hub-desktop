@@ -63,8 +63,8 @@ req() {
       -d "$body" \
       "${BASE}${path}" 2>/dev/null)
   else
+    # Pas de Content-Type sans body — évite que Fastify tente de parser un JSON vide (→ 400)
     response=$(curl -s -w "\n%{http_code}" -X "$method" \
-      -H "Content-Type: application/json" \
       "${BASE}${path}" 2>/dev/null)
   fi
   # Dernière ligne = code HTTP, le reste = body

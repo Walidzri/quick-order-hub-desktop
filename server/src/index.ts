@@ -14,6 +14,16 @@ const fastify = Fastify({
   },
 });
 
+// Convertit les erreurs "non implémenté" (stubs Phase 2/3) en 501 au lieu de 500
+fastify.setErrorHandler((error, request, reply) => {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes('non implémenté')) {
+    return reply.status(501).send({ error: message });
+  }
+  fastify.log.error(error);
+  reply.status(500).send({ error: 'Internal Server Error' });
+});
+
 export async function startServer(port = 3001): Promise<typeof fastify> {
   await fastify.register(cors, { origin: true });
   await fastify.register(websocket);
@@ -28,7 +38,7 @@ export async function startServer(port = 3001): Promise<typeof fastify> {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
 
-  await fastify.listen({ port, host: '127.0.0.1' });
+  await fastify.listen({ port, host: '0.0.0.0' });
   console.log(`[FASTIFY] Server listening on http://127.0.0.1:${port}`);
 
   return fastify;
