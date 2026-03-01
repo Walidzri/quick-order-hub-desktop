@@ -99,6 +99,8 @@ export function SettingsScreen() {
   const [isCheckingDaemon, setIsCheckingDaemon] = useState(false);
   const [isOpeningDrawer, setIsOpeningDrawer] = useState(false);
   const [migrationStatus, setMigrationStatus] = useState<MigrationStatus | null>(null);
+  const [migrationStatusLoading, setMigrationStatusLoading] = useState(false);
+  const [migrationStatusError, setMigrationStatusError] = useState<string | null>(null);
   const [isMigrating, setIsMigrating] = useState(false);
   const [migrationProgress, setMigrationProgress] = useState<string | null>(null);
   const [migrationDone, setMigrationDone] = useState(false);
@@ -152,13 +154,22 @@ export function SettingsScreen() {
   }, []);
 
   // Check migration status when data section is active
+  const refreshMigrationStatus = useCallback(() => {
+    setMigrationStatusLoading(true);
+    setMigrationStatusError(null);
+    checkMigrationStatus()
+      .then((s) => { setMigrationStatus(s); setMigrationStatusLoading(false); })
+      .catch((err) => {
+        setMigrationStatusError(err instanceof Error ? err.message : String(err));
+        setMigrationStatusLoading(false);
+      });
+  }, []);
+
   useEffect(() => {
     if (activeSection === 'data' && !migrationDone) {
-      checkMigrationStatus()
-        .then(setMigrationStatus)
-        .catch(() => setMigrationStatus(null));
+      refreshMigrationStatus();
     }
-  }, [activeSection, migrationDone]);
+  }, [activeSection, migrationDone, refreshMigrationStatus]);
 
   // Check PrintDaemon C# status when data section is active
   useEffect(() => {
@@ -1710,13 +1721,26 @@ export function SettingsScreen() {
                       Les données sont maintenant gérées par le backend Fastify.
                     </p>
                   </div>
-                ) : migrationStatus === null ? (
-                  <p className="text-xs text-muted-foreground">Vérification du statut en cours…</p>
-                ) : !migrationStatus.needed ? (
+                ) : migrationStatusLoading ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                    Vérification du statut en cours…
+                  </div>
+                ) : migrationStatusError ? (
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg space-y-2">
+                    <p className="text-sm text-destructive font-medium">Impossible de contacter le backend Fastify.</p>
+                    <p className="text-xs text-muted-foreground break-all">{migrationStatusError}</p>
+                    <p className="text-xs text-muted-foreground">Assurez-vous que l'application tourne via Electron (pas le navigateur seul).</p>
+                    <Button variant="outline" size="sm" onClick={refreshMigrationStatus} className="w-full">
+                      <RefreshCw className="w-3 h-3 mr-2" />
+                      Réessayer
+                    </Button>
+                  </div>
+                ) : !migrationStatus?.needed ? (
                   <div className="p-3 bg-success/10 border border-success/20 rounded-lg">
                     <p className="text-sm text-success font-medium">✓ SQLite contient déjà des données — migration non nécessaire.</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Commandes : {migrationStatus.counts.orders} · Produits : {migrationStatus.counts.products} · Paramètres : {migrationStatus.counts.settings}
+                      Commandes : {migrationStatus?.counts.orders} · Produits : {migrationStatus?.counts.products} · Paramètres : {migrationStatus?.counts.settings}
                     </p>
                   </div>
                 ) : (
