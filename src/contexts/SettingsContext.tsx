@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { getDB, initializeDatabase, Settings } from '@/lib/database';
 import { createBackup } from '@/lib/database-sqlite';
 import { Language, Currency, LANGUAGES, translations } from '@/lib/i18n';
+import { settingsService } from '@/services/settingsService';
+import type { Settings } from '@shared/types';
 
 interface SettingsContextType {
   settings: Settings | null;
@@ -59,7 +60,7 @@ function applyTheme(s: Settings) {
   }
   const lang = s.language as Language;
   document.documentElement.dir = LANGUAGES[lang]?.dir || 'ltr';
-  const uiScale = s.uiScale ?? 1.0;
+  const uiScale = (s as any).uiScale ?? 1.0;
   document.documentElement.style.setProperty('--ui-scale', uiScale.toString());
 }
 
@@ -71,9 +72,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function init() {
       try {
-        await initializeDatabase();
-        const db = await getDB();
-        const loaded = await db.get('settings', 'main');
+        const loaded = await settingsService.get();
         if (loaded) {
           setSettings(loaded);
           setKioskMode(loaded.kioskMode);
@@ -90,9 +89,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const updateSettings = useCallback(async (updates: Partial<Settings>) => {
     if (!settings) return;
-    const newSettings = { ...settings, ...updates };
-    const db = await getDB();
-    await db.put('settings', newSettings);
+    const newSettings = await settingsService.update(updates);
     setSettings(newSettings);
     applyTheme(newSettings);
     if (updates.kioskMode !== undefined) setKioskMode(updates.kioskMode);
@@ -117,17 +114,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   }, [kioskMode, updateSettings]);
 
-  // Automatic backup — sera déplacé vers server/services/backupService en Phase 1.5
+  // Automatic backup — sera déplacé vers server/services/backupService
   useEffect(() => {
-    if (!settings?.backupEnabled || !settings.backupDirectory) return;
+    if (!settings?.backupEnabled || !(settings as any).backupDirectory) return;
 
-    const scheduleType = settings.backupScheduleType || 'interval';
+    const scheduleType = (settings as any).backupScheduleType || 'interval';
     let intervalId: NodeJS.Timeout | null = null;
     let checkIntervalId: NodeJS.Timeout | null = null;
 
     const performBackup = async () => {
       try {
-        const backupPath = await createBackup(settings.backupDirectory!);
+        const backupPath = await createBackup((settings as any).backupDirectory!);
         if (backupPath) console.log('Automatic backup completed:', backupPath);
         else console.error('Automatic backup failed');
       } catch (err) {
@@ -138,16 +135,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const getNextBackupTime = (): number => {
       const now = new Date();
       switch (scheduleType) {
-        case 'interval': return (settings.backupInterval || 60) * 60 * 1000;
+        case 'interval': return ((settings as any).backupInterval || 60) * 60 * 1000;
         case 'daily': {
-          const [h, m] = (settings.backupDailyTime || '02:00').split(':').map(Number);
+          const [h, m] = ((settings as any).backupDailyTime || '02:00').split(':').map(Number);
           const t = new Date(now); t.setHours(h, m, 0, 0);
           if (t <= now) t.setDate(t.getDate() + 1);
           return t.getTime() - now.getTime();
         }
         case 'weekly': {
-          const day = settings.backupWeeklyDay ?? 0;
-          const [h, m] = (settings.backupWeeklyTime || '02:00').split(':').map(Number);
+          const day = (settings as any).backupWeeklyDay ?? 0;
+          const [h, m] = ((settings as any).backupWeeklyTime || '02:00').split(':').map(Number);
           const t = new Date(now); t.setHours(h, m, 0, 0);
           let diff = (day - now.getDay() + 7) % 7;
           if (diff === 0 && t <= now) diff = 7;
@@ -155,8 +152,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           return t.getTime() - now.getTime();
         }
         case 'monthly': {
-          const dom = settings.backupMonthlyDay ?? 1;
-          const [h, m] = (settings.backupMonthlyTime || '02:00').split(':').map(Number);
+          const dom = (settings as any).backupMonthlyDay ?? 1;
+          const [h, m] = ((settings as any).backupMonthlyTime || '02:00').split(':').map(Number);
           const t = new Date(now); t.setHours(h, m, 0, 0); t.setDate(dom);
           if (t <= now) t.setMonth(t.getMonth() + 1);
           return t.getTime() - now.getTime();
@@ -173,22 +170,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     performBackup();
 
     if (scheduleType === 'interval') {
-      intervalId = setInterval(performBackup, (settings.backupInterval || 60) * 60 * 1000) as unknown as NodeJS.Timeout;
+      intervalId = setInterval(performBackup, ((settings as any).backupInterval || 60) * 60 * 1000) as unknown as NodeJS.Timeout;
     } else {
       scheduleNextBackup();
       checkIntervalId = setInterval(() => {
         const now = new Date();
         let should = false;
         if (scheduleType === 'daily') {
-          const [h, m] = (settings.backupDailyTime || '02:00').split(':').map(Number);
+          const [h, m] = ((settings as any).backupDailyTime || '02:00').split(':').map(Number);
           should = now.getHours() === h && now.getMinutes() === m;
         } else if (scheduleType === 'weekly') {
-          const day = settings.backupWeeklyDay ?? 0;
-          const [h, m] = (settings.backupWeeklyTime || '02:00').split(':').map(Number);
+          const day = (settings as any).backupWeeklyDay ?? 0;
+          const [h, m] = ((settings as any).backupWeeklyTime || '02:00').split(':').map(Number);
           should = now.getDay() === day && now.getHours() === h && now.getMinutes() === m;
         } else if (scheduleType === 'monthly') {
-          const dom = settings.backupMonthlyDay ?? 1;
-          const [h, m] = (settings.backupMonthlyTime || '02:00').split(':').map(Number);
+          const dom = (settings as any).backupMonthlyDay ?? 1;
+          const [h, m] = ((settings as any).backupMonthlyTime || '02:00').split(':').map(Number);
           should = now.getDate() === dom && now.getHours() === h && now.getMinutes() === m;
         }
         if (should) performBackup();
@@ -200,9 +197,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       if (checkIntervalId) clearInterval(checkIntervalId);
     };
   }, [
-    settings?.backupEnabled, settings?.backupDirectory, settings?.backupScheduleType,
-    settings?.backupInterval, settings?.backupDailyTime, settings?.backupWeeklyDay,
-    settings?.backupWeeklyTime, settings?.backupMonthlyDay, settings?.backupMonthlyTime,
+    settings?.backupEnabled,
+    (settings as any)?.backupDirectory, (settings as any)?.backupScheduleType,
+    (settings as any)?.backupInterval, (settings as any)?.backupDailyTime,
+    (settings as any)?.backupWeeklyDay, (settings as any)?.backupWeeklyTime,
+    (settings as any)?.backupMonthlyDay, (settings as any)?.backupMonthlyTime,
   ]);
 
   return (

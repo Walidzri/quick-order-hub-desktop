@@ -195,6 +195,19 @@ export const productService = {
     return rows.map(rowToVariant);
   },
 
+  /** Remplace toutes les variantes d'un produit. */
+  replaceVariants(productId: string, variants: ProductVariant[]): ProductVariant[] {
+    const db = getDatabase();
+    db.prepare('DELETE FROM product_variants WHERE productId = ?').run(productId);
+    for (const v of variants) {
+      db.prepare(`
+        INSERT INTO product_variants (id, productId, size, price)
+        VALUES (?, ?, ?, ?)
+      `).run(v.id, productId, v.size, v.price);
+    }
+    return productService.getVariantsByProduct(productId);
+  },
+
   // ── Modifier groups & options ─────────────────────────────────────────────
 
   getModifierGroups(): ModifierGroup[] {

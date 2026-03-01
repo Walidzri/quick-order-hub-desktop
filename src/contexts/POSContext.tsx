@@ -13,6 +13,8 @@ import { useCatalog, CatalogProvider } from './CatalogContext';
 import { usePrinter, PrinterProvider } from './PrinterContext';
 import { useCart, CartProvider } from './CartContext';
 import { useOrder, OrderProvider } from './OrderContext';
+import { printerService } from '@/services/printerService';
+import type { Order, Printer } from '@shared/types';
 
 export type { OrderDraft } from './CartContext';
 
@@ -83,6 +85,10 @@ export function usePOS() {
     removePromo: cart.removePromo,
     generateOrderNumber: cart.generateOrderNumber,
     createOrder: cart.createOrder,
+
+    // Print helpers (délèguent à printerService)
+    printKitchenTicket: (o: Order, p: Printer) => printerService.printKitchenTicket(o, p),
+    printReceipt:       (o: Order, p: Printer) => printerService.printReceipt(o, p),
 
     // Orders
     orders: order.orders,

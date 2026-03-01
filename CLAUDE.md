@@ -529,10 +529,10 @@ export const orderService = {
 > Mettre à jour cette section à chaque session de travail.
 > Ne jamais modifier cette section sans validation du développeur.
 
-**Dernière session :** Phase 2.1 + 2.2 validées — migration IDB→SQLite testée et fonctionnelle
-**Phase active :** Phase 2 — Étape 2.3 — Brancher SQLite dans les services Fastify
-**Prochaine tâche :** Implémenter le vrai CRUD SQLite dans server/src/services/ (orders, products, categories, settings, printers)
-**Blockers :** Aucun
+**Dernière session :** Phase 2.3 terminée — migration frontend complète (0 getDB() dans les contextes), shim usePOS() corrigé
+**Phase active :** Phase 2 — Étape 2.4 — Nettoyage (supprimer database.ts, database-sqlite.ts, migrate-to-sqlite.ts)
+**Prochaine tâche :** Tester l'app, puis supprimer les fichiers IDB obsolètes
+**Blockers :** Aucun — TypeScript backend 0 erreur, TypeScript des contextes/services 0 erreur
 
 ---
 

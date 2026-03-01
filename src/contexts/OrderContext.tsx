@@ -1,15 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { getDB } from '@/lib/database';
-import type { Order, OrderStatus, PaymentMethod, PrintJob } from '@/lib/database';
+import { orderService } from '@/services/orderService';
+import type { Order, OrderStatus, PaymentMethod } from '@shared/types';
 import { useCart } from './CartContext';
-
-function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = (Math.random() * 16) | 0;
-    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-  });
-}
 
 interface OrderContextType {
   orders: Order[];
@@ -38,126 +30,60 @@ export function OrderProvider({ children }: { children: ReactNode }) {
   const { removeEmptyDraftAfterPayment } = useCart();
 
   const loadOrders = useCallback(async (startDate?: Date, endDate?: Date) => {
-    const db = await getDB();
-    let all = await db.getAll('orders');
+    let all: Order[];
     if (startDate || endDate) {
-      all = all.filter(o => {
-        const d = new Date(o.createdAt);
-        if (startDate && d < startDate) return false;
-        if (endDate && d > endDate) return false;
-        return true;
-      });
+      all = await orderService.getByDateRange(
+        startDate ?? new Date(0),
+        endDate   ?? new Date()
+      );
+    } else {
+      all = await orderService.getAll();
     }
     setOrders(all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
   }, []);
 
   const sendToKitchen = useCallback(async (orderId: string) => {
-    const db = await getDB();
-    const order = await db.get('orders', orderId);
-    if (!order) return;
-    const now = new Date();
-    order.status = 'sentToKitchen';
-    order.sentToKitchenAt = now;
-    order.updatedAt = now;
-    await db.put('orders', order);
-    const printJob: PrintJob = {
-      id: generateUUID(),
-      orderId: order.id,
-      printerRole: 'kitchen',
-      status: 'pending',
-      createdAt: now,
-    };
-    await db.put('printJobs', printJob);
+    await orderService.sendToKitchen(orderId);
   }, []);
 
   const markAsPaid = useCallback(async (orderId: string, paymentMethod: PaymentMethod): Promise<Order> => {
-    const db = await getDB();
-    const order = await db.get('orders', orderId);
-    if (!order) throw new Error('Order not found');
-    const now = new Date();
-    order.status = 'paid';
-    order.paymentMethod = paymentMethod;
-    order.paidAt = now;
-    order.updatedAt = now;
-    await db.put('orders', order);
-    const printJob: PrintJob = {
-      id: generateUUID(),
-      orderId: order.id,
-      printerRole: 'cashier',
-      status: 'pending',
-      createdAt: now,
-    };
-    await db.put('printJobs', printJob);
+    const order = await orderService.markAsPaid(orderId, paymentMethod);
     removeEmptyDraftAfterPayment();
     await loadOrders();
     return order;
   }, [loadOrders, removeEmptyDraftAfterPayment]);
 
   const cancelOrder = useCallback(async (orderId: string) => {
-    const db = await getDB();
-    const order = await db.get('orders', orderId);
-    if (!order) return;
-    order.status = 'cancelled';
-    order.updatedAt = new Date();
-    await db.put('orders', order);
+    await orderService.updateStatus(orderId, 'cancelled');
     await loadOrders();
   }, [loadOrders]);
 
   const updateOrderStatus = useCallback(async (orderId: string, status: OrderStatus) => {
-    const db = await getDB();
-    const order = await db.get('orders', orderId);
-    if (!order) return;
-    order.status = status;
-    order.updatedAt = new Date();
-    await db.put('orders', order);
+    await orderService.updateStatus(orderId, status);
     await loadOrders();
   }, [loadOrders]);
 
   const deleteOrder = useCallback(async (orderId: string) => {
-    const db = await getDB();
-    await db.delete('orders', orderId);
+    await orderService.delete(orderId);
     await loadOrders();
   }, [loadOrders]);
 
   const deleteOrders = useCallback(async (orderIds: string[]) => {
-    const db = await getDB();
-    for (const id of orderIds) await db.delete('orders', id);
+    await orderService.deleteMultiple(orderIds);
     await loadOrders();
   }, [loadOrders]);
 
   const deleteAllOrders = useCallback(async () => {
-    const db = await getDB();
-    const all = await db.getAll('orders');
-    for (const o of all) await db.delete('orders', o.id);
+    await orderService.deleteAll();
     await loadOrders();
   }, [loadOrders]);
 
   const loadOrdersByDateRange = useCallback(async (startDate: Date, endDate: Date): Promise<Order[]> => {
-    const db = await getDB();
-    if ('getOrdersByDateRange' in db) {
-      return await (db as any).getOrdersByDateRange(startDate, endDate);
-    }
-    const all = await db.getAll('orders') as Order[];
-    return all.filter(o => {
-      const d = new Date(o.createdAt);
-      return d >= startDate && d <= endDate;
-    }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return orderService.getByDateRange(startDate, endDate);
   }, []);
 
   const loadOrdersPaginated = useCallback(async (page: number, pageSize: number): Promise<{ orders: Order[]; total: number; totalPages: number }> => {
-    const db = await getDB();
-    const offset = (page - 1) * pageSize;
-    if ('getOrdersPaginated' in db) {
-      const result = await (db as any).getOrdersPaginated(pageSize, offset);
-      return { orders: result.orders, total: result.total, totalPages: Math.ceil(result.total / pageSize) };
-    }
-    const all = await db.getAll('orders') as Order[];
-    const sorted = all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return {
-      orders: sorted.slice(offset, offset + pageSize),
-      total: all.length,
-      totalPages: Math.ceil(all.length / pageSize),
-    };
+    return orderService.getPaginated(page, pageSize);
   }, []);
 
   return (

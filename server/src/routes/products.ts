@@ -34,6 +34,13 @@ export async function productsRoutes(fastify: FastifyInstance) {
     return productService.getVariantsByProduct(id);
   });
 
+  // Remplace toutes les variantes d'un produit
+  fastify.put('/api/products/:id/variants', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const variants = request.body as any[];
+    return productService.replaceVariants(id, variants ?? []);
+  });
+
   fastify.get('/api/modifier-groups', async (request, reply) => {
     return productService.getModifierGroups();
   });

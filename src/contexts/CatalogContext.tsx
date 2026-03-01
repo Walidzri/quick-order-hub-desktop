@@ -1,11 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import {
-  getDB,
-  exportProductsTemplate as dbExportTemplate,
-  importProductsTemplate as dbImportTemplate,
-  resetDatabase as dbReset,
-} from '@/lib/database';
-import type { Category, Product, ProductVariant, Promotion } from '@/lib/database';
+import { productService } from '@/services/productService';
+import { promotionService } from '@/services/promotionService';
+import { api } from '@/services/api';
+import type { Category, Product, ProductVariant, Promotion } from '@shared/types';
 
 interface CatalogContextType {
   categories: Category[];
@@ -57,15 +54,22 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function init() {
       try {
-        const db = await getDB();
-        const cats = await db.getAll('categories');
+        const [cats, prods, promos] = await Promise.all([
+          productService.getAllCategories(),
+          productService.getAll(),
+          promotionService.getAll(),
+        ]);
         setCategories(cats.sort((a, b) => a.sortOrder - b.sortOrder));
-        const prods = await db.getAll('products');
         setProducts(prods.sort((a, b) => a.sortOrder - b.sortOrder));
-        const vars = await db.getAll('productVariants');
-        setVariants(vars);
-        const promos = await db.getAll('promotions');
         setPromotions(promos);
+
+        // Charger les variantes pour tous les produits
+        const allVariants: ProductVariant[] = [];
+        await Promise.all(prods.map(async p => {
+          const vars = await productService.getVariants(p.id);
+          allVariants.push(...vars);
+        }));
+        setVariants(allVariants);
       } catch (err) {
         console.error('[CatalogContext] init error:', err);
       }
@@ -81,103 +85,102 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     variants.filter(v => v.productId === productId),
   [variants]);
 
-  const saveProduct = useCallback(async (product: Product, productVariants: ProductVariant[] = []) => {
-    const db = await getDB();
-    await db.put('products', { ...product, available: product.available !== false });
-    if (productVariants.length > 0) {
-      const existing = await db.getAllFromIndex('productVariants', 'by-product', product.id);
-      for (const v of existing) await db.delete('productVariants', v.id);
-      for (const v of productVariants) await db.put('productVariants', v);
-    }
-    const prods = await db.getAll('products');
+  const loadProducts = useCallback(async () => {
+    const prods = await productService.getAll();
     setProducts(prods.sort((a, b) => a.sortOrder - b.sortOrder));
-    const vars = await db.getAll('productVariants');
-    setVariants(vars);
+    const allVariants: ProductVariant[] = [];
+    await Promise.all(prods.map(async p => {
+      const vars = await productService.getVariants(p.id);
+      allVariants.push(...vars);
+    }));
+    setVariants(allVariants);
   }, []);
+
+  const saveProduct = useCallback(async (product: Product, productVariants: ProductVariant[] = []) => {
+    const existing = products.find(p => p.id === product.id);
+    if (existing) {
+      await productService.update(product.id, product);
+    } else {
+      await productService.create(product);
+    }
+    if (productVariants.length > 0) {
+      await productService.replaceVariants(product.id, productVariants);
+    }
+    await loadProducts();
+  }, [products, loadProducts]);
 
   const deleteProduct = useCallback(async (productId: string) => {
     try {
-      const db = await getDB();
-      const pvs = await db.getAllFromIndex('productVariants', 'by-product', productId);
-      for (const v of pvs) await db.delete('productVariants', v.id);
-      await db.delete('products', productId);
-      const prods = await db.getAll('products');
-      setProducts(prods.sort((a, b) => a.sortOrder - b.sortOrder));
-      const vars = await db.getAll('productVariants');
-      setVariants(vars);
+      await productService.delete(productId);
+      await loadProducts();
     } catch (err) {
       console.error('Error deleting product:', err);
       throw err;
     }
-  }, []);
+  }, [loadProducts]);
 
-  const loadProducts = useCallback(async () => {
-    const db = await getDB();
-    const prods = await db.getAll('products');
-    setProducts(prods.sort((a, b) => a.sortOrder - b.sortOrder));
-    const vars = await db.getAll('productVariants');
-    setVariants(vars);
-  }, []);
-
-  const saveCategory = useCallback(async (category: Category) => {
-    const db = await getDB();
-    await db.put('categories', category);
-    const cats = await db.getAll('categories');
+  const loadCategories = useCallback(async () => {
+    const cats = await productService.getAllCategories();
     setCategories(cats.sort((a, b) => a.sortOrder - b.sortOrder));
   }, []);
 
+  const saveCategory = useCallback(async (category: Category) => {
+    const existing = categories.find(c => c.id === category.id);
+    if (existing) {
+      await productService.updateCategory(category.id, category);
+    } else {
+      await productService.createCategory(category);
+    }
+    await loadCategories();
+  }, [categories, loadCategories]);
+
   const deleteCategory = useCallback(async (categoryId: string) => {
     try {
-      const db = await getDB();
-      const allProds = await db.getAll('products');
-      const inCat = allProds.filter(p => p.categoryId === categoryId);
-      if (inCat.length > 0) {
-        throw new Error(
-          `Impossible de supprimer cette catégorie car elle contient ${inCat.length} produit(s). Veuillez d'abord supprimer ou déplacer les produits.`
-        );
-      }
-      await db.delete('categories', categoryId);
-      const cats = await db.getAll('categories');
-      setCategories(cats.sort((a, b) => a.sortOrder - b.sortOrder));
+      await productService.deleteCategory(categoryId);
+      await loadCategories();
     } catch (err) {
       console.error('Error deleting category:', err);
       throw err;
     }
-  }, []);
-
-  const loadCategories = useCallback(async () => {
-    const db = await getDB();
-    const cats = await db.getAll('categories');
-    setCategories(cats.sort((a, b) => a.sortOrder - b.sortOrder));
-  }, []);
+  }, [loadCategories]);
 
   const loadPromotions = useCallback(async () => {
-    const db = await getDB();
-    setPromotions(await db.getAll('promotions'));
+    setPromotions(await promotionService.getAll());
   }, []);
 
   const savePromotion = useCallback(async (promo: Promotion) => {
-    const db = await getDB();
-    await db.put('promotions', promo);
+    const existing = promotions.find(p => p.id === promo.id);
+    if (existing) {
+      await promotionService.update(promo.id, promo);
+    } else {
+      await promotionService.create(promo);
+    }
     await loadPromotions();
-  }, [loadPromotions]);
+  }, [promotions, loadPromotions]);
 
   const deletePromotion = useCallback(async (id: string) => {
-    const db = await getDB();
-    await db.delete('promotions', id);
+    await promotionService.delete(id);
     await loadPromotions();
   }, [loadPromotions]);
 
-  const exportTemplate = useCallback(async () => dbExportTemplate(), []);
+  const exportTemplate = useCallback(async () => {
+    return api.get<{
+      categories: any[]; products: any[]; productVariants: any[];
+      modifierGroups: any[]; modifierOptions: any[];
+    }>('/api/products/export-template');
+  }, []);
 
-  const importTemplate = useCallback(async (data: Parameters<typeof dbImportTemplate>[0]) => {
-    await dbImportTemplate(data);
+  const importTemplate = useCallback(async (data: {
+    categories?: any[]; products?: any[]; productVariants?: any[];
+    modifierGroups?: any[]; modifierOptions?: any[];
+  }) => {
+    await api.post('/api/products/import-template', data);
     await loadCategories();
     await loadProducts();
   }, [loadCategories, loadProducts]);
 
   const resetDb = useCallback(async () => {
-    await dbReset();
+    await api.post('/api/admin/reset-database', {});
     window.location.reload();
   }, []);
 

@@ -21,6 +21,9 @@ export const productService = {
   getVariants: (productId: string) =>
     api.get<ProductVariant[]>(`/api/products/${productId}/variants`),
 
+  replaceVariants: (productId: string, variants: ProductVariant[]) =>
+    api.put<ProductVariant[]>(`/api/products/${productId}/variants`, variants),
+
   // Categories
   getAllCategories: () =>
     api.get<Category[]>('/api/categories'),

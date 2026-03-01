@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { useSettings } from './SettingsContext';
-import { getDB } from '@/lib/database';
-import type { OrderLine, Promotion, OrderType, Order } from '@/lib/database';
+import { orderService } from '@/services/orderService';
+import { promotionService } from '@/services/promotionService';
+import type { OrderLine, Promotion, OrderType, Order } from '@shared/types';
 
 function generateUUID(): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -202,8 +203,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [activeOrderId]);
 
   const applyPromoCode = useCallback(async (code: string): Promise<{ success: boolean; message: string }> => {
-    const db = await getDB();
-    const promos = await db.getAll('promotions');
+    const promos = await promotionService.getAll();
     const promo = promos.find(p => p.code.toUpperCase() === code.toUpperCase());
 
     if (!promo || !promo.active) {
@@ -227,28 +227,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setOrderDrafts(prev => prev.map(d => d.id === activeOrderId ? { ...d, appliedPromo: null } : d));
   }, [activeOrderId]);
 
+  // Le numéro de commande est généré côté serveur lors du create
   const generateOrderNumber = useCallback(async (): Promise<string> => {
-    const db = await getDB();
-    const counterId = 'counter-global';
-    const today = new Date().toISOString().split('T')[0];
-    let counter = await db.get('numberingCounters', counterId);
-    if (!counter) counter = { id: counterId, date: today, counter: 0 };
-    if (counter.date !== today) { counter.date = today; counter.counter = 0; }
-    counter.counter += 1;
-    await db.put('numberingCounters', counter);
-    return `#${counter.counter.toString().padStart(3, '0')}`;
+    return '';
   }, []);
 
   const createOrder = useCallback(async (): Promise<Order> => {
-    const orderNumber = await generateOrderNumber();
-    const now = new Date();
     const draft = orderDrafts.find(d => d.id === activeOrderId) || orderDrafts[0];
     const lines = draft?.cart || [];
     const draftPromo = draft?.appliedPromo || null;
 
-    const order: Order = {
-      id: generateUUID(),
-      orderNumber,
+    const order = await orderService.create({
       status: 'draft',
       type: draft?.type || 'dine-in',
       lines: [...lines],
@@ -258,17 +247,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
       promoName: draftPromo?.name,
       total,
       createdBy: user?.id,
-      createdAt: now,
-      updatedAt: now,
       ...(draft?.type === 'delivery' && {
         deliveryAddress: draft.deliveryAddress,
         deliveryPhone: draft.deliveryPhone,
         deliveryCustomerName: draft.deliveryCustomerName,
       }),
-    };
-
-    const db = await getDB();
-    await db.put('orders', order);
+    });
 
     setOrderDrafts(prev => {
       const next = prev.filter(d => d.id !== draft?.id);
@@ -280,7 +264,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     setCurrentOrder(order);
     return order;
-  }, [orderDrafts, activeOrderId, subtotal, discount, total, generateOrderNumber, user]);
+  }, [orderDrafts, activeOrderId, subtotal, discount, total, user]);
 
   const removeEmptyDraftAfterPayment = useCallback(() => {
     setOrderDrafts(prev => {

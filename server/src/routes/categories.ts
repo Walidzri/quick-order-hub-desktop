@@ -25,7 +25,13 @@ export async function categoriesRoutes(fastify: FastifyInstance) {
 
   fastify.delete('/api/categories/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    await productService.deleteCategory(id);
+    const prods = productService.getAllProducts().filter(p => p.categoryId === id);
+    if (prods.length > 0) {
+      return reply.status(409).send({
+        error: `Impossible de supprimer cette catégorie car elle contient ${prods.length} produit(s). Veuillez d'abord supprimer ou déplacer les produits.`,
+      });
+    }
+    productService.deleteCategory(id);
     return reply.status(204).send();
   });
 }

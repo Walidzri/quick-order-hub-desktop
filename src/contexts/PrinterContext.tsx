@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { getDB } from '@/lib/database';
-import type { Printer } from '@/lib/database';
+import { settingsService } from '@/services/settingsService';
+import type { Printer } from '@shared/types';
 
 interface PrinterContextType {
   printers: Printer[];
@@ -20,27 +20,21 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
   const [printers, setPrinters] = useState<Printer[]>([]);
 
   useEffect(() => {
-    async function init() {
-      try {
-        const db = await getDB();
-        setPrinters(await db.getAll('printers'));
-      } catch (err) {
-        console.error('[PrinterContext] init error:', err);
-      }
-    }
-    init();
+    settingsService.getPrinters()
+      .then(setPrinters)
+      .catch(err => console.error('[PrinterContext] init error:', err));
   }, []);
 
   const updatePrinter = useCallback(async (printer: Printer) => {
-    const db = await getDB();
-    await db.put('printers', printer);
-    setPrinters(await db.getAll('printers'));
+    await settingsService.upsertPrinter(printer);
+    const updated = await settingsService.getPrinters();
+    setPrinters(updated);
   }, []);
 
   const deletePrinter = useCallback(async (id: string) => {
-    const db = await getDB();
-    await db.delete('printers', id);
-    setPrinters(await db.getAll('printers'));
+    await settingsService.deletePrinter(id);
+    const updated = await settingsService.getPrinters();
+    setPrinters(updated);
   }, []);
 
   return (
