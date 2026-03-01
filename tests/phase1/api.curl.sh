@@ -7,7 +7,7 @@
 #   bash tests/phase1/api.curl.sh
 #
 # Prérequis :
-#   - L'app Electron est lancée (le serveur Fastify tourne sur http://10.8.0.2:3001)
+#   - L'app Electron est lancée (le serveur Fastify tourne sur http://10.8.0.2:3002)
 #   - curl et jq sont installés
 #     Windows : scoop install curl jq  |  choco install curl jq
 #
@@ -15,7 +15,7 @@
 # Le test vérifie que la route répond correctement (pas de 404/500 inattendu).
 # =============================================================================
 
-BASE="http://10.8.0.2:3001"
+BASE="http://10.8.0.2:3002"
 PASS=0
 FAIL=0
 SKIP=0
@@ -80,7 +80,7 @@ parse_body()   { echo "$1" | head -n -1; }
 
 echo ""
 echo -e "${CYAN}============================================================${RESET}"
-echo -e "${CYAN}  Tests API Phase 1 — Fastify http://10.8.0.2:3001         ${RESET}"
+echo -e "${CYAN}  Tests API Phase 1 — Fastify http://10.8.0.2:3002         ${RESET}"
 echo -e "${CYAN}============================================================${RESET}"
 echo ""
 

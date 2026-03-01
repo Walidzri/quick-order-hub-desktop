@@ -10,7 +10,7 @@
 
 import { getDB } from '@/lib/database';
 
-const API_BASE = 'http://127.0.0.1:3001';
+const API_BASE = 'http://127.0.0.1:3002';
 
 export interface MigrationStatus {
   needed: boolean;
@@ -33,7 +33,7 @@ export async function checkMigrationStatus(): Promise<MigrationStatus> {
     return res.json();
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error('Timeout : Fastify ne répond pas sur 127.0.0.1:3001');
+      throw new Error('Timeout : Fastify ne répond pas sur 127.0.0.1:3002');
     }
     throw err;
   } finally {

@@ -26,7 +26,7 @@ fastify.setErrorHandler((error, request, reply) => {
   reply.status(500).send({ error: 'Internal Server Error' });
 });
 
-export async function startServer(port = 3001, dbPath?: string): Promise<typeof fastify> {
+export async function startServer(port = 3002, dbPath?: string): Promise<typeof fastify> {
   // Initialiser SQLite avant les routes
   initDatabase(dbPath ?? getDefaultDbPath());
   await fastify.register(cors, { origin: true });

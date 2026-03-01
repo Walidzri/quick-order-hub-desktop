@@ -353,7 +353,7 @@ app.on('ready', async () => {
   try {
     const dbPath = join(app.getPath('userData'), 'pos.db');
     console.log('[MAIN] SQLite path:', dbPath);
-    await startServer(3001, dbPath);
+    await startServer(3002, dbPath);
   } catch (error) {
     console.error('[MAIN] Failed to start Fastify server:', error);
   }
