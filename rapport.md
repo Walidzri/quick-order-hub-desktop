@@ -978,6 +978,39 @@ SettingsProvider > CatalogProvider > PrinterProvider > CartProvider > OrderProvi
 - [x] Étape 1.2 — Créer le serveur Fastify ✅
 - [x] Étape 1.3 — Créer la couche services frontend ✅
 - [x] Étape 1.4 — Éclater POSContext ✅
-- [ ] Étape 1.5 — Déplacer la logique métier vers server/services
+- [x] Étape 1.5 — Déplacer la logique métier vers server/services ✅
 
 *Dernière mise à jour : Étape 1.4 terminée — POSContext éclaté en 5 contextes*
+
+---
+
+### Étape 1.5 — Logique métier vers server/services
+
+**Contexte :** En Phase 1, la source de données reste IndexedDB (browser-only, inaccessible depuis le main process Node.js). Les services serveur sont donc des stubs avec les interfaces complètes, activables en Phase 2 quand SQLite sera en place.
+
+**Fichiers créés :**
+
+| Fichier | Rôle |
+|---|---|
+| `server/src/services/backupService.ts` | Scheduling complet (interval/daily/weekly/monthly), copie fichier SQLite via `fs.copyFile`. **Stub Phase 1** : active uniquement quand `dbPath` est fourni (Phase 2). |
+| `server/src/services/syncService.ts` | Interface vide — synchronisation cloud (Phase 3). |
+
+**Déjà existants (stubs créés en Étape 1.2) :**
+
+| Fichier | Statut |
+|---|---|
+| `server/src/services/orderService.ts` | Stub — attendra SQLite (Phase 2) |
+| `server/src/services/productService.ts` | Stub — attendra SQLite (Phase 2) |
+| `server/src/services/settingsService.ts` | Stub — attendra SQLite (Phase 2) |
+| `server/src/services/printService.ts` | Stub — délègue au PrintDaemon C# |
+
+**Décision technique :**
+Le backup useEffect dans `SettingsContext.tsx` est conservé jusqu'à la Phase 2.
+Raison : `createBackup()` utilise `window.electronAPI` (Renderer uniquement).
+En Phase 2, `backupService.start(config, dbPath)` remplacera ce useEffect.
+
+**Résultat :**
+- `tsc --noEmit` ✅ 0 erreur
+- `tsc -p tsconfig.server.json --noEmit` ✅ 0 erreur
+
+*Dernière mise à jour : Étape 1.5 terminée — backupService + syncService créés*
