@@ -14,6 +14,7 @@ const fastify = Fastify({
   logger: {
     level: 'info',
   },
+  bodyLimit: 100 * 1024 * 1024, // 100 MB — migration IndexedDB peut être volumineuse
 });
 
 // Convertit les erreurs "non implémenté" (stubs Phase 2/3) en 501 au lieu de 500
