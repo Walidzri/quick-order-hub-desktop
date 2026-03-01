@@ -17,6 +17,7 @@ const electronExternals = [
   '@fastify/websocket',
   '@fastify/websocket/types',
   'ws',
+  'better-sqlite3',
 ];
 
 // Read version from package.json

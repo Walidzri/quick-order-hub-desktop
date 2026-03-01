@@ -332,8 +332,8 @@ Cette section peut amender le plan d'action si l'analyse révèle des surprises.
 
 ---
 
-### 🔄 PHASE 1 — Séparation Frontend / Backend
-**Statut : EN COURS**
+### ✅ PHASE 1 — Séparation Frontend / Backend
+**Statut : VALIDÉE** — 30/30 tests curl PASS, checklist UI 83/83 items validés
 **Objectif : Créer le backend Fastify et faire fetcher React dessus. Ne pas encore migrer la DB.**
 
 #### Étape 1.1 — Extraire les types partagés
@@ -388,8 +388,8 @@ Cette section peut amender le plan d'action si l'analyse révèle des surprises.
 
 ---
 
-### ⏳ PHASE 2 — Migration IndexedDB → SQLite
-**Statut : EN ATTENTE (démarrer seulement quand Phase 1 est 100% validée)**
+### 🔄 PHASE 2 — Migration IndexedDB → SQLite
+**Statut : EN COURS**
 
 #### Étape 2.1 — Setup SQLite
 - [ ] Installer `better-sqlite3` + types
@@ -529,9 +529,9 @@ export const orderService = {
 > Mettre à jour cette section à chaque session de travail.
 > Ne jamais modifier cette section sans validation du développeur.
 
-**Dernière session :** Phase 1 complète — toutes les étapes (1.1 → 1.5) + tests créés
-**Phase active :** Phase 1 — EN ATTENTE VALIDATION (checklist.md 83 items + api.curl.sh)
-**Prochaine tâche :** Valider manuellement `tests/phase1/checklist.md`, puis démarrer Phase 2
+**Dernière session :** Phase 1 validée (30/30 tests curl + checklist 83/83) — démarrage Phase 2
+**Phase active :** Phase 2 — Migration IndexedDB → SQLite
+**Prochaine tâche :** Étape 2.1 — Setup SQLite (better-sqlite3, connection, schema, migrations)
 **Blockers :** Aucun
 
 ---

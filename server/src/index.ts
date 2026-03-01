@@ -7,6 +7,7 @@ import { productsRoutes } from './routes/products';
 import { categoriesRoutes } from './routes/categories';
 import { settingsRoutes } from './routes/settings';
 import { printRoutes } from './routes/print';
+import { initDatabase, closeDatabase, getDefaultDbPath } from './db/connection';
 
 const fastify = Fastify({
   logger: {
@@ -24,7 +25,9 @@ fastify.setErrorHandler((error, request, reply) => {
   reply.status(500).send({ error: 'Internal Server Error' });
 });
 
-export async function startServer(port = 3001): Promise<typeof fastify> {
+export async function startServer(port = 3001, dbPath?: string): Promise<typeof fastify> {
+  // Initialiser SQLite avant les routes
+  initDatabase(dbPath ?? getDefaultDbPath());
   await fastify.register(cors, { origin: true });
   await fastify.register(websocket);
 
@@ -59,5 +62,6 @@ export async function startServer(port = 3001): Promise<typeof fastify> {
 
 export async function stopServer(): Promise<void> {
   await fastify.close();
+  closeDatabase();
   console.log('[FASTIFY] Server stopped');
 }
