@@ -1,33 +1,178 @@
-import type { Order, OrderStatus } from '@shared/types';
+import { randomUUID } from 'crypto';
+import type { Order, OrderStatus, OrderLine } from '@shared/types';
+import { getDatabase } from '../db/connection';
 
-// Stub — sera remplacé par SQLite en Phase 2
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+function toDate(val: unknown): Date {
+  if (!val) return new Date();
+  if (val instanceof Date) return val;
+  return new Date(val as string);
+}
+
+function toDateOrNull(val: unknown): Date | undefined {
+  if (!val) return undefined;
+  return new Date(val as string);
+}
+
+function rowToOrder(row: Record<string, unknown>): Order {
+  return {
+    id:                   row['id']          as string,
+    orderNumber:          row['orderNumber'] as string,
+    status:               row['status']      as OrderStatus,
+    type:                 row['type']        as Order['type'],
+    lines:                JSON.parse(row['lines'] as string ?? '[]') as OrderLine[],
+    subtotal:             row['subtotal']    as number,
+    discount:             row['discount']    as number,
+    total:                row['total']       as number,
+    paymentMethod:        (row['paymentMethod']  as Order['paymentMethod'] | null) ?? undefined,
+    promoCode:            (row['promoCode']       as string | null) ?? undefined,
+    promoName:            (row['promoName']       as string | null) ?? undefined,
+    createdBy:            (row['createdBy']       as string | null) ?? undefined,
+    createdAt:            toDate(row['createdAt']),
+    updatedAt:            toDate(row['updatedAt']),
+    paidAt:               toDateOrNull(row['paidAt']),
+    sentToKitchenAt:      toDateOrNull(row['sentToKitchenAt']),
+    deliveryAddress:      (row['deliveryAddress']      as string | null) ?? undefined,
+    deliveryPhone:        (row['deliveryPhone']        as string | null) ?? undefined,
+    deliveryCustomerName: (row['deliveryCustomerName'] as string | null) ?? undefined,
+  };
+}
+
+/** Génère le numéro de commande du jour (ex: "0042") via numbering_counters. */
+function nextOrderNumber(): string {
+  const db = getDatabase();
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  const row = db.prepare('SELECT counter FROM numbering_counters WHERE id = ?').get(today) as
+    { counter: number } | undefined;
+
+  const next = (row?.counter ?? 0) + 1;
+
+  db.prepare(`
+    INSERT INTO numbering_counters (id, date, counter) VALUES (?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET counter = excluded.counter
+  `).run(today, today, next);
+
+  return String(next).padStart(4, '0');
+}
+
+// ─── service ────────────────────────────────────────────────────────────────
+
 export const orderService = {
-  getAll: async (): Promise<Order[]> => {
-    return [];
+
+  getAll(): Order[] {
+    const db = getDatabase();
+    const rows = db.prepare('SELECT * FROM orders ORDER BY createdAt DESC').all() as Record<string, unknown>[];
+    return rows.map(rowToOrder);
   },
 
-  getByStatus: async (status: OrderStatus): Promise<Order[]> => {
-    return [];
+  getByStatus(status: OrderStatus): Order[] {
+    const db = getDatabase();
+    const rows = db.prepare('SELECT * FROM orders WHERE status = ? ORDER BY createdAt DESC').all(status) as Record<string, unknown>[];
+    return rows.map(rowToOrder);
   },
 
-  getById: async (id: string): Promise<Order | null> => {
-    return null;
+  getById(id: string): Order | null {
+    const db = getDatabase();
+    const row = db.prepare('SELECT * FROM orders WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    return row ? rowToOrder(row) : null;
   },
 
-  create: async (data: Partial<Order>): Promise<Order> => {
-    throw new Error('orderService.create: non implémenté — Phase 2');
+  create(data: Partial<Order>): Order {
+    const db = getDatabase();
+    const id          = data.id ?? randomUUID();
+    const now         = new Date().toISOString();
+    const orderNumber = data.orderNumber ?? nextOrderNumber();
+
+    db.prepare(`
+      INSERT INTO orders
+        (id, orderNumber, status, type, lines, subtotal, discount, total, paymentMethod,
+         promoCode, promoName, createdBy, createdAt, updatedAt, paidAt, sentToKitchenAt,
+         deliveryAddress, deliveryPhone, deliveryCustomerName)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      orderNumber,
+      data.status        ?? 'draft',
+      data.type          ?? 'dine-in',
+      JSON.stringify(data.lines ?? []),
+      data.subtotal      ?? 0,
+      data.discount      ?? 0,
+      data.total         ?? 0,
+      data.paymentMethod ?? null,
+      data.promoCode     ?? null,
+      data.promoName     ?? null,
+      data.createdBy     ?? null,
+      data.createdAt ? new Date(data.createdAt).toISOString() : now,
+      now,
+      data.paidAt        ? new Date(data.paidAt).toISOString()        : null,
+      data.sentToKitchenAt ? new Date(data.sentToKitchenAt).toISOString() : null,
+      data.deliveryAddress      ?? null,
+      data.deliveryPhone        ?? null,
+      data.deliveryCustomerName ?? null,
+    );
+
+    return orderService.getById(id)!;
   },
 
-  update: async (id: string, data: Partial<Order>): Promise<Order> => {
-    throw new Error('orderService.update: non implémenté — Phase 2');
+  update(id: string, data: Partial<Order>): Order {
+    const db = getDatabase();
+    const current = orderService.getById(id);
+    if (!current) throw new Error(`Commande introuvable : ${id}`);
+
+    const merged = { ...current, ...data, id };
+    const now = new Date().toISOString();
+
+    db.prepare(`
+      UPDATE orders SET
+        orderNumber=?, status=?, type=?, lines=?, subtotal=?, discount=?, total=?,
+        paymentMethod=?, promoCode=?, promoName=?, createdBy=?,
+        updatedAt=?, paidAt=?, sentToKitchenAt=?,
+        deliveryAddress=?, deliveryPhone=?, deliveryCustomerName=?
+      WHERE id=?
+    `).run(
+      merged.orderNumber,
+      merged.status,
+      merged.type,
+      JSON.stringify(merged.lines ?? []),
+      merged.subtotal,
+      merged.discount,
+      merged.total,
+      merged.paymentMethod        ?? null,
+      merged.promoCode            ?? null,
+      merged.promoName            ?? null,
+      merged.createdBy            ?? null,
+      now,
+      merged.paidAt           ? new Date(merged.paidAt).toISOString()           : null,
+      merged.sentToKitchenAt  ? new Date(merged.sentToKitchenAt).toISOString()  : null,
+      merged.deliveryAddress      ?? null,
+      merged.deliveryPhone        ?? null,
+      merged.deliveryCustomerName ?? null,
+      id,
+    );
+
+    return orderService.getById(id)!;
   },
 
-  updateStatus: async (id: string, status: OrderStatus): Promise<Order> => {
-    throw new Error('orderService.updateStatus: non implémenté — Phase 2');
+  updateStatus(id: string, status: OrderStatus): Order {
+    const db      = getDatabase();
+    const current = orderService.getById(id);
+    if (!current) throw new Error(`Commande introuvable : ${id}`);
+
+    const now = new Date().toISOString();
+    const paidAt          = status === 'paid'           ? now : (current.paidAt          ? new Date(current.paidAt).toISOString()          : null);
+    const sentToKitchenAt = status === 'sentToKitchen'  ? now : (current.sentToKitchenAt ? new Date(current.sentToKitchenAt).toISOString() : null);
+
+    db.prepare(`
+      UPDATE orders SET status=?, updatedAt=?, paidAt=?, sentToKitchenAt=? WHERE id=?
+    `).run(status, now, paidAt, sentToKitchenAt, id);
+
+    return orderService.getById(id)!;
   },
 
-  delete: async (id: string): Promise<void> => {
-    // Phase 1 stub — no-op (suppression réelle dans SQLite en Phase 2)
-    return;
+  delete(id: string): void {
+    const db = getDatabase();
+    db.prepare('DELETE FROM orders WHERE id = ?').run(id);
   },
 };
