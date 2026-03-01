@@ -36,6 +36,7 @@ export const settingsService = {
   },
 
   deletePrinter: async (id: string): Promise<void> => {
-    throw new Error('settingsService.deletePrinter: non implémenté — Phase 2');
+    // Phase 1 stub — no-op (suppression réelle dans SQLite en Phase 2)
+    return;
   },
 };

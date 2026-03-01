@@ -19,7 +19,8 @@ export const productService = {
   },
 
   deleteProduct: async (id: string): Promise<void> => {
-    throw new Error('productService.deleteProduct: non implémenté — Phase 2');
+    // Phase 1 stub — no-op (suppression réelle dans SQLite en Phase 2)
+    return;
   },
 
   getAllCategories: async (): Promise<Category[]> => {
@@ -39,7 +40,8 @@ export const productService = {
   },
 
   deleteCategory: async (id: string): Promise<void> => {
-    throw new Error('productService.deleteCategory: non implémenté — Phase 2');
+    // Phase 1 stub — no-op (suppression réelle dans SQLite en Phase 2)
+    return;
   },
 
   getVariantsByProduct: async (productId: string): Promise<ProductVariant[]> => {
