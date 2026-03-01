@@ -881,7 +881,7 @@ packages/shared/types/
 #### Statut
 - [x] Étape 1.1 — Extraire les types partagés ✅
 - [x] Étape 1.2 — Créer le serveur Fastify ✅
-- [ ] Étape 1.3 — Créer la couche services frontend
+- [x] Étape 1.3 — Créer la couche services frontend ✅
 - [ ] Étape 1.4 — Éclater POSContext
 - [ ] Étape 1.5 — Déplacer la logique métier vers server/services
 
