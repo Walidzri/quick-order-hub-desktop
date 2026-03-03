@@ -425,42 +425,113 @@ Cette section peut amender le plan d'action si l'analyse révèle des surprises.
 
 ---
 
-### ⏳ PHASE 3 — API cloud + Sync VPS
+### ⏳ PHASE 3 — Tablette cuisine + Télé salle
 **Statut : EN ATTENTE (démarrer seulement quand Phase 2 est 100% validée)**
 
-#### Étape 3.1 — Setup VPS
+#### Contexte
+Deux interfaces web légères, accessibles depuis n'importe quel appareil avec un navigateur,
+servies par le même Fastify embarqué. Zéro installation côté tablette/télé.
+
+```
+Tablette cuisine  →  http://[IP-POS]:3002/cuisine   →  WebSocket ws://[IP-POS]:3002/ws/events
+Télé salle        →  http://[IP-POS]:3002/display   →  WebSocket ws://[IP-POS]:3002/ws/events
+```
+
+#### Flux complet
+```
+1. Nouvelle commande créée sur le POS
+2. WebSocket push → tablette cuisine + télé salle (statut "pending"/"preparing")
+3. Commande apparaît sur la tablette cuisine
+4. Cuisinier prépare → appuie "Prêt"
+5. PATCH /api/orders/:id { status: "ready" }
+6. WebSocket push → télé salle affiche le numéro + notification caisse
+7. Client récupère → PATCH { status: "picked-up" } → télé retire le numéro
+```
+
+#### Étape 3.1 — WebSocket server
+- [ ] Installer `@fastify/websocket`
+- [ ] Créer `server/src/routes/events.ts` — endpoint `ws://[IP]:3002/ws/events`
+- [ ] Créer `server/src/services/wsService.ts` — broadcast helper (`broadcastEvent(type, payload)`)
+- [ ] Brancher le broadcast sur les mutations d'ordres (create, status change)
+
+#### Étape 3.2 — Tablette cuisine (`/cuisine`)
+- [ ] Créer `server/src/routes/cuisine.ts` — sert le HTML statique
+- [ ] Page HTML/CSS/JS vanilla (pas de React — zéro dépendance côté client)
+- [ ] Affiche les commandes en cours (statut `pending` / `preparing`) par ordre d'arrivée
+- [ ] Bouton "Prêt" → `PATCH /api/orders/:id { status: "ready" }`
+- [ ] WebSocket client → reçoit les nouvelles commandes et les mises à jour en temps réel
+- [ ] Responsive — fonctionne sur tablette Android, iPad, vieille tablette reconditionnée
+
+#### Étape 3.3 — Télé salle (`/display`)
+- [ ] Créer `server/src/routes/display.ts` — sert le HTML statique
+- [ ] Page HTML/CSS/JS vanilla, plein écran
+- [ ] Affiche les numéros de commandes prêtes (statut `ready`) en grand
+- [ ] Affiche les commandes en cours (statut `preparing`) en plus petit
+- [ ] WebSocket client → mise à jour automatique sans rechargement
+- [ ] Compatible Smart TV (Samsung Tizen, LG WebOS), tablette, Raspberry Pi
+
+```
+┌─────────────────────────────┐
+│     COMMANDES PRÊTES        │
+│                             │
+│   🟢 N°12    🟢 N°15       │
+│   🟢 N°18                  │
+│                             │
+│   En préparation : N°20    │
+└─────────────────────────────┘
+```
+
+#### Étape 3.4 — Intégration POS
+- [ ] Notification visuelle dans le POS quand une commande passe à "ready"
+- [ ] Statut "ready" visible dans l'historique des commandes
+- [ ] Bouton "Récupérée" → `PATCH { status: "picked-up" }` → retire de la télé salle
+
+#### Tests Phase 3
+- [ ] Créer `tests/phase3/ws.curl.sh` — vérifier WebSocket + broadcast
+- [ ] Créer `tests/phase3/checklist.md` — tablette cuisine, télé salle, flux complet
+- [ ] Tester sur un vrai appareil (tablette Android ou iPad)
+
+#### Validation Phase 3
+- [ ] WebSocket envoie les events en temps réel (< 500ms)
+- [ ] Tablette cuisine reçoit les nouvelles commandes sans rechargement
+- [ ] Bouton "Prêt" met à jour le statut et notifie la télé salle
+- [ ] Télé salle affiche/retire les numéros automatiquement
+- [ ] Fonctionne sur au moins 2 types d'appareils différents
+- [ ] POS fonctionne normalement si tablette/télé déconnectées
+
+---
+
+### ⏳ PHASE 4 — API cloud + Sync VPS
+**Statut : EN ATTENTE (démarrer seulement quand Phase 3 est 100% validée)**
+
+#### Étape 4.1 — Setup VPS
 - [ ] Choisir PostgreSQL ou MariaDB
 - [ ] Installer et configurer sur le VPS
 - [ ] Créer le schéma de la base cloud
 
-#### Étape 3.2 — Backend cloud
+#### Étape 4.2 — Backend cloud
 - [ ] Projet Fastify sur le VPS
 - [ ] Réutiliser `packages/shared/`
 - [ ] Exposer les routes nécessaires
 
-#### Étape 3.3 — Implémenter SyncService
+#### Étape 4.3 — Implémenter SyncService
 - [ ] Ajouter `syncStatus` sur les commandes SQLite
 - [ ] Sync async avec retry si réseau down
 
-#### Étape 3.4 — Écran salle
-- [ ] WebSocket `/ws/events`
-- [ ] Page web simple pour l'écran salle
-
-#### Étape 3.5 — Tests unitaires Vitest (maintenant que l'archi est stable)
+#### Étape 4.4 — Tests unitaires Vitest (maintenant que l'archi est stable)
 - [ ] Installer Vitest dans `server/`
 - [ ] Tester `orderService` — calcul totaux, validation, statuts
 - [ ] Tester `syncService` — comportement offline, retry
 - [ ] Tester `backupService` — scheduling, création fichier
 
-#### Tests Phase 3
-- [ ] Créer `tests/phase3/sync.curl.sh` — vérifier sync local → VPS
-- [ ] Créer `tests/phase3/checklist.md` — écran salle, panel admin, offline
+#### Tests Phase 4
+- [ ] Créer `tests/phase4/sync.curl.sh` — vérifier sync local → VPS
+- [ ] Créer `tests/phase4/checklist.md` — panel admin, offline
 - [ ] Lancer les tests unitaires Vitest
 
-#### Validation Phase 3
+#### Validation Phase 4
 - [ ] Commandes payées synchronisées vers VPS
 - [ ] Panel admin fonctionnel
-- [ ] Écran salle reçoit les updates
 - [ ] POS fonctionne offline si VPS injoignable
 - [ ] Tests unitaires passent
 
@@ -521,7 +592,7 @@ export const orderService = {
 - **PrintDaemon** — ne pas y toucher, il reste exactement comme il est
 - **Auth** — ne pas refactoriser AuthContext pour l'instant, pas prioritaire
 - **UI components** — `src/components/ui/` ne pas y toucher
-- **database-sqlite.ts** — fichier d'une migration ratée, à supprimer en Phase 2
+- **database-sqlite.ts** — supprimé en Phase 2.4 ✅
 - **Offline-first** — toujours vérifier que l'app fonctionne sans réseau après chaque changement
 
 ---
@@ -531,10 +602,10 @@ export const orderService = {
 > Mettre à jour cette section à chaque session de travail.
 > Ne jamais modifier cette section sans validation du développeur.
 
-**Dernière session :** Phase 2.4 terminée — nettoyage IDB complet (database.ts, database-sqlite.ts, migrate-to-sqlite.ts supprimés, useEffect backup sorti de React, InventoryManagement/ReportsScreen/SettingsScreen migrés vers HTTP)
-**Phase active :** Phase 2 terminée — en attente de validation manuelle de l'app
-**Prochaine tâche :** Tester l'app manuellement (lancer Electron, vérifier les fonctionnalités), puis passer à Phase 3 si ok
-**Blockers :** Aucun — TypeScript backend 0 erreur, frontend uniquement erreurs pré-existantes
+**Dernière session :** Phase 2 validée ✅ — plan réorganisé (Phase 3 = tablette cuisine + télé salle, Phase 4 = sync VPS)
+**Phase active :** Phase 3 — Tablette cuisine + Télé salle
+**Prochaine tâche :** Étape 3.1 — WebSocket server (@fastify/websocket + wsService + broadcast sur mutations d'ordres)
+**Blockers :** Aucun
 
 ---
 
