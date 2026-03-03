@@ -304,10 +304,14 @@ const HTML = /* html */`<!DOCTYPE html>
               orders[payload.id] = payload.order;
               renderOrders();
               playBeep();
-            } else if (orders[payload.id]) {
-              delete orders[payload.id];
-              renderOrders();
+            } else if (payload.status === 'ready' || payload.status === 'cancelled') {
+              if (orders[payload.id]) {
+                delete orders[payload.id];
+                renderOrders();
+              }
             }
+            // 'paid' et autres statuts ne retirent PAS la commande de la cuisine
+            // (commande comptoir : payée immédiatement mais le cuisinier doit quand même la préparer)
           }
         } catch {}
       };

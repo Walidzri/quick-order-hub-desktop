@@ -169,11 +169,10 @@ const HTML = /* html */`<!DOCTYPE html>
   </main>
 
   <script>
-    const READY_STATUS    = 'ready';
-    const PREP_STATUSES   = ['sentToKitchen'];
-    const DONE_STATUSES   = ['paid', 'cancelled'];
+    const READY_STATUS  = 'ready';
+    const PREP_STATUSES = ['sentToKitchen'];
 
-    let readyOrders    = {};   // id → order
+    let readyOrders     = {};  // id → order
     let preparingOrders = {};  // id → order
     let ws = null;
 
@@ -222,17 +221,30 @@ const HTML = /* html */`<!DOCTYPE html>
     // ── Appliquer un event d'ordre ─────────────────────────────────────────────
     function applyOrder(order) {
       const { id, status } = order;
+
       if (status === READY_STATUS) {
-        readyOrders[id] = order;
+        // Toujours afficher dans "Prêtes", même si déjà payé (comptoir)
         delete preparingOrders[id];
+        readyOrders[id] = order;
         renderReady();
         renderPreparing();
+
       } else if (PREP_STATUSES.includes(status)) {
         preparingOrders[id] = order;
         delete readyOrders[id];
         renderReady();
         renderPreparing();
-      } else if (DONE_STATUSES.includes(status)) {
+
+      } else if (status === 'paid') {
+        // Retirer de "Prêtes" si la commande y était (client vient chercher sa commande)
+        // NE PAS retirer de "En préparation" : commande comptoir payée
+        // immédiatement mais cuisinier prépare encore
+        if (readyOrders[id]) {
+          delete readyOrders[id];
+          renderReady();
+        }
+
+      } else if (status === 'cancelled') {
         delete readyOrders[id];
         delete preparingOrders[id];
         renderReady();
@@ -260,10 +272,10 @@ const HTML = /* html */`<!DOCTYPE html>
         if (ordersRes.ok) {
           const data = await ordersRes.json();
           const list = data.orders || data;
-          readyOrders    = {};
+          readyOrders     = {};
           preparingOrders = {};
           for (const o of list) {
-            if (o.status === READY_STATUS)           readyOrders[o.id]    = o;
+            if (o.status === READY_STATUS)             readyOrders[o.id]    = o;
             else if (PREP_STATUSES.includes(o.status)) preparingOrders[o.id] = o;
           }
           renderReady();
