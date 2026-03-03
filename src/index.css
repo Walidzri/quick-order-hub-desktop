@@ -209,6 +209,10 @@
     @apply bg-destructive/20 text-destructive;
   }
 
+  .status-ready {
+    @apply bg-teal-500/20 text-teal-600 dark:text-teal-400;
+  }
+
   /* Smooth animations */
   .animate-slide-in {
     animation: slideIn 0.2s ease-out;

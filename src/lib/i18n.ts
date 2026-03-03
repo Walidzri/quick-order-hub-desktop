@@ -56,6 +56,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Order Status
     'status.draft': 'Brouillon',
     'status.sentToKitchen': 'En Cuisine',
+    'status.ready': 'Prêt',
     'status.paid': 'Payé',
     'status.cancelled': 'Annulé',
     
@@ -678,6 +679,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Order Status
     'status.draft': 'Draft',
     'status.sentToKitchen': 'In Kitchen',
+    'status.ready': 'Ready',
     'status.paid': 'Paid',
     'status.cancelled': 'Cancelled',
     
@@ -1295,6 +1297,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Order Status
     'status.draft': 'مسودة',
     'status.sentToKitchen': 'في المطبخ',
+    'status.ready': 'جاهز',
     'status.paid': 'مدفوع',
     'status.cancelled': 'ملغى',
     

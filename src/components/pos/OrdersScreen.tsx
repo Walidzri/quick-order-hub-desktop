@@ -8,11 +8,12 @@ import {
   Search, 
   Calendar, 
   Printer, 
-  ChefHat, 
+  ChefHat,
   Receipt,
   Clock,
   CheckCircle2,
   XCircle,
+  BellRing,
   Filter,
   Download,
   Trash2,
@@ -40,6 +41,7 @@ import {
 const statusIcons: Record<OrderStatus, React.ReactNode> = {
   draft: <Clock className="w-4 h-4" />,
   sentToKitchen: <ChefHat className="w-4 h-4" />,
+  ready: <BellRing className="w-4 h-4" />,
   paid: <CheckCircle2 className="w-4 h-4" />,
   cancelled: <XCircle className="w-4 h-4" />,
 };
@@ -47,6 +49,7 @@ const statusIcons: Record<OrderStatus, React.ReactNode> = {
 const statusColors: Record<OrderStatus, string> = {
   draft: 'status-draft',
   sentToKitchen: 'status-kitchen',
+  ready: 'status-ready',
   paid: 'status-paid',
   cancelled: 'status-cancelled',
 };
@@ -369,7 +372,7 @@ export function OrdersScreen() {
 
             {/* Status Filter */}
             <div className="flex gap-2">
-              {(['all', 'draft', 'sentToKitchen', 'paid', 'cancelled'] as const).map((status) => (
+              {(['all', 'draft', 'sentToKitchen', 'ready', 'paid', 'cancelled'] as const).map((status) => (
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}
@@ -613,7 +616,7 @@ export function OrdersScreen() {
                 <div className="mt-3 pt-3 border-t border-border">
                   <p className="text-xs text-muted-foreground mb-2">{t('orders.changeStatus')}</p>
                   <div className="flex flex-wrap gap-1">
-                    {(['draft', 'sentToKitchen', 'paid', 'cancelled'] as const).map((status) => (
+                    {(['draft', 'sentToKitchen', 'ready', 'paid', 'cancelled'] as const).map((status) => (
                       <button
                         key={status}
                         onClick={() => {

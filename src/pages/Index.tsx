@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { POSProvider, usePOS } from '@/contexts/POSContext';
+import { useOrderReadyNotifications } from '@/hooks/useOrderReadyNotifications';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { MainNav } from '@/components/pos/MainNav';
 import { OrderScreen } from '@/components/pos/OrderScreen';
@@ -20,6 +21,7 @@ function POSApp() {
   const { isLoading, kioskMode, direction, settings } = usePOS();
   const { isAuthenticated, isLocked, isSetupRequired, canAccessView, user } = useAuth();
   const [activeView, setActiveView] = useState<View>('order');
+  useOrderReadyNotifications();
 
   // Reset to accessible view if current view is not accessible
   useEffect(() => {
