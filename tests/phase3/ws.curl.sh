@@ -6,7 +6,7 @@
 # Pré-requis : wscat installé pour les tests WebSocket (npm i -g wscat)
 # =============================================================================
 
-BASE="http://127.0.0.1:3002"
+BASE="${POS_HOST:-http://127.0.0.1:3002}"
 PASS=0
 FAIL=0
 

@@ -72,7 +72,9 @@ export async function startServer(port = 3002, dbPath?: string): Promise<typeof 
   });
 
   await fastify.listen({ port, host: '0.0.0.0' });
-  console.log(`[FASTIFY] Server listening on http://127.0.0.1:${port}`);
+  console.log(`[FASTIFY] Server listening on 0.0.0.0:${port} (http://127.0.0.1:${port} / réseau local)`);
+  console.log(`[FASTIFY]   Tablette cuisine : http://[IP-LAN]:${port}/cuisine`);
+  console.log(`[FASTIFY]   Télé salle       : http://[IP-LAN]:${port}/display`);
 
   return fastify;
 }
