@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { orderService } from '../services/orderService';
+import { wsService } from '../services/wsService';
 
 export async function ordersRoutes(fastify: FastifyInstance) {
   // GET /api/orders — supporte ?status=, ?start=, ?end=, ?page=, ?pageSize=
@@ -45,12 +46,14 @@ export async function ordersRoutes(fastify: FastifyInstance) {
 
   fastify.post('/api/orders', async (request, reply) => {
     const order = orderService.create(request.body as any);
+    wsService.broadcast('order:created', order);
     return reply.status(201).send(order);
   });
 
   fastify.patch('/api/orders/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const order = orderService.update(id, request.body as any);
+    wsService.broadcast('order:updated', order);
     return order;
   });
 
@@ -58,6 +61,7 @@ export async function ordersRoutes(fastify: FastifyInstance) {
     const { id }     = request.params as { id: string };
     const { status } = request.body as { status: any };
     const order = orderService.updateStatus(id, status);
+    wsService.broadcast('order:status', { id: order.id, status: order.status, order });
     return order;
   });
 
@@ -65,6 +69,7 @@ export async function ordersRoutes(fastify: FastifyInstance) {
   fastify.post('/api/orders/:id/send-to-kitchen', async (request, reply) => {
     const { id } = request.params as { id: string };
     const order = orderService.updateStatus(id, 'sentToKitchen');
+    wsService.broadcast('order:status', { id: order.id, status: order.status, order });
     return order;
   });
 
@@ -74,6 +79,7 @@ export async function ordersRoutes(fastify: FastifyInstance) {
     const { paymentMethod } = request.body as { paymentMethod: any };
     const order = orderService.update(id, { paymentMethod });
     const paid  = orderService.updateStatus(order.id, 'paid');
+    wsService.broadcast('order:status', { id: paid.id, status: paid.status, order: paid });
     return paid;
   });
 
