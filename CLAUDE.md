@@ -401,14 +401,16 @@ Cette section peut amender le plan d'action si l'analyse révèle des surprises.
 - [x] Script one-shot : IndexedDB → SQLite
 - [x] Tester la migration — succès confirmé en prod
 
-#### Étape 2.3 — Brancher SQLite dans les services
-- [ ] Remplacer les appels IndexedDB par SQLite service par service
-- [ ] Tester route par route
+#### Étape 2.3 — Brancher SQLite dans les services ✅ VALIDÉE
+- [x] Remplacer les appels IndexedDB par SQLite service par service
+- [x] Tester route par route
 
-#### Étape 2.4 — Nettoyer
-- [ ] Supprimer `src/lib/database.ts`
-- [ ] Supprimer `src/lib/database-sqlite.ts`
-- [ ] Supprimer `src/lib/migrate-to-sqlite.ts`
+#### Étape 2.4 — Nettoyer ✅ VALIDÉE
+- [x] Supprimer `src/lib/database.ts`
+- [x] Supprimer `src/lib/database-sqlite.ts`
+- [x] Supprimer `src/lib/migrate-to-sqlite.ts` (+ `migration-idb-to-sqlite.ts`)
+- [x] Supprimer le useEffect backup automatique de `SettingsContext.tsx`
+- [x] Migrer `InventoryManagement.tsx`, `ReportsScreen.tsx`, `SettingsScreen.tsx` → HTTP
 
 #### Tests Phase 2
 - [ ] Créer `tests/phase2/migration.curl.sh` — vérifier counts et données migrées
@@ -529,10 +531,10 @@ export const orderService = {
 > Mettre à jour cette section à chaque session de travail.
 > Ne jamais modifier cette section sans validation du développeur.
 
-**Dernière session :** Phase 2.3 terminée — migration frontend complète (0 getDB() dans les contextes), shim usePOS() corrigé
-**Phase active :** Phase 2 — Étape 2.4 — Nettoyage (supprimer database.ts, database-sqlite.ts, migrate-to-sqlite.ts)
-**Prochaine tâche :** Tester l'app, puis supprimer les fichiers IDB obsolètes
-**Blockers :** Aucun — TypeScript backend 0 erreur, TypeScript des contextes/services 0 erreur
+**Dernière session :** Phase 2.4 terminée — nettoyage IDB complet (database.ts, database-sqlite.ts, migrate-to-sqlite.ts supprimés, useEffect backup sorti de React, InventoryManagement/ReportsScreen/SettingsScreen migrés vers HTTP)
+**Phase active :** Phase 2 terminée — en attente de validation manuelle de l'app
+**Prochaine tâche :** Tester l'app manuellement (lancer Electron, vérifier les fonctionnalités), puis passer à Phase 3 si ok
+**Blockers :** Aucun — TypeScript backend 0 erreur, frontend uniquement erreurs pré-existantes
 
 ---
 

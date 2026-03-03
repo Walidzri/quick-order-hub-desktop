@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Product, ProductVariant } from '@/lib/database';
+import { Product, ProductVariant } from '@shared/types';
 import { CategorySidebar } from './CategorySidebar';
 import { ProductGrid } from './ProductGrid';
 import { Cart } from './Cart';

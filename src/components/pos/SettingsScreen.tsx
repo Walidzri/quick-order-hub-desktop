@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { usePOS } from '@/contexts/POSContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Language, Currency, LANGUAGES, CURRENCIES } from '@/lib/i18n';
-import { Promotion, PromoType, Product, ProductVariant, User, UserRole, Printer as PrinterType, PrinterRole, PrinterMode, PrinterConnectionType, ReceiptCustomization } from '@/lib/database';
+import { Promotion, PromoType, Product, ProductVariant, User, UserRole, Printer as PrinterType, PrinterRole, PrinterMode, PrinterConnectionType, ReceiptCustomization } from '@shared/types';
 import { DirectPrinter, PrinterConnection } from '@/lib/printer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { generateUUID } from '@/lib/utils';
@@ -58,7 +58,6 @@ import { ProductsManagement } from './ProductsManagement';
 import { UserModal } from './UserModal';
 import { ReceiptCustomizationSection } from './ReceiptCustomizationSection';
 import { InventoryManagement } from './InventoryManagement';
-import { checkMigrationStatus, runMigration, MigrationStatus } from '@/lib/migration-idb-to-sqlite';
 
 type SettingsSection = 'general' | 'branding' | 'printers' | 'receipt' | 'promotions' | 'theme' | 'products' | 'users' | 'inventory' | 'data';
 
@@ -98,12 +97,6 @@ export function SettingsScreen() {
   } | null>(null);
   const [isCheckingDaemon, setIsCheckingDaemon] = useState(false);
   const [isOpeningDrawer, setIsOpeningDrawer] = useState(false);
-  const [migrationStatus, setMigrationStatus] = useState<MigrationStatus | null>(null);
-  const [migrationStatusLoading, setMigrationStatusLoading] = useState(false);
-  const [migrationStatusError, setMigrationStatusError] = useState<string | null>(null);
-  const [isMigrating, setIsMigrating] = useState(false);
-  const [migrationProgress, setMigrationProgress] = useState<string | null>(null);
-  const [migrationDone, setMigrationDone] = useState(false);
 
   // Check PrintDaemon C# status via HTTP
   const checkDaemonStatus = useCallback(async () => {
@@ -153,23 +146,6 @@ export function SettingsScreen() {
     }
   }, []);
 
-  // Check migration status when data section is active
-  const refreshMigrationStatus = useCallback(() => {
-    setMigrationStatusLoading(true);
-    setMigrationStatusError(null);
-    checkMigrationStatus()
-      .then((s) => { setMigrationStatus(s); setMigrationStatusLoading(false); })
-      .catch((err) => {
-        setMigrationStatusError(err instanceof Error ? err.message : String(err));
-        setMigrationStatusLoading(false);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (activeSection === 'data' && !migrationDone) {
-      refreshMigrationStatus();
-    }
-  }, [activeSection, migrationDone, refreshMigrationStatus]);
 
   // Check PrintDaemon C# status when data section is active
   useEffect(() => {
@@ -280,32 +256,7 @@ export function SettingsScreen() {
 
     setIsExporting(true);
     try {
-      const { getDB } = await import('@/lib/database');
-      const db = await getDB();
-
-      // Export all data from all stores
-      const backupData = {
-        version: '1.0.0',
-        exportDate: new Date().toISOString(),
-        data: {
-          categories: await db.getAll('categories'),
-          products: await db.getAll('products'),
-          productVariants: await db.getAll('productVariants'),
-          modifierGroups: await db.getAll('modifierGroups'),
-          modifierOptions: await db.getAll('modifierOptions'),
-          orders: await db.getAll('orders'),
-          printers: await db.getAll('printers'),
-          printJobs: await db.getAll('printJobs'),
-          promotions: await db.getAll('promotions'),
-          settings: await db.getAll('settings'),
-          numberingCounters: await db.getAll('numberingCounters'),
-          users: await db.getAll('users'),
-          userSessions: await db.getAll('userSessions'),
-          suppliers: await db.getAll('suppliers'),
-          inventoryItems: await db.getAll('inventoryItems'),
-          invoices: await db.getAll('invoices'),
-        },
-      };
+      const backupData = await fetch('http://127.0.0.1:3002/api/backup/export').then(r => r.json());
 
       const jsonData = JSON.stringify(backupData, null, 2);
       const fileName = `backup-quick-order-hub-${new Date().toISOString().split('T')[0]}.json`;
@@ -387,35 +338,17 @@ export function SettingsScreen() {
         throw new Error('Format de sauvegarde invalide');
       }
 
-      const { getDB } = await import('@/lib/database');
-      const db = await getDB();
+      // Restore via API Fastify — le serveur vide les tables et réimporte
+      const restoreResult = await fetch('http://127.0.0.1:3002/api/backup/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(backupData),
+      });
 
-      // Import all data
-      const stores = [
-        'categories', 'products', 'productVariants', 'modifierGroups', 'modifierOptions',
-        'orders', 'printers', 'printJobs', 'promotions', 'settings', 'numberingCounters',
-        'users', 'userSessions', 'suppliers', 'inventoryItems', 'invoices',
-      ];
-
-      for (const storeName of stores) {
-        if (backupData.data[storeName] && Array.isArray(backupData.data[storeName])) {
-          // Clear existing data
-          const tx = db.transaction(storeName, 'readwrite');
-          await tx.store.clear();
-          await tx.done;
-
-          // Import new data
-          for (const item of backupData.data[storeName]) {
-            await db.put(storeName, item);
-          }
-        }
+      if (!restoreResult.ok) {
+        const err = await restoreResult.json().catch(() => ({ error: 'Erreur inconnue' }));
+        throw new Error(err.error ?? `HTTP ${restoreResult.status}`);
       }
-
-      // Reload all data
-      await loadCategories();
-      await loadProducts();
-      await loadPromotions();
-      await loadUsers();
       
       // Reload page to refresh all data
       window.location.reload();
@@ -1705,90 +1638,6 @@ export function SettingsScreen() {
                 </div>
               </div>
 
-              {/* Migration IndexedDB → SQLite */}
-              <div className="p-3 sm:p-4 bg-amber-500/10 border-2 border-amber-500/20 rounded-xl">
-                <div className="flex items-center gap-2 mb-2">
-                  <Database className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                  <h3 className="font-medium text-amber-700 dark:text-amber-400 text-sm sm:text-base">
-                    Migration IndexedDB → SQLite
-                  </h3>
-                </div>
-
-                {migrationDone ? (
-                  <div className="p-3 bg-success/10 border border-success/20 rounded-lg">
-                    <p className="text-sm text-success font-medium">✓ Données migrées avec succès dans SQLite.</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Les données sont maintenant gérées par le backend Fastify.
-                    </p>
-                  </div>
-                ) : migrationStatusLoading ? (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                    Vérification du statut en cours…
-                  </div>
-                ) : migrationStatusError ? (
-                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg space-y-2">
-                    <p className="text-sm text-destructive font-medium">Impossible de contacter le backend Fastify.</p>
-                    <p className="text-xs text-muted-foreground break-all">{migrationStatusError}</p>
-                    <p className="text-xs text-muted-foreground">Assurez-vous que l'application tourne via Electron (pas le navigateur seul).</p>
-                    <Button variant="outline" size="sm" onClick={refreshMigrationStatus} className="w-full">
-                      <RefreshCw className="w-3 h-3 mr-2" />
-                      Réessayer
-                    </Button>
-                  </div>
-                ) : !migrationStatus?.needed ? (
-                  <div className="p-3 bg-success/10 border border-success/20 rounded-lg">
-                    <p className="text-sm text-success font-medium">✓ SQLite contient déjà des données — migration non nécessaire.</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Commandes : {migrationStatus?.counts.orders} · Produits : {migrationStatus?.counts.products} · Paramètres : {migrationStatus?.counts.settings}
-                    </p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-3">
-                      SQLite est vide. Cliquez sur le bouton pour transférer toutes vos données (commandes, produits, paramètres…) vers le nouveau backend.
-                    </p>
-                    {migrationProgress && (
-                      <div className="mb-3 p-2 bg-muted/50 rounded text-xs text-muted-foreground flex items-center gap-2">
-                        <Loader2 className="w-3 h-3 animate-spin shrink-0" />
-                        {migrationProgress}
-                      </div>
-                    )}
-                    <Button
-                      variant="default"
-                      disabled={isMigrating}
-                      onClick={async () => {
-                        setIsMigrating(true);
-                        setMigrationProgress(null);
-                        try {
-                          await runMigration((step) => setMigrationProgress(step));
-                          setMigrationDone(true);
-                          toast({ title: 'Migration réussie', description: 'Toutes les données ont été transférées vers SQLite.' });
-                        } catch (err) {
-                          const msg = err instanceof Error ? err.message : String(err);
-                          await showAlert(`Erreur de migration : ${msg}`, 'Erreur');
-                        } finally {
-                          setIsMigrating(false);
-                          setMigrationProgress(null);
-                        }
-                      }}
-                      className="w-full"
-                    >
-                      {isMigrating ? (
-                        <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Migration en cours…
-                        </>
-                      ) : (
-                        <>
-                          <Server className="w-4 h-4 mr-2" />
-                          Migrer vers SQLite
-                        </>
-                      )}
-                    </Button>
-                  </>
-                )}
-              </div>
 
               {/* Database Reset */}
               <div className="p-3 sm:p-4 bg-destructive/10 border-2 border-destructive/20 rounded-xl">

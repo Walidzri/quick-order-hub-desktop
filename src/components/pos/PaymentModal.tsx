@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { usePOS } from '@/contexts/POSContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/i18n';
-import { PaymentMethod, Order, PrinterConnectionType } from '@/lib/database';
+import { PaymentMethod, Order, PrinterConnectionType } from '@shared/types';
 import { motion } from 'framer-motion';
 import { X, Banknote, CreditCard, Check, Trash2, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';

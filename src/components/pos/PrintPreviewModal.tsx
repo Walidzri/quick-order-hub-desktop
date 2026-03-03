@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Order, Settings, Printer as PrinterType, PrinterConnectionType } from '@/lib/database';
+import { Order, Settings, Printer as PrinterType, PrinterConnectionType } from '@shared/types';
 import { formatCurrency, Currency } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Printer, Download, FileText, Wifi, AlertCircle } from 'lucide-react';

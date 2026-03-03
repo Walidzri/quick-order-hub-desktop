@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Product, ProductVariant, Category } from '@/lib/database';
+import { Product, ProductVariant, Category } from '@shared/types';
 import { formatCurrency, Currency } from '@/lib/i18n';
 import { usePOS } from '@/contexts/POSContext';
 import { motion, AnimatePresence } from 'framer-motion';

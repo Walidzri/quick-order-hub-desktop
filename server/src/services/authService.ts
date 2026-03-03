@@ -148,6 +148,12 @@ export const authService = {
 
   // ── Auth ───────────────────────────────────────────────────────────────
 
+  getAllSessions(): UserSession[] {
+    const db = getDatabase();
+    const rows = db.prepare('SELECT * FROM user_sessions ORDER BY loginAt DESC').all() as Record<string, unknown>[];
+    return rows.map(rowToSession);
+  },
+
   createSession(userId: string): UserSession {
     const db = getDatabase();
     const id = randomUUID();

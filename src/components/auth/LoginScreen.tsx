@@ -6,7 +6,7 @@ import { TouchInput } from '@/components/ui/touch-input';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePOS } from '@/contexts/POSContext';
 import { cn } from '@/lib/utils';
-import { User } from '@/lib/database';
+import { User } from '@shared/types';
 import { LANGUAGES, Language } from '@/lib/i18n';
 
 type LoginMode = 'select' | 'password' | 'pin';

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Category, Product } from '@/lib/database';
+import { Category, Product } from '@shared/types';
 import { motion } from 'framer-motion';
 import { X, Save, Upload, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';

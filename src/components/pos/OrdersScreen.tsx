@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { usePOS } from '@/contexts/POSContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/i18n';
-import { Order, OrderStatus } from '@/lib/database';
+import { Order, OrderStatus } from '@shared/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 

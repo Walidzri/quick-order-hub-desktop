@@ -4,7 +4,7 @@ import { UtensilsCrossed, ShoppingBag, Truck, X, ChevronLeft } from 'lucide-reac
 import { Button } from '@/components/ui/button';
 import { TouchInput } from '@/components/ui/touch-input';
 import { usePOS } from '@/contexts/POSContext';
-import { OrderType } from '@/lib/database';
+import { OrderType } from '@shared/types';
 
 export interface DeliveryInfo {
   address: string;

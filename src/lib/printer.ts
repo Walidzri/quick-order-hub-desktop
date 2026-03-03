@@ -1,5 +1,5 @@
 // Direct printing utilities without browser dialog
-import { ReceiptCustomization } from './database';
+import type { ReceiptCustomization } from '@shared/types';
 import { defaultReceiptCustomization } from '@shared/types';
 
 export interface PrinterConnection {

@@ -11,6 +11,7 @@ import { migrateRoutes } from './routes/migrate';
 import { promotionsRoutes } from './routes/promotions';
 import { usersRoutes } from './routes/users';
 import { authRoutes } from './routes/auth';
+import { inventoryRoutes } from './routes/inventory';
 import { initDatabase, closeDatabase, getDefaultDbPath } from './db/connection';
 
 const fastify = Fastify({
@@ -58,6 +59,7 @@ export async function startServer(port = 3002, dbPath?: string): Promise<typeof 
   await fastify.register(promotionsRoutes);
   await fastify.register(usersRoutes);
   await fastify.register(authRoutes);
+  await fastify.register(inventoryRoutes);
 
   fastify.get('/api/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };

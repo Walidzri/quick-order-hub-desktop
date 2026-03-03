@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { OrderLine, OrderLineModifier, Product, ProductVariant } from '@/lib/database';
+import { OrderLine, OrderLineModifier, Product, ProductVariant } from '@shared/types';
 import { usePOS } from '@/contexts/POSContext';
 import { formatCurrency } from '@/lib/i18n';
 import { motion } from 'framer-motion';

@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { usePOS } from '@/contexts/POSContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { Supplier, InventoryItem, Invoice, InvoiceLine } from '@/lib/database';
+import type { Supplier, InventoryItem, Invoice, InvoiceLine } from '@shared/types';
+import { inventoryService } from '@/services/inventoryService';
 import { formatCurrency, Currency } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -78,9 +79,7 @@ export function InventoryManagement({ currency, t }: InventoryManagementProps) {
 
   const loadSuppliers = async () => {
     try {
-      const { getDB } = await import('@/lib/database');
-      const db = await getDB();
-      const all = await db.getAll('suppliers');
+      const all = await inventoryService.getAllSuppliers();
       setSuppliers(all);
     } catch (error) {
       console.error('Error loading suppliers:', error);
@@ -89,9 +88,7 @@ export function InventoryManagement({ currency, t }: InventoryManagementProps) {
 
   const loadInventoryItems = async () => {
     try {
-      const { getDB } = await import('@/lib/database');
-      const db = await getDB();
-      const all = await db.getAll('inventoryItems');
+      const all = await inventoryService.getAllItems();
       setInventoryItems(all);
     } catch (error) {
       console.error('Error loading inventory items:', error);
@@ -100,9 +97,7 @@ export function InventoryManagement({ currency, t }: InventoryManagementProps) {
 
   const loadInvoices = async () => {
     try {
-      const { getDB } = await import('@/lib/database');
-      const db = await getDB();
-      const all = await db.getAll('invoices');
+      const all = await inventoryService.getAllInvoices();
       setInvoices(all);
     } catch (error) {
       console.error('Error loading invoices:', error);
@@ -111,9 +106,7 @@ export function InventoryManagement({ currency, t }: InventoryManagementProps) {
 
   const saveSupplier = async (supplier: Supplier) => {
     try {
-      const { getDB } = await import('@/lib/database');
-      const db = await getDB();
-      await db.put('suppliers', supplier);
+      await inventoryService.saveSupplier(supplier);
       await loadSuppliers();
       setEditingSupplier(null);
     } catch (error) {
@@ -124,9 +117,7 @@ export function InventoryManagement({ currency, t }: InventoryManagementProps) {
 
   const saveInventoryItem = async (item: InventoryItem) => {
     try {
-      const { getDB } = await import('@/lib/database');
-      const db = await getDB();
-      await db.put('inventoryItems', item);
+      await inventoryService.saveItem(item);
       await loadInventoryItems();
       setEditingItem(null);
     } catch (error) {
@@ -137,24 +128,10 @@ export function InventoryManagement({ currency, t }: InventoryManagementProps) {
 
   const saveInvoice = async (invoice: Invoice) => {
     try {
-      const { getDB } = await import('@/lib/database');
-      const db = await getDB();
-      await db.put('invoices', invoice);
-      await loadInvoices();
+      // Le serveur gère la mise à jour des stocks automatiquement
+      await inventoryService.saveInvoice(invoice);
+      await Promise.all([loadInvoices(), loadInventoryItems()]);
       setEditingInvoice(null);
-      
-      // Update inventory items from invoice lines
-      for (const line of invoice.lines) {
-        if (line.inventoryItemId) {
-          const item = await db.get('inventoryItems', line.inventoryItemId);
-          if (item) {
-            item.currentStock += line.quantity;
-            item.updatedAt = new Date();
-            await db.put('inventoryItems', item);
-          }
-        }
-      }
-      await loadInventoryItems();
     } catch (error) {
       console.error('Error saving invoice:', error);
       await showAlert(t('inventory.saveError'), 'Erreur');
@@ -163,9 +140,7 @@ export function InventoryManagement({ currency, t }: InventoryManagementProps) {
 
   const deleteSupplier = async (id: string) => {
     try {
-      const { getDB } = await import('@/lib/database');
-      const db = await getDB();
-      await db.delete('suppliers', id);
+      await inventoryService.deleteSupplier(id);
       await loadSuppliers();
       setShowDeleteDialog({ open: false, type: 'supplier', id: '', name: '' });
     } catch (error) {
@@ -176,9 +151,7 @@ export function InventoryManagement({ currency, t }: InventoryManagementProps) {
 
   const deleteInventoryItem = async (id: string) => {
     try {
-      const { getDB } = await import('@/lib/database');
-      const db = await getDB();
-      await db.delete('inventoryItems', id);
+      await inventoryService.deleteItem(id);
       await loadInventoryItems();
       setShowDeleteDialog({ open: false, type: 'item', id: '', name: '' });
     } catch (error) {
@@ -189,25 +162,9 @@ export function InventoryManagement({ currency, t }: InventoryManagementProps) {
 
   const deleteInvoice = async (id: string) => {
     try {
-      const { getDB } = await import('@/lib/database');
-      const db = await getDB();
-      const invoice = await db.get('invoices', id);
-      if (invoice) {
-        // Reverse stock changes
-        for (const line of invoice.lines) {
-          if (line.inventoryItemId) {
-            const item = await db.get('inventoryItems', line.inventoryItemId);
-            if (item) {
-              item.currentStock -= line.quantity;
-              item.updatedAt = new Date();
-              await db.put('inventoryItems', item);
-            }
-          }
-        }
-      }
-      await db.delete('invoices', id);
-      await loadInvoices();
-      await loadInventoryItems();
+      // Le serveur annule les changements de stock automatiquement
+      await inventoryService.deleteInvoice(id);
+      await Promise.all([loadInvoices(), loadInventoryItems()]);
       setShowDeleteDialog({ open: false, type: 'invoice', id: '', name: '' });
     } catch (error) {
       console.error('Error deleting invoice:', error);

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Settings, ReceiptCustomization, Order } from '@/lib/database';
+import { Settings, ReceiptCustomization, Order } from '@shared/types';
 import { motion } from 'framer-motion';
 import { 
   Eye, 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { usePOS } from '@/contexts/POSContext';
-import { OrderLine } from '@/lib/database';
+import { OrderLine } from '@shared/types';
 import { motion } from 'framer-motion';
 import { X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';

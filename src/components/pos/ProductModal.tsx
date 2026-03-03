@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { usePOS } from '@/contexts/POSContext';
-import { Product, ProductVariant, OrderLine, OrderLineModifier } from '@/lib/database';
+import { Product, ProductVariant, OrderLine, OrderLineModifier } from '@shared/types';
 import { formatCurrency } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Minus, Plus, MessageSquare, Check } from 'lucide-react';

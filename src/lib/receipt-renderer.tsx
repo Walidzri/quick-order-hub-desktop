@@ -1,5 +1,5 @@
 import React from 'react';
-import { Order, Settings, ReceiptCustomization } from '@/lib/database';
+import { Order, Settings, ReceiptCustomization } from '@shared/types';
 import { formatCurrency, Currency } from '@/lib/i18n';
 import { DirectPrinter } from './printer';
 

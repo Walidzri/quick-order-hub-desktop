@@ -6,7 +6,7 @@ import { TouchInput } from '@/components/ui/touch-input';
 import { NumericInput } from '@/components/ui/numeric-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { User, UserRole } from '@/lib/database';
+import { User, UserRole } from '@shared/types';
 import { generateUUID, cn } from '@/lib/utils';
 
 const AVATARS = ['👨‍💼', '👩‍💼', '🧑‍💻', '👨‍🍳', '👩‍🍳', '🧑‍🍳', '👤', '👥', '🙂', '😊', '🤠', '😎'];

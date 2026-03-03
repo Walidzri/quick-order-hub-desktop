@@ -21,7 +21,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { getDB, UserSession, User, Order } from '@/lib/database';
+import type { UserSession, User, Order } from '@shared/types';
+import { api } from '@/services/api';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
 type PeriodType = 'day' | 'week' | 'month' | 'year';
@@ -38,19 +39,14 @@ export function ReportsScreen() {
 
   const loadCashierStats = useCallback(async () => {
     try {
-      const db = await getDB();
-      // Check if userSessions store exists (for backward compatibility)
-      if (db.objectStoreNames.contains('userSessions')) {
-        const sessions = await db.getAll('userSessions');
-        setUserSessions(sessions);
-      } else {
-        setUserSessions([]);
-      }
-      const usersList = await db.getAll('users');
+      const [sessions, usersList] = await Promise.all([
+        api.get<UserSession[]>('/api/auth/sessions'),
+        api.get<User[]>('/api/users'),
+      ]);
+      setUserSessions(sessions);
       setAllUsers(usersList);
     } catch (error) {
       console.error('Failed to load cashier stats:', error);
-      // Set empty arrays on error to prevent render issues
       setUserSessions([]);
       setAllUsers([]);
     }

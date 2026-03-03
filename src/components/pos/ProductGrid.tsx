@@ -1,5 +1,5 @@
 import { usePOS } from '@/contexts/POSContext';
-import { Product, ProductVariant } from '@/lib/database';
+import { Product, ProductVariant } from '@shared/types';
 import { formatCurrency } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus } from 'lucide-react';

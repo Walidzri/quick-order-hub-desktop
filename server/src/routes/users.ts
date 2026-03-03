@@ -11,6 +11,10 @@ export async function usersRoutes(fastify: FastifyInstance) {
     return authService.getAllUsers();
   });
 
+  fastify.get('/api/auth/sessions', async () => {
+    return authService.getAllSessions();
+  });
+
   fastify.get('/api/users/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const user = authService.getUserById(id);
