@@ -501,35 +501,107 @@ Télé salle        →  http://[IP-POS]:3002/display   →  WebSocket ws://[IP-
 
 ---
 
-### ⏳ PHASE 4 — API cloud + Sync VPS
+### ⏳ PHASE 4 — Service OS autonome (Fastify découplé d'Electron, multi-OS)
 **Statut : EN ATTENTE (démarrer seulement quand Phase 3 est 100% validée)**
 
-#### Étape 4.1 — Setup VPS
+#### Contexte
+Actuellement Fastify tourne **à l'intérieur du processus Electron**. Si l'opérateur ferme
+le POS accidentellement, la tablette cuisine et la télé salle tombent hors ligne.
+
+Solution : extraire Fastify en **service système autonome** qui démarre avec l'OS,
+indépendamment de la fenêtre Electron. Compatible Windows et Linux.
+
+```
+Démarrage OS (Windows ou Linux)
+├── Service Node.js (Fastify :3002)   ← tourne TOUJOURS, avant tout
+│    ├── SQLite  database.db
+│    ├── /cuisine  /display  /ws/events
+│    └── /api/*
+│
+└── Electron POS (fenêtre)            ← optionnel, se connecte au service
+     └── http://127.0.0.1:3002
+```
+
+#### Compatibilité OS cible
+| OS | Mécanisme de service | Outil |
+|---|---|---|
+| **Windows** | Windows Service (SCM) | `node-windows` ou NSSM |
+| **Linux** | systemd unit | fichier `.service` |
+| **macOS** (bonus) | launchd plist | fichier `.plist` |
+
+#### Avantages
+- Tablette cuisine / télé salle fonctionnent même si le POS est fermé
+- Redémarrage automatique si crash ou redémarrage machine
+- Compatible déploiement sur mini PC Linux (Raspberry Pi, Ubuntu Server)
+- Base pour la sync cloud (le service tourne 24h/24)
+
+#### Étape 4.1 — Extraire Fastify en processus standalone
+- [ ] Créer `server/src/main.ts` — entry point Node.js pur (sans Electron)
+- [ ] Vérifier que `node server/src/main.ts` lance Fastify correctement
+- [ ] Adapter `electron/main.ts` pour détecter si le service tourne déjà
+- [ ] Si service déjà lancé → ouvrir la fenêtre directement
+- [ ] Si non → spawner le service en process enfant puis attendre /api/health
+
+#### Étape 4.2 — Scripts d'installation multi-OS
+- [ ] Détecter l'OS au runtime (`process.platform`)
+- [ ] **Windows** : `scripts/install-service.win.js` avec `node-windows`
+  - Enregistre comme Windows Service, redémarrage auto, logs dans Event Viewer
+- [ ] **Linux** : `scripts/install-service.linux.js`
+  - Génère `/etc/systemd/system/quick-order-hub.service`
+  - `systemctl enable --now quick-order-hub`
+- [ ] `scripts/uninstall-service.js` — désinstallation multi-OS
+- [ ] Tester : service démarre au boot sur les 2 OS
+
+#### Étape 4.3 — Packaging
+- [ ] `electron-builder` : inclure le script d'installation dans le setup
+- [ ] Installer le service automatiquement à l'installation de l'app (si droits admin)
+- [ ] Désinstaller le service à la désinstallation de l'app
+
+#### Tests Phase 4
+- [ ] Créer `tests/phase4/service.checklist.md`
+- [ ] Windows : `sc query QuickOrderHub` → service visible
+- [ ] Linux : `systemctl status quick-order-hub` → active (running)
+- [ ] Vérifier : tablette cuisine accessible si fenêtre POS fermée
+- [ ] Vérifier : service redémarre après `kill -9` ou reboot machine
+
+#### Validation Phase 4
+- [ ] Service visible dans les services système (Windows + Linux)
+- [ ] Tablette cuisine accessible après fermeture de la fenêtre Electron
+- [ ] Redémarrage machine → service redémarre automatiquement
+- [ ] POS se reconnecte au service existant sans le redémarrer
+- [ ] Fonctionne sur Windows 10/11 ET Ubuntu 22.04+
+
+---
+
+### ⏳ PHASE 5 — API cloud + Sync VPS
+**Statut : EN ATTENTE (démarrer seulement quand Phase 4 est 100% validée)**
+
+#### Étape 5.1 — Setup VPS
 - [ ] Choisir PostgreSQL ou MariaDB
 - [ ] Installer et configurer sur le VPS
 - [ ] Créer le schéma de la base cloud
 
-#### Étape 4.2 — Backend cloud
+#### Étape 5.2 — Backend cloud
 - [ ] Projet Fastify sur le VPS
 - [ ] Réutiliser `packages/shared/`
 - [ ] Exposer les routes nécessaires
 
-#### Étape 4.3 — Implémenter SyncService
+#### Étape 5.3 — Implémenter SyncService
 - [ ] Ajouter `syncStatus` sur les commandes SQLite
 - [ ] Sync async avec retry si réseau down
 
-#### Étape 4.4 — Tests unitaires Vitest (maintenant que l'archi est stable)
+#### Étape 5.4 — Tests unitaires Vitest (maintenant que l'archi est stable)
 - [ ] Installer Vitest dans `server/`
 - [ ] Tester `orderService` — calcul totaux, validation, statuts
 - [ ] Tester `syncService` — comportement offline, retry
 - [ ] Tester `backupService` — scheduling, création fichier
 
-#### Tests Phase 4
-- [ ] Créer `tests/phase4/sync.curl.sh` — vérifier sync local → VPS
-- [ ] Créer `tests/phase4/checklist.md` — panel admin, offline
+#### Tests Phase 5
+- [ ] Créer `tests/phase5/sync.curl.sh` — vérifier sync local → VPS
+- [ ] Créer `tests/phase5/checklist.md` — panel admin, offline
 - [ ] Lancer les tests unitaires Vitest
 
-#### Validation Phase 4
+#### Validation Phase 5
 - [ ] Commandes payées synchronisées vers VPS
 - [ ] Panel admin fonctionnel
 - [ ] POS fonctionne offline si VPS injoignable
@@ -602,10 +674,10 @@ export const orderService = {
 > Mettre à jour cette section à chaque session de travail.
 > Ne jamais modifier cette section sans validation du développeur.
 
-**Dernière session :** Phase 2 validée ✅ — plan réorganisé (Phase 3 = tablette cuisine + télé salle, Phase 4 = sync VPS)
-**Phase active :** Phase 3 — Tablette cuisine + Télé salle
-**Prochaine tâche :** Étape 3.1 — WebSocket server (@fastify/websocket + wsService + broadcast sur mutations d'ordres)
-**Blockers :** Aucun
+**Dernière session :** Phase 3 étapes 3.1→3.4 complètes — WS server, tablette /cuisine, télé /display, intégration POS (toast + badge ready)
+**Phase active :** Phase 3 — Tests (3.5) puis validation
+**Prochaine tâche :** Créer tests/phase3/ (ws.curl.sh + checklist.md), puis valider manuellement
+**Blockers :** Aucun — TypeScript backend + frontend 0 nouvelles erreurs
 
 ---
 
