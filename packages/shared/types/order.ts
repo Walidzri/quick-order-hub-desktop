@@ -1,4 +1,4 @@
-export type OrderStatus = 'draft' | 'sentToKitchen' | 'paid' | 'cancelled';
+export type OrderStatus = 'draft' | 'sentToKitchen' | 'ready' | 'paid' | 'cancelled';
 export type PaymentMethod = 'cash' | 'card';
 export type OrderType = 'dine-in' | 'takeaway' | 'delivery';
 export type PromoType = 'percent' | 'fixed' | 'freeItem';

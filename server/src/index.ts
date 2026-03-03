@@ -13,6 +13,7 @@ import { usersRoutes } from './routes/users';
 import { authRoutes } from './routes/auth';
 import { inventoryRoutes } from './routes/inventory';
 import { eventsRoutes } from './routes/events';
+import { cuisineRoutes } from './routes/cuisine';
 import { initDatabase, closeDatabase, getDefaultDbPath } from './db/connection';
 
 const fastify = Fastify({
@@ -62,6 +63,7 @@ export async function startServer(port = 3002, dbPath?: string): Promise<typeof 
   await fastify.register(authRoutes);
   await fastify.register(inventoryRoutes);
   await fastify.register(eventsRoutes);
+  await fastify.register(cuisineRoutes);
 
   fastify.get('/api/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
