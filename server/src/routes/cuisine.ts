@@ -207,7 +207,7 @@ const HTML = /* html */`<!DOCTYPE html>
           + '</div></div>'
           + '<ul class="items">' + itemsHtml + '</ul>'
           + deliveryNote
-          + '<button class="btn-ready" onclick="markReady(\'' + o.id + '\')">\u2713 Pr\xEAt</button>'
+          + '<button class="btn-ready" data-id="' + o.id + '">\u2713 Pr\xEAt</button>'
           + '</div>';
       }).join('');
     }
@@ -227,8 +227,7 @@ const HTML = /* html */`<!DOCTYPE html>
     }, 10000);
 
     // ── Action "Prêt" ─────────────────────────────────────────────────────────
-    async function markReady(id) {
-      const btn = document.querySelector('#card-' + id + ' .btn-ready');
+    async function markReady(id, btn) {
       if (btn) { btn.disabled = true; btn.textContent = '\u23F3'; }
       try {
         const res = await fetch('/api/orders/' + id + '/status', {
@@ -247,6 +246,14 @@ const HTML = /* html */`<!DOCTYPE html>
         if (btn) { btn.disabled = false; btn.textContent = '\u2713 Pr\xEAt'; }
       }
     }
+
+    // Event delegation — un seul listener pour tous les boutons "Prêt"
+    document.getElementById('grid').addEventListener('click', function(e) {
+      const btn = e.target.closest('.btn-ready');
+      if (btn && !btn.disabled) {
+        markReady(btn.getAttribute('data-id'), btn);
+      }
+    });
 
     // ── Chargement initial ────────────────────────────────────────────────────
     async function loadOrders() {
