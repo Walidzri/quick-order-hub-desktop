@@ -63,6 +63,7 @@ export async function syncRoutes(fastify: FastifyInstance) {
 
       for (const o of orders) {
         try {
+          await client.query('SAVEPOINT sp');
           await client.query(
             `INSERT INTO orders (
               id, "orderNumber", status, type, lines,
@@ -100,7 +101,7 @@ export async function syncRoutes(fastify: FastifyInstance) {
               o.orderNumber   ?? null,
               o.status        ?? 'pending',
               o.type          ?? 'dine-in',
-              parseJson(o.lines),
+              parseJson(o.lines) ?? [],
               o.subtotal      ?? 0,
               o.discount      ?? 0,
               o.total         ?? 0,
@@ -119,8 +120,10 @@ export async function syncRoutes(fastify: FastifyInstance) {
               new Date().toISOString(),
             ]
           );
+          await client.query('RELEASE SAVEPOINT sp');
           synced++;
         } catch (err: any) {
+          await client.query('ROLLBACK TO SAVEPOINT sp');
           errors.push(`order ${o.id} : ${err.message}`);
         }
       }
@@ -156,6 +159,7 @@ export async function syncRoutes(fastify: FastifyInstance) {
 
       for (const p of products) {
         try {
+          await client.query('SAVEPOINT sp');
           await client.query(
             `INSERT INTO products (
               id, "categoryId", name, "basePrice", "sortOrder", available,
@@ -183,14 +187,16 @@ export async function syncRoutes(fastify: FastifyInstance) {
               Boolean(p.available),
               p.description        ?? null,
               p.image              ?? null,
-              parseJson(p.modifierGroupIds),
-              parseJson(p.supplementIds),
+              parseJson(p.modifierGroupIds) ?? [],
+              parseJson(p.supplementIds)    ?? [],
               'synced',
               new Date().toISOString(),
             ]
           );
+          await client.query('RELEASE SAVEPOINT sp');
           synced++;
         } catch (err: any) {
+          await client.query('ROLLBACK TO SAVEPOINT sp');
           errors.push(`product ${p.id} : ${err.message}`);
         }
       }
