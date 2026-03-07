@@ -353,6 +353,11 @@ app.on('ready', async () => {
   try {
     const dbPath = join(app.getPath('userData'), 'pos.db');
     console.log('[MAIN] SQLite path:', dbPath);
+
+    // Config synchronisation cloud (VPS via VPN)
+    process.env.CLOUD_API_URL = 'http://172.18.0.6:4000';
+    process.env.CLOUD_API_KEY = '87c13ec5a96402620fbe09c0a8312635176849ac57329b550363d8e01008dd69';
+
     await startServer(3002, dbPath);
   } catch (error) {
     console.error('[MAIN] Failed to start Fastify server:', error);
