@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { Order, OrderStatus, OrderLine } from '@shared/types';
 import { getDatabase } from '../db/connection';
+import { syncService } from './syncService';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -113,6 +114,7 @@ export const orderService = {
       data.deliveryCustomerName ?? null,
     );
 
+    syncService.syncOrders().catch(() => {});
     return orderService.getById(id)!;
   },
 
@@ -129,7 +131,8 @@ export const orderService = {
         orderNumber=?, status=?, type=?, lines=?, subtotal=?, discount=?, total=?,
         paymentMethod=?, promoCode=?, promoName=?, createdBy=?,
         updatedAt=?, paidAt=?, sentToKitchenAt=?,
-        deliveryAddress=?, deliveryPhone=?, deliveryCustomerName=?
+        deliveryAddress=?, deliveryPhone=?, deliveryCustomerName=?,
+        sync_status='pending'
       WHERE id=?
     `).run(
       merged.orderNumber,
@@ -152,6 +155,7 @@ export const orderService = {
       id,
     );
 
+    syncService.syncOrders().catch(() => {});
     return orderService.getById(id)!;
   },
 
@@ -165,9 +169,11 @@ export const orderService = {
     const sentToKitchenAt = status === 'sentToKitchen'  ? now : (current.sentToKitchenAt ? new Date(current.sentToKitchenAt).toISOString() : null);
 
     db.prepare(`
-      UPDATE orders SET status=?, updatedAt=?, paidAt=?, sentToKitchenAt=? WHERE id=?
+      UPDATE orders SET status=?, updatedAt=?, paidAt=?, sentToKitchenAt=?,
+        sync_status='pending' WHERE id=?
     `).run(status, now, paidAt, sentToKitchenAt, id);
 
+    syncService.syncOrders().catch(() => {});
     return orderService.getById(id)!;
   },
 

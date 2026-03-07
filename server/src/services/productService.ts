@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { Product, Category, ProductVariant, ModifierGroup, ModifierOption } from '@shared/types';
 import { getDatabase } from '../db/connection';
+import { syncService } from './syncService';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ export const productService = {
       JSON.stringify(data.modifierGroupIds ?? []),
       JSON.stringify(data.supplementIds ?? []),
     );
+    syncService.syncProducts().catch(() => {});
     return productService.getProductById(id)!;
   },
 
@@ -165,7 +167,8 @@ export const productService = {
     db.prepare(`
       UPDATE products SET
         categoryId=?, name=?, basePrice=?, sortOrder=?, available=?,
-        description=?, image=?, modifierGroupIds=?, supplementIds=?
+        description=?, image=?, modifierGroupIds=?, supplementIds=?,
+        sync_status='pending'
       WHERE id=?
     `).run(
       merged.categoryId,
@@ -179,6 +182,7 @@ export const productService = {
       JSON.stringify(merged.supplementIds ?? []),
       id,
     );
+    syncService.syncProducts().catch(() => {});
     return productService.getProductById(id)!;
   },
 
