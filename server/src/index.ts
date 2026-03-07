@@ -15,6 +15,7 @@ import { inventoryRoutes } from './routes/inventory';
 import { eventsRoutes } from './routes/events';
 import { cuisineRoutes } from './routes/cuisine';
 import { displayRoutes } from './routes/display';
+import { syncRoutes } from './routes/sync';
 import { initDatabase, closeDatabase, getDefaultDbPath } from './db/connection';
 import { syncService } from './services/syncService';
 
@@ -67,6 +68,7 @@ export async function startServer(port = 3002, dbPath?: string): Promise<typeof 
   await fastify.register(eventsRoutes);
   await fastify.register(cuisineRoutes);
   await fastify.register(displayRoutes);
+  await fastify.register(syncRoutes);
 
   fastify.get('/api/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
