@@ -1,0 +1,21 @@
+{
+  "name": "server-cloud",
+  "version": "1.0.0",
+  "description": "Fastify cloud API — sync VPS pour Doudou Tacos POS",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.0",
+    "fastify": "^4.28.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

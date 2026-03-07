@@ -34,7 +34,9 @@ CREATE TABLE IF NOT EXISTS products (
   description     TEXT,
   image           TEXT,
   modifierGroupIds TEXT DEFAULT '[]',
-  supplementIds   TEXT DEFAULT '[]'
+  supplementIds   TEXT DEFAULT '[]',
+  sync_status     TEXT NOT NULL DEFAULT 'pending',
+  synced_at       TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(categoryId);
 
@@ -85,7 +87,9 @@ CREATE TABLE IF NOT EXISTS orders (
   sentToKitchenAt        TEXT,
   deliveryAddress        TEXT,
   deliveryPhone          TEXT,
-  deliveryCustomerName   TEXT
+  deliveryCustomerName   TEXT,
+  sync_status            TEXT NOT NULL DEFAULT 'pending',
+  synced_at              TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_orders_status  ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created ON orders(createdAt);
@@ -235,6 +239,37 @@ CREATE INDEX IF NOT EXISTS idx_invoices_supplier ON invoices(supplierId);
 CREATE INDEX IF NOT EXISTS idx_invoices_date     ON invoices(date);
 `;
 
+/**
+ * Migration non-destructive — ajoute les colonnes sync si elles n'existent pas.
+ * SQLite ne supporte pas ALTER TABLE ADD COLUMN IF NOT EXISTS, donc on vérifie
+ * d'abord via pragma_table_info.
+ */
+function applyColumnMigrations(db: Database.Database): void {
+  const hasColumn = (table: string, col: string): boolean => {
+    const rows = db.prepare(
+      `SELECT name FROM pragma_table_info(?) WHERE name = ?`
+    ).all(table, col) as Array<{ name: string }>;
+    return rows.length > 0;
+  };
+
+  if (!hasColumn('orders', 'sync_status')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'`);
+    console.log('[DB] Migration : orders.sync_status ajouté');
+  }
+  if (!hasColumn('orders', 'synced_at')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN synced_at TEXT`);
+    console.log('[DB] Migration : orders.synced_at ajouté');
+  }
+  if (!hasColumn('products', 'sync_status')) {
+    db.exec(`ALTER TABLE products ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'`);
+    console.log('[DB] Migration : products.sync_status ajouté');
+  }
+  if (!hasColumn('products', 'synced_at')) {
+    db.exec(`ALTER TABLE products ADD COLUMN synced_at TEXT`);
+    console.log('[DB] Migration : products.synced_at ajouté');
+  }
+}
+
 /** Supprime toutes les tables (utilisé lors d'un changement de version de schéma). */
 function dropAllTables(db: Database.Database): void {
   const tables = (db.prepare(`
@@ -260,4 +295,7 @@ export function applySchema(db: Database.Database): void {
 
   db.exec(SCHEMA_SQL);
   db.pragma(`user_version = ${SCHEMA_VERSION}`);
+
+  // Migrations non-destructives (colonnes ajoutées sans changer la version)
+  applyColumnMigrations(db);
 }

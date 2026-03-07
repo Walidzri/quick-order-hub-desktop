@@ -1,0 +1,30 @@
+services:
+  server-cloud:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: doudoutacos-cloud
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: "4000"
+      PG_HOST: ${PG_HOST:-172.18.0.3}
+      PG_PORT: ${PG_PORT:-5432}
+      PG_DATABASE: ${PG_DATABASE:-doudoutacos}
+      PG_USER: ${PG_USER:-admin}
+      PG_PASSWORD: ${PG_PASSWORD:-admin}
+      API_KEY: ${API_KEY}
+    networks:
+      - vps_net
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+networks:
+  vps_net:
+    external: true
+    name: ${DOCKER_NETWORK}
