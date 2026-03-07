@@ -83,15 +83,26 @@ class SyncService {
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const result = await res.json() as { synced: number; errors: number };
+      const result = await res.json() as { synced: number; errors: number; details?: string[] };
 
-      const now = new Date().toISOString();
-      db.prepare(
-        `UPDATE orders SET sync_status='synced', synced_at=? WHERE id IN (${placeholders})`
-      ).run(now, ...ids);
+      if (result.errors > 0)
+        console.warn(`[SyncService] Orders VPS errors :`, result.details);
 
-      if (result.synced > 0)
+      // Ne marquer synced que les orders effectivement acceptées
+      if (result.synced > 0) {
+        const now = new Date().toISOString();
+        db.prepare(
+          `UPDATE orders SET sync_status='synced', synced_at=? WHERE id IN (${placeholders})`
+        ).run(now, ...ids);
         console.log(`[SyncService] Orders : ${result.synced} syncées`);
+      }
+
+      // Marquer error les orders rejetées
+      if (result.errors > 0 && result.synced === 0) {
+        db.prepare(
+          `UPDATE orders SET sync_status='error' WHERE id IN (${placeholders})`
+        ).run(...ids);
+      }
 
       return { synced: result.synced, failed: result.errors };
     } catch (err: any) {
@@ -132,15 +143,24 @@ class SyncService {
       });
 
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const result = await res.json() as { synced: number; errors: number };
+      const result = await res.json() as { synced: number; errors: number; details?: string[] };
 
-      const now = new Date().toISOString();
-      db.prepare(
-        `UPDATE products SET sync_status='synced', synced_at=? WHERE id IN (${placeholders})`
-      ).run(now, ...ids);
+      if (result.errors > 0)
+        console.warn(`[SyncService] Products VPS errors :`, result.details);
 
-      if (result.synced > 0)
+      if (result.synced > 0) {
+        const now = new Date().toISOString();
+        db.prepare(
+          `UPDATE products SET sync_status='synced', synced_at=? WHERE id IN (${placeholders})`
+        ).run(now, ...ids);
         console.log(`[SyncService] Products : ${result.synced} syncés`);
+      }
+
+      if (result.errors > 0 && result.synced === 0) {
+        db.prepare(
+          `UPDATE products SET sync_status='error' WHERE id IN (${placeholders})`
+        ).run(...ids);
+      }
 
       return { synced: result.synced, failed: result.errors };
     } catch (err: any) {

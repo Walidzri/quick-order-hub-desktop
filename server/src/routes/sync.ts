@@ -48,4 +48,15 @@ export async function syncRoutes(fastify: FastifyInstance) {
     const result = await syncService.syncNow();
     return reply.send(result);
   });
+
+  // POST /api/sync/reset — remet tous les records en 'pending' (utile après un fix PostgreSQL)
+  fastify.post('/api/sync/reset', async (_request, reply) => {
+    const db = getDatabase();
+    const orders   = db.prepare(`UPDATE orders   SET sync_status='pending', synced_at=NULL`).run();
+    const products = db.prepare(`UPDATE products SET sync_status='pending', synced_at=NULL`).run();
+    return reply.send({
+      reset: { orders: orders.changes, products: products.changes },
+      message: 'Tous les records repassés en pending — lance /api/sync/now pour re-syncer',
+    });
+  });
 }
