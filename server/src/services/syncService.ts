@@ -58,6 +58,43 @@ class SyncService {
     return h;
   }
 
+  // ─── Categories ──────────────────────────────────────────────────────────
+
+  async syncCategories(): Promise<{ synced: number; failed: number }> {
+    if (!this.config) return { synced: 0, failed: 0 };
+
+    const db = getDatabase();
+    const rows = db.prepare(`SELECT * FROM categories`).all() as Record<string, unknown>[];
+
+    if (rows.length === 0) return { synced: 0, failed: 0 };
+
+    const categories = rows.map(r => ({
+      ...r,
+      supplementIds: parseJsonField(r['supplementIds']),
+    }));
+
+    try {
+      const res = await fetch(`${this.config.vpsUrl}/api/sync/categories`, {
+        method: 'POST',
+        headers: this.headers,
+        body: JSON.stringify({ categories }),
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const result = await res.json() as { synced: number; errors: number; details?: string[] };
+
+      if (result.errors > 0)
+        console.warn(`[SyncService] Categories VPS errors :`, result.details);
+
+      console.log(`[SyncService] Categories : ${result.synced} syncées`);
+      return { synced: result.synced, failed: result.errors };
+    } catch (err: any) {
+      console.warn(`[SyncService] Sync categories échoué : ${err.message}`);
+      return { synced: 0, failed: rows.length };
+    }
+  }
+
   // ─── Orders ──────────────────────────────────────────────────────────────
 
   async syncOrders(): Promise<{ synced: number; failed: number }> {
@@ -176,6 +213,9 @@ class SyncService {
 
   async syncNow(): Promise<SyncResult> {
     if (!this.config) return { synced: 0, failed: 0, pending: 0, timestamp: new Date() };
+
+    // Les catégories doivent arriver avant les produits (FK constraint)
+    await this.syncCategories().catch(() => {});
 
     const [ordersRes, productsRes] = await Promise.allSettled([
       this.syncOrders(),

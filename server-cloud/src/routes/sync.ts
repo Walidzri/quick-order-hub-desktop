@@ -44,6 +44,64 @@ export async function syncRoutes(fastify: FastifyInstance) {
   });
 
   // ──────────────────────────────────────────────────────────────
+  // POST /api/sync/categories — upsert batch de catégories
+  // Body: { categories: Category[] }
+  // ──────────────────────────────────────────────────────────────
+  fastify.post('/api/sync/categories', async (request, reply) => {
+    const { categories } = request.body as { categories: any[] };
+    if (!Array.isArray(categories) || categories.length === 0) {
+      return reply.status(400).send({ error: 'categories doit être un tableau non vide' });
+    }
+
+    const pool = getPool();
+    const client = await pool.connect();
+    let synced = 0;
+    const errors: string[] = [];
+
+    try {
+      await client.query('BEGIN');
+
+      for (const c of categories) {
+        try {
+          await client.query('SAVEPOINT sp');
+          await client.query(
+            `INSERT INTO categories (id, name, "sortOrder", icon, image, "supplementIds")
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (id) DO UPDATE SET
+               name             = EXCLUDED.name,
+               "sortOrder"      = EXCLUDED."sortOrder",
+               icon             = EXCLUDED.icon,
+               image            = EXCLUDED.image,
+               "supplementIds"  = EXCLUDED."supplementIds"`,
+            [
+              c.id,
+              c.name,
+              c.sortOrder ?? 0,
+              c.icon      ?? null,
+              c.image     ?? null,
+              JSON.stringify(parseJson(c.supplementIds) ?? []),
+            ]
+          );
+          await client.query('RELEASE SAVEPOINT sp');
+          synced++;
+        } catch (err: any) {
+          await client.query('ROLLBACK TO SAVEPOINT sp');
+          errors.push(`category ${c.id} : ${err.message}`);
+        }
+      }
+
+      await client.query('COMMIT');
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      return reply.status(500).send({ error: err.message });
+    } finally {
+      client.release();
+    }
+
+    return reply.send({ synced, errors: errors.length, details: errors });
+  });
+
+  // ──────────────────────────────────────────────────────────────
   // POST /api/sync/orders — upsert batch de commandes
   // Body: { orders: Order[] }
   // ──────────────────────────────────────────────────────────────
