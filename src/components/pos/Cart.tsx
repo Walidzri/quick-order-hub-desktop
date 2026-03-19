@@ -203,7 +203,7 @@ export function Cart() {
                           <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 text-destructive" />
                         </button>
                         <span className="text-[10px] sm:text-xs text-muted-foreground hidden sm:inline">
-                          {draft.cart.length} art.
+                          {draft.cart.length} {t('order.itemsAbbr')}
                         </span>
                       </div>
                       <span className="font-bold text-xs sm:text-sm text-primary flex-shrink-0">
@@ -250,7 +250,7 @@ export function Cart() {
                                   )}
                                   {item.modifiers.length > 0 && (
                                     <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                                      +{item.modifiers.length} supp.
+                                      +{item.modifiers.length} {t('order.supplementsAbbr')}
                                     </p>
                                   )}
                                   {item.note && (

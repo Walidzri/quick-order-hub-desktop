@@ -166,7 +166,7 @@ export function SettingsScreen() {
   const handleRestartDaemon = async () => {
     // PrintDaemon C# runs as a separate process - just refresh status
     await showAlert(
-      'PrintDaemon C# est un processus séparé.\n\nPour le redémarrer, arrêtez et relancez PrintDaemon.exe manuellement, ou configurez-le comme service Windows.',
+      t('printer.daemonInfo'),
       'Information'
     );
     // Recheck status
@@ -178,7 +178,7 @@ export function SettingsScreen() {
       (p) => p.role === 'cashier' && p.enabled !== false
     );
     if (!receiptPrinters?.length) {
-      toast({ title: t('general.error'), description: 'Aucune imprimante reçu client configurée', variant: 'destructive' });
+      toast({ title: t('general.error'), description: t('printer.noCashierPrinter'), variant: 'destructive' });
       return;
     }
     const printer = receiptPrinters[0];
@@ -203,7 +203,7 @@ export function SettingsScreen() {
         port: printer.tcpPort || 9100,
       };
     } else {
-      toast({ title: t('general.error'), description: 'Imprimante reçu client non configurée (IP ou nom manquant)', variant: 'destructive' });
+      toast({ title: t('general.error'), description: t('printer.incompleteConfig'), variant: 'destructive' });
       return;
     }
     setIsOpeningDrawer(true);
@@ -490,10 +490,10 @@ export function SettingsScreen() {
                 <div className="flex items-center justify-between">
                   <div className="flex-1 pr-4">
                     <label className="text-sm font-medium block mb-1">
-                      Paiement par carte
+                      {t('payment.card')}
                     </label>
                     <p className="text-xs text-muted-foreground">
-                      Activer ou désactiver le paiement par carte bancaire
+                      {t('payment.cardDisabledMessage')}
                     </p>
                   </div>
                   <Switch
@@ -509,7 +509,7 @@ export function SettingsScreen() {
                   {t('order.openDrawer')}
                 </label>
                 <p className="text-xs text-muted-foreground mb-3">
-                  Ouvre le tiroir caisse connecté en RJ12 à l'imprimante reçu client
+                  {t('settings.drawerDesc')}
                 </p>
                 <Button
                   type="button"
@@ -530,7 +530,7 @@ export function SettingsScreen() {
                     {t('general.shutdownPC')}
                   </label>
                   <p className="text-xs text-muted-foreground mb-3">
-                    Arrête l’ordinateur après confirmation (Windows : arrêt dans 5 secondes).
+                    {t('settings.shutdownDesc')}
                   </p>
                   <Button
                     type="button"
@@ -770,7 +770,7 @@ export function SettingsScreen() {
               {/* UI Scale */}
               <div>
                 <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2 sm:mb-3">
-                  Taille de l'interface
+                  {t('settings.uiScale')}
                 </label>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3 sm:gap-4">
@@ -790,7 +790,7 @@ export function SettingsScreen() {
                     </div>
                   </div>
                   <p className="text-xs sm:text-sm text-muted-foreground">
-                    Ajustez la taille de l'interface pour les petits écrans. Réduire pour afficher plus de contenu, augmenter pour des boutons plus grands.
+                    {t('settings.uiScaleDesc')}
                   </p>
                   <div className="flex gap-2 flex-wrap">
                     {[0.75, 0.9, 1.0, 1.1, 1.25].map((scale) => (
@@ -921,10 +921,10 @@ export function SettingsScreen() {
                             <button
                               onClick={async () => {
                                 const confirmed = await showDialog({
-                                  title: 'Supprimer la promotion',
-                                  description: `Êtes-vous sûr de vouloir supprimer la promotion ${promo.code} ?`,
-                                  confirmText: 'Supprimer',
-                                  cancelText: 'Annuler',
+                                  title: t('promo.delete'),
+                                  description: `${t('general.deleteConfirm')} ${promo.code} ?`,
+                                  confirmText: t('general.delete'),
+                                  cancelText: t('general.cancel'),
                                   variant: 'destructive',
                                 });
                                 if (confirmed) {
@@ -1307,7 +1307,7 @@ export function SettingsScreen() {
                     {/* Backup Directory */}
                     <div className="mb-4">
                       <label className="text-sm font-medium text-muted-foreground block mb-2">
-                        Répertoire de sauvegarde
+                        {t('backup.selectDirectory')}
                       </label>
                       <div className="flex gap-2">
                         <Input
@@ -1322,7 +1322,7 @@ export function SettingsScreen() {
                             if (typeof window !== 'undefined' && window.electronAPI) {
                               try {
                                 const result = await window.electronAPI.showOpenDialog({
-                                  title: 'Sélectionner le répertoire de sauvegarde',
+                                  title: t('backup.selectDirectory'),
                                   properties: ['openDirectory'],
                                 });
                                 if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
@@ -1330,7 +1330,7 @@ export function SettingsScreen() {
                                 }
                               } catch (error) {
                                 console.error('Error selecting directory:', error);
-                                await showAlert('Erreur lors de la sélection du répertoire', 'Erreur');
+                                await showAlert(t('backup.selectionError'), t('general.error'));
                               }
                             } else {
                               await showAlert('L\'API Electron n\'est pas disponible. Veuillez utiliser la version desktop.', 'Erreur');
@@ -1338,11 +1338,11 @@ export function SettingsScreen() {
                           }}
                         >
                           <FolderOpen className="w-4 h-4 mr-2" />
-                          Parcourir
+                          {t('general.continue')}
                         </Button>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Répertoire où seront stockées les sauvegardes automatiques. Les fichiers seront nommés avec un horodatage.
+                        {t('backup.directoryDesc')}
                       </p>
                     </div>
 
@@ -1354,25 +1354,25 @@ export function SettingsScreen() {
                             {(() => {
                               const scheduleType = settings.backupScheduleType || 'interval';
                               if (scheduleType === 'interval') {
-                                return `Sauvegarde automatique active - Toutes les ${settings.backupInterval || 60} minute(s)`;
+                                return `${t('data.autoBackupActive')} - ${t('data.everyMinutes').replace('{minutes}', String(settings.backupInterval || 60))}`;
                               } else if (scheduleType === 'daily') {
-                                return `Sauvegarde automatique active - Quotidienne à ${settings.backupDailyTime || '02:00'}`;
+                                return `${t('data.autoBackupActive')} - ${t('data.dailyAt').replace('{time}', settings.backupDailyTime || '02:00')}`;
                               } else if (scheduleType === 'weekly') {
                                 const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
                                 const day = days[settings.backupWeeklyDay || 0];
-                                return `Sauvegarde automatique active - Hebdomadaire le ${day} à ${settings.backupWeeklyTime || '02:00'}`;
+                                return `${t('data.autoBackupActive')} - ${t('data.weeklyOn').replace('{day}', day).replace('{time}', settings.backupWeeklyTime || '02:00')}`;
                               } else if (scheduleType === 'monthly') {
-                                return `Sauvegarde automatique active - Mensuelle le ${settings.backupMonthlyDay || 1} à ${settings.backupMonthlyTime || '02:00'}`;
+                                return `${t('data.autoBackupActive')} - ${t('data.monthlyOn').replace('{day}', String(settings.backupMonthlyDay || 1)).replace('{time}', settings.backupMonthlyTime || '02:00')}`;
                               }
-                              return 'Sauvegarde automatique active';
+                              return t('data.autoBackupActive');
                             })()}
                           </>
                         ) : (
-                          <>Veuillez sélectionner un répertoire de sauvegarde pour activer la sauvegarde automatique</>
+                          <>{t('backup.selectDirectoryPrompt')}</>
                         )}
                       </p>
                       <p className="text-xs text-muted-foreground mt-2">
-                        Les sauvegardes sont créées au format JSON, compatible avec la fonction d&apos;import/export manuelle.
+                        {t('backup.formatInfo')}
                       </p>
                     </div>
                   </>
@@ -1480,7 +1480,7 @@ export function SettingsScreen() {
                 <div className="p-3 sm:p-4 bg-gray-500/10 border-2 border-gray-500/20 rounded-xl">
                   <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2 text-sm sm:text-base">Emplacement des Données</h3>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-2">
-                    Les données de l'application (produits, commandes, paramètres) sont stockées localement sur votre ordinateur.
+                    {t('settings.dataStorageInfo')}
                   </p>
                   <Button
                     variant="ghost"
@@ -1513,7 +1513,7 @@ export function SettingsScreen() {
               <div className="p-3 sm:p-4 bg-blue-500/10 border-2 border-blue-500/20 rounded-xl">
                 <h3 className="font-medium text-blue-600 dark:text-blue-400 mb-2 text-sm sm:text-base">Template des Produits</h3>
                 <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                  Exportez ou importez un template de produits (catégories, produits, variantes et modifiers) pour partager votre configuration ou démarrer rapidement.
+                  {t('settings.productTemplateInfo')}
                 </p>
                 <div className="flex gap-2">
                   <Button
@@ -1588,7 +1588,7 @@ export function SettingsScreen() {
                       setIsImportingTemplate(true);
                       try {
                         const result = await window.electronAPI.showOpenDialog({
-                          title: 'Importer un template de produits',
+                          title: t('data.importTemplateProducts'),
                           filters: [
                             { name: 'Fichiers JSON', extensions: ['json'] },
                             { name: 'Tous les fichiers', extensions: ['*'] },

@@ -128,29 +128,29 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
         animate={{ opacity: 1 }}
         className="space-y-4 sm:space-y-6 w-full"
       >
-        <h2 className="text-xl sm:text-2xl font-bold">Personnalisation des Tickets et Reçus</h2>
+        <h2 className="text-xl sm:text-2xl font-bold">{t('receipt.customizationTitle')}</h2>
 
         <div className="flex flex-col lg:flex-row gap-6 w-full">
           <div className="lg:w-[50%] lg:min-w-[600px] space-y-4 sm:space-y-6">
             {/* Général (toujours visible) */}
             <div className="p-4 bg-muted/50 rounded-xl space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-base">Paramètres généraux</h3>
+                <h3 className="font-semibold text-base">{t('receipt.generalSettings')}</h3>
               </div>
               <div>
-                <label className="text-xs sm:text-sm font-medium text-muted-foreground">Message d&apos;en-tête</label>
-                <TouchTextarea value={settings.receiptHeader} onChange={(v) => updateSettings({ receiptHeader: v })} className="mt-1" rows={2} placeholder="Message d'en-tête" showQuickSuggestions={false} />
+                <label className="text-xs sm:text-sm font-medium text-muted-foreground">{t('receipt.headerMessage')}</label>
+                <TouchTextarea value={settings.receiptHeader} onChange={(v) => updateSettings({ receiptHeader: v })} className="mt-1" rows={2} placeholder={t('receipt.headerMessage')} showQuickSuggestions={false} />
               </div>
               <div>
-                <label className="text-xs sm:text-sm font-medium text-muted-foreground">Message de pied de page</label>
-                <TouchTextarea value={settings.receiptFooter} onChange={(v) => updateSettings({ receiptFooter: v })} className="mt-1" rows={2} placeholder="Message de pied de page" showQuickSuggestions={false} />
+                <label className="text-xs sm:text-sm font-medium text-muted-foreground">{t('receipt.footerMessage')}</label>
+                <TouchTextarea value={settings.receiptFooter} onChange={(v) => updateSettings({ receiptFooter: v })} className="mt-1" rows={2} placeholder={t('receipt.footerMessage')} showQuickSuggestions={false} />
               </div>
               <div className="flex items-center justify-between p-3 bg-background rounded-lg">
-                <span className="font-medium text-sm">Afficher l&apos;adresse</span>
+                <span className="font-medium text-sm">{t('receipt.showAddress')}</span>
                 <Switch checked={settings.showAddress} onCheckedChange={(c) => updateSettings({ showAddress: c })} />
               </div>
               <div className="flex items-center justify-between p-3 bg-background rounded-lg">
-                <span className="font-medium text-sm">Afficher le téléphone</span>
+                <span className="font-medium text-sm">{t('receipt.showPhone')}</span>
                 <Switch checked={settings.showPhone} onCheckedChange={(c) => updateSettings({ showPhone: c })} />
               </div>
             </div>
@@ -287,29 +287,29 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                       </div>
                       {customization.separatorStyle !== 'none' && (
                         <div>
-                          <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Caractère de séparation personnalisé</label>
+                          <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.customSeparatorChar')}</label>
                           <TouchInput value={customization.separatorChar} onChange={(value) => updateCustomization({ separatorChar: value || '─' })} maxLength={1} className="w-32 font-mono text-2xl text-center" placeholder="─" />
                         </div>
                       )}
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Taille de police</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.fontSize')}</label>
                         <Select value={customization.fontSize} onValueChange={(v: 'small'|'normal'|'large') => updateCustomization({ fontSize: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="small">Petite</SelectItem>
-                            <SelectItem value="normal">Normale</SelectItem>
-                            <SelectItem value="large">Grande</SelectItem>
+                            <SelectItem value="small">{t('receipt.fontSizeSmall')}</SelectItem>
+                            <SelectItem value="normal">{t('receipt.fontSizeNormal')}</SelectItem>
+                            <SelectItem value="large">{t('receipt.fontSizeLarge')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Police de caractères</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.fontFamily')}</label>
                         <Select value={customization.fontFamily} onValueChange={(v: 'monospace'|'sans-serif'|'serif') => updateCustomization({ fontFamily: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="monospace">Monospace (Courier)</SelectItem>
-                            <SelectItem value="sans-serif">Sans-serif (Arial)</SelectItem>
-                            <SelectItem value="serif">Serif (Times)</SelectItem>
+                            <SelectItem value="monospace">{t('receipt.fontMono')}</SelectItem>
+                            <SelectItem value="sans-serif">{t('receipt.fontSans')}</SelectItem>
+                            <SelectItem value="serif">{t('receipt.fontSerif')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -377,12 +377,12 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                     {/* Formatage - Cuisine */}
                     <Collapsible open={expandedSections.kitchenFormat} onOpenChange={() => toggleSection('kitchenFormat')}>
                       <CollapsibleTrigger className="w-full flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
-                        <h4 className="font-medium text-sm">Formatage</h4>
+                        <h4 className="font-medium text-sm">{t('receipt.formatting')}</h4>
                         {expandedSections.kitchenFormat ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </CollapsibleTrigger>
                       <CollapsibleContent className="mt-3 space-y-4">
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Format de date</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.dateFormat')}</label>
                         <Select value={customization.dateFormat} onValueChange={(v) => updateCustomization({ dateFormat: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -394,7 +394,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                         </Select>
                       </div>
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Format d&apos;heure</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.timeFormat')}</label>
                         <Select value={customization.timeFormat} onValueChange={(v) => updateCustomization({ timeFormat: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -409,70 +409,70 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                     {/* Mise en page - Cuisine */}
                     <Collapsible open={expandedSections.kitchenLayout} onOpenChange={() => toggleSection('kitchenLayout')}>
                       <CollapsibleTrigger className="w-full flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
-                        <h4 className="font-medium text-sm">Mise en page</h4>
+                        <h4 className="font-medium text-sm">{t('receipt.layout')}</h4>
                         {expandedSections.kitchenLayout ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </CollapsibleTrigger>
                       <CollapsibleContent className="mt-3 space-y-4">
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Alignement de l&apos;en-tête</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.headerAlignment')}</label>
                         <div className="flex gap-2">
-                          <Button variant={customization.headerAlignment === 'left' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'left' })}><AlignLeft className="w-4 h-4 mr-2" />Gauche</Button>
-                          <Button variant={customization.headerAlignment === 'center' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'center' })}><AlignCenter className="w-4 h-4 mr-2" />Centre</Button>
-                          <Button variant={customization.headerAlignment === 'right' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'right' })}><AlignRight className="w-4 h-4 mr-2" />Droite</Button>
+                          <Button variant={customization.headerAlignment === 'left' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'left' })}><AlignLeft className="w-4 h-4 mr-2" />{t('receipt.left')}</Button>
+                          <Button variant={customization.headerAlignment === 'center' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'center' })}><AlignCenter className="w-4 h-4 mr-2" />{t('receipt.center')}</Button>
+                          <Button variant={customization.headerAlignment === 'right' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'right' })}><AlignRight className="w-4 h-4 mr-2" />{t('receipt.right')}</Button>
                         </div>
                       </div>
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Style du nom des produits</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.productNameStyle')}</label>
                         <Select value={customization.productNameStyle} onValueChange={(v: 'normal'|'uppercase'|'lowercase') => updateCustomization({ productNameStyle: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="normal">Normal</SelectItem>
-                            <SelectItem value="uppercase">MAJUSCULES</SelectItem>
-                            <SelectItem value="lowercase">minuscules</SelectItem>
+                            <SelectItem value="uppercase">{t('receipt.uppercase')}</SelectItem>
+                            <SelectItem value="lowercase">{t('receipt.lowercase')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Style des séparateurs</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.separatorStyle')}</label>
                         <Select value={customization.separatorStyle} onValueChange={(v: 'dashes'|'dots'|'equals'|'line'|'none') => {
                           const chars: Record<string, string> = { dashes: '─', dots: '·', equals: '═', line: '─', none: ' ' };
                           updateCustomization({ separatorStyle: v, separatorChar: chars[v] });
                         }}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="dashes">Tirets (─)</SelectItem>
-                            <SelectItem value="dots">Points (·)</SelectItem>
-                            <SelectItem value="equals">Double traits (═)</SelectItem>
-                            <SelectItem value="line">Ligne simple</SelectItem>
-                            <SelectItem value="none">Aucun</SelectItem>
+                            <SelectItem value="dashes">{t('receipt.dashed')} (─)</SelectItem>
+                            <SelectItem value="dots">{t('receipt.dots')} (·)</SelectItem>
+                            <SelectItem value="equals">{t('receipt.equals')} (═)</SelectItem>
+                            <SelectItem value="line">{t('receipt.line')}</SelectItem>
+                            <SelectItem value="none">{t('receipt.none')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       {customization.separatorStyle !== 'none' && (
                         <div>
-                          <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Caractère de séparation personnalisé</label>
+                          <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.customSeparatorChar')}</label>
                           <TouchInput value={customization.separatorChar} onChange={(value) => updateCustomization({ separatorChar: value || '─' })} maxLength={1} className="w-32 font-mono text-2xl text-center" placeholder="─" />
                         </div>
                       )}
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Taille de police</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.fontSize')}</label>
                         <Select value={customization.fontSize} onValueChange={(v: 'small'|'normal'|'large') => updateCustomization({ fontSize: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="small">Petite</SelectItem>
-                            <SelectItem value="normal">Normale</SelectItem>
-                            <SelectItem value="large">Grande</SelectItem>
+                            <SelectItem value="small">{t('receipt.fontSizeSmall')}</SelectItem>
+                            <SelectItem value="normal">{t('receipt.fontSizeNormal')}</SelectItem>
+                            <SelectItem value="large">{t('receipt.fontSizeLarge')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
                       <div>
-                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">Police de caractères</label>
+                        <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.fontFamily')}</label>
                         <Select value={customization.fontFamily} onValueChange={(v: 'monospace'|'sans-serif'|'serif') => updateCustomization({ fontFamily: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="monospace">Monospace (Courier)</SelectItem>
-                            <SelectItem value="sans-serif">Sans-serif (Arial)</SelectItem>
-                            <SelectItem value="serif">Serif (Times)</SelectItem>
+                            <SelectItem value="monospace">{t('receipt.fontMono')}</SelectItem>
+                            <SelectItem value="sans-serif">{t('receipt.fontSans')}</SelectItem>
+                            <SelectItem value="serif">{t('receipt.fontSerif')}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -482,19 +482,19 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                     {/* Libellés - Cuisine */}
                     <Collapsible open={expandedSections.kitchenLabels} onOpenChange={() => toggleSection('kitchenLabels')}>
                       <CollapsibleTrigger className="w-full flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors">
-                        <h4 className="font-medium text-sm">Libellés personnalisés</h4>
+                        <h4 className="font-medium text-sm">{t('receipt.customLabels')}</h4>
                         {expandedSections.kitchenLabels ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       </CollapsibleTrigger>
                       <CollapsibleContent className="mt-3 space-y-3">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <LabelInput label="Titre du ticket" value={customization.labelKitchenTicket} onChange={(v) => updateCustomization({ labelKitchenTicket: v })} />
-                        <LabelInput label="Message de fin" value={customization.labelBonAppetit} onChange={(v) => updateCustomization({ labelBonAppetit: v })} />
-                        <LabelInput label="Nombre d'articles" value={customization.kitchenLabelItemCount || customization.labelItemCount} onChange={(v) => updateCustomization({ kitchenLabelItemCount: v })} />
-                        <LabelInput label="Numéro de commande" value={customization.labelOrderNumber} onChange={(v) => updateCustomization({ labelOrderNumber: v })} />
-                        <LabelInput label="Date" value={customization.labelDate} onChange={(v) => updateCustomization({ labelDate: v })} />
-                        <LabelInput label="Heure" value={customization.labelTime} onChange={(v) => updateCustomization({ labelTime: v })} />
-                        <LabelInput label="Type de commande" value={customization.labelOrderType} onChange={(v) => updateCustomization({ labelOrderType: v })} />
-                        <LabelInput label="Caissier" value={customization.labelCashier} onChange={(v) => updateCustomization({ labelCashier: v })} />
+                        <LabelInput label={t('receipt.kitchenTicketTitle')} value={customization.labelKitchenTicket} onChange={(v) => updateCustomization({ labelKitchenTicket: v })} />
+                        <LabelInput label={t('receipt.endMessage')} value={customization.labelBonAppetit} onChange={(v) => updateCustomization({ labelBonAppetit: v })} />
+                        <LabelInput label={t('receipt.itemCountLabel')} value={customization.kitchenLabelItemCount || customization.labelItemCount} onChange={(v) => updateCustomization({ kitchenLabelItemCount: v })} />
+                        <LabelInput label={t('receipt.orderNumberLabel')} value={customization.labelOrderNumber} onChange={(v) => updateCustomization({ labelOrderNumber: v })} />
+                        <LabelInput label={t('receipt.dateLabel')} value={customization.labelDate} onChange={(v) => updateCustomization({ labelDate: v })} />
+                        <LabelInput label={t('receipt.timeLabel')} value={customization.labelTime} onChange={(v) => updateCustomization({ labelTime: v })} />
+                        <LabelInput label={t('receipt.orderTypeLabel')} value={customization.labelOrderType} onChange={(v) => updateCustomization({ labelOrderType: v })} />
+                        <LabelInput label={t('receipt.cashierLabel')} value={customization.labelCashier} onChange={(v) => updateCustomization({ labelCashier: v })} />
                       </div>
                       </CollapsibleContent>
                     </Collapsible>

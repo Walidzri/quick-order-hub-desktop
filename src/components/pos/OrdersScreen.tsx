@@ -261,17 +261,17 @@ export function OrdersScreen() {
 
   const generateOrdersCSV = (ordersToExport: Order[]): string => {
     const headers = [
-      'Numéro',
-      'Date',
-      'Heure',
-      'Statut',
-      'Type',
-      'Méthode de paiement',
-      'Caissier',
-      'Sous-total',
-      'Remise',
-      'Total',
-      'Articles'
+      t('csv.number'),
+      t('receipt.dateLabel'),
+      t('csv.time'),
+      t('csv.status'),
+      t('csv.type'),
+      t('csv.paymentMethod'),
+      t('csv.cashier'),
+      t('csv.subtotal'),
+      t('csv.discount'),
+      t('csv.total'),
+      t('csv.items'),
     ];
     
     const rows = ordersToExport.map(order => {
@@ -484,7 +484,7 @@ export function OrdersScreen() {
                             {formatCurrency(order.total, currency)}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {order.lines.length} article{order.lines.length > 1 ? 's' : ''}
+                            {order.lines.length} {order.lines.length > 1 ? t('order.itemLabelPlural') : t('order.itemLabel')}
                           </div>
                         </div>
                         
@@ -664,7 +664,7 @@ export function OrdersScreen() {
                     )}
                     {line.note && (
                       <div className="text-sm text-primary italic mt-1">
-                        Note: {line.note}
+                        {t('order.noteLabel')} {line.note}
                       </div>
                     )}
                   </div>

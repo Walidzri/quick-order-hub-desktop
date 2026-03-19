@@ -39,7 +39,15 @@ fastify.setErrorHandler((error, request, reply) => {
 export async function startServer(port = 3002, dbPath?: string): Promise<typeof fastify> {
   // Initialiser SQLite avant les routes
   initDatabase(dbPath ?? getDefaultDbPath());
-  await fastify.register(cors, { origin: true });
+  await fastify.register(cors, {
+    origin: true,
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-api-key'],
+    exposedHeaders: [],
+    credentials: false,
+    preflight: true,
+    strictPreflight: false,
+  });
   await fastify.register(websocket);
 
   // Parser JSON permissif : accepte un body vide (utile pour DELETE avec Content-Type: application/json)

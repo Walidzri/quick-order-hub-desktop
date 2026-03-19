@@ -52,15 +52,15 @@ export function OrderTypeModal({ isOpen, onClose, onSelect, initialDeliveryInfo 
   const handleDeliverySubmit = () => {
     const { address, phone, customerName } = deliveryForm;
     if (!customerName.trim()) {
-      setFormError(t('order.deliveryCustomerName') + ' requis');
+      setFormError(t('order.deliveryCustomerName') + ' ' + t('general.required'));
       return;
     }
     if (!address.trim()) {
-      setFormError(t('order.deliveryAddress') + ' requise');
+      setFormError(t('order.deliveryAddress') + ' ' + t('general.requiredFem'));
       return;
     }
     if (!phone.trim()) {
-      setFormError(t('order.deliveryPhone') + ' requis');
+      setFormError(t('order.deliveryPhone') + ' ' + t('general.required'));
       return;
     }
     onSelect('delivery', { address: address.trim(), phone: phone.trim(), customerName: customerName.trim() });
@@ -177,7 +177,7 @@ export function OrderTypeModal({ isOpen, onClose, onSelect, initialDeliveryInfo 
               </div>
 
               <p className="text-sm text-muted-foreground mb-4">
-                Renseignez les informations de livraison
+                {t('order.deliveryFormInfo')}
               </p>
 
               <div className="space-y-3">
@@ -188,7 +188,7 @@ export function OrderTypeModal({ isOpen, onClose, onSelect, initialDeliveryInfo 
                   <TouchInput
                     value={deliveryForm.customerName}
                     onChange={(value) => setDeliveryForm((f) => ({ ...f, customerName: value }))}
-                    placeholder="Nom du client"
+                    placeholder={t('order.deliveryCustomerNamePlaceholder')}
                     showQuickSuggestions={false}
                     className="h-11"
                   />
@@ -200,7 +200,7 @@ export function OrderTypeModal({ isOpen, onClose, onSelect, initialDeliveryInfo 
                   <TouchInput
                     value={deliveryForm.phone}
                     onChange={(value) => setDeliveryForm((f) => ({ ...f, phone: value }))}
-                    placeholder="06 12 34 56 78"
+                    placeholder={t('order.deliveryPhonePlaceholder')}
                     showQuickSuggestions={false}
                     className="h-11"
                   />
@@ -212,7 +212,7 @@ export function OrderTypeModal({ isOpen, onClose, onSelect, initialDeliveryInfo 
                   <TouchInput
                     value={deliveryForm.address}
                     onChange={(value) => setDeliveryForm((f) => ({ ...f, address: value }))}
-                    placeholder="123 rue Example, 75001 Paris"
+                    placeholder={t('order.deliveryAddressPlaceholder')}
                     showQuickSuggestions={true}
                     quickSuggestions={['Rue', 'Avenue', 'Boulevard', 'Place', 'Allée', 'Chemin', 'Impasse', 'Cours']}
                     className="h-11"
@@ -228,7 +228,7 @@ export function OrderTypeModal({ isOpen, onClose, onSelect, initialDeliveryInfo 
                 onClick={handleDeliverySubmit}
                 className="w-full mt-4"
               >
-                Valider la livraison
+                {t('order.validateDelivery')}
               </Button>
             </motion.div>
           )}

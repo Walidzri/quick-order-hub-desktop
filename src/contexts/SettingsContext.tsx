@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Language, Currency, LANGUAGES, translations } from '@/lib/i18n';
 import { settingsService } from '@/services/settingsService';
+import { toast } from '@/hooks/use-toast';
 import type { Settings } from '@shared/types';
 
 interface SettingsContextType {
@@ -88,10 +89,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const updateSettings = useCallback(async (updates: Partial<Settings>) => {
     if (!settings) return;
-    const newSettings = await settingsService.update(updates);
-    setSettings(newSettings);
-    applyTheme(newSettings);
-    if (updates.kioskMode !== undefined) setKioskMode(updates.kioskMode);
+    try {
+      const newSettings = await settingsService.update(updates);
+      setSettings(newSettings);
+      applyTheme(newSettings);
+      if (updates.kioskMode !== undefined) setKioskMode(updates.kioskMode);
+    } catch (err) {
+      console.error('[SettingsContext] updateSettings error:', err);
+      toast({
+        title: 'Erreur de sauvegarde',
+        description: err instanceof Error ? err.message : 'Impossible de sauvegarder les paramètres',
+        variant: 'destructive',
+      });
+    }
   }, [settings]);
 
   const language = (settings?.language || 'fr-FR') as Language;

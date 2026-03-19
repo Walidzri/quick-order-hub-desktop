@@ -637,6 +637,106 @@ export const translations: Record<Language, Record<string, string>> = {
     'inventory.confirmDeleteMessage': 'Êtes-vous sûr de vouloir supprimer {name} ?',
     'inventory.saveError': 'Erreur lors de la sauvegarde',
     'inventory.deleteError': 'Erreur lors de la suppression',
+
+    // Payment (additional)
+    'payment.successTitle': 'Paiement Réussi!',
+    'payment.preparingReceipt': 'Préparation du reçu...',
+    'payment.continue': 'Continuer',
+    'payment.disabled': 'Désactivé',
+    'payment.cardDisabledMessage': 'Le paiement par carte est désactivé. Activez-le dans les paramètres.',
+    'payment.cardDisabledTooltip': 'Paiement par carte désactivé dans les paramètres',
+
+    // Order (additional)
+    'order.itemsAbbr': 'art.',
+    'order.supplementsAbbr': 'supp.',
+    'order.deliveryFormInfo': 'Renseignez les informations de livraison',
+    'order.deliveryPhonePlaceholder': '06 12 34 56 78',
+    'order.deliveryAddressPlaceholder': '123 rue Example, 75001 Paris',
+    'order.deliveryCustomerNamePlaceholder': 'Nom du client',
+    'order.validateDelivery': 'Valider la livraison',
+    'order.noteLabel': 'Note:',
+    'order.itemLabel': 'article',
+    'order.itemLabelPlural': 'articles',
+
+    // Category management (additional)
+    'category.management': 'Gestion des catégories',
+    'category.deleteTitle': 'Supprimer la catégorie',
+    'category.productsCount': 'produit(s)',
+
+    // Product (additional)
+    'product.deleteTitle': 'Supprimer le produit',
+
+    // CSV (additional)
+    'csv.number': 'Numéro',
+    'csv.time': 'Heure',
+    'csv.status': 'Statut',
+    'csv.type': 'Type',
+    'csv.paymentMethod': 'Méthode de paiement',
+    'csv.cashier': 'Caissier',
+    'csv.subtotal': 'Sous-total',
+    'csv.discount': 'Remise',
+    'csv.total': 'Total',
+    'csv.items': 'Articles',
+
+    // Receipt customization (additional)
+    'receipt.customizationTitle': 'Personnalisation des Tickets et Reçus',
+    'receipt.generalSettings': 'Paramètres généraux',
+    'receipt.headerMessage': 'Message d\'en-tête',
+    'receipt.footerMessage': 'Message de pied de page',
+    'receipt.showAddress': 'Afficher l\'adresse',
+    'receipt.showPhone': 'Afficher le téléphone',
+    'receipt.customSeparatorChar': 'Caractère de séparation personnalisé',
+    'receipt.fontSize': 'Taille de police',
+    'receipt.fontSizeSmall': 'Petite',
+    'receipt.fontSizeNormal': 'Normale',
+    'receipt.fontSizeLarge': 'Grande',
+    'receipt.fontFamily': 'Police de caractères',
+    'receipt.fontMono': 'Monospace (Courier)',
+    'receipt.fontSans': 'Sans-serif (Arial)',
+    'receipt.fontSerif': 'Serif (Times)',
+    'receipt.dateFormat': 'Format de date',
+    'receipt.timeFormat': 'Format d\'heure',
+    'receipt.productNameStyle': 'Style du nom des produits',
+    'receipt.uppercase': 'MAJUSCULES',
+    'receipt.lowercase': 'minuscules',
+    'receipt.separatorStyle': 'Style des séparateurs',
+    'receipt.kitchenTicketTitle': 'Titre du ticket',
+    'receipt.endMessage': 'Message de fin',
+    'receipt.itemCountLabel': 'Nombre d\'articles',
+    'receipt.orderNumberLabel': 'Numéro de commande',
+    'receipt.dateLabel': 'Date',
+    'receipt.timeLabel': 'Heure',
+    'receipt.orderTypeLabel': 'Type de commande',
+    'receipt.cashierLabel': 'Caissier',
+    'receipt.customLabels': 'Libellés personnalisés',
+
+    // Settings (additional)
+    'settings.uiScale': 'Échelle de l\'interface',
+    'settings.uiScaleDesc': 'Ajustez la taille de l\'interface pour les petits écrans',
+    'settings.shutdownDesc': 'Arrête l\'ordinateur après confirmation',
+    'settings.drawerDesc': 'Ouvre le tiroir caisse connecté en RJ12 à l\'imprimante reçu client',
+    'settings.dataStorageInfo': 'Les données sont stockées localement sur cet ordinateur',
+    'settings.productTemplateInfo': 'Exportez ou importez un template de produits',
+
+    // Printer (additional)
+    'printer.noCashierPrinter': 'Aucune imprimante reçu client configurée',
+    'printer.incompleteConfig': 'Imprimante reçu client non configurée (IP ou nom manquant)',
+    'printer.drawerDesc': 'Tiroir caisse',
+    'printer.daemonInfo': 'PrintDaemon C# est un processus séparé qui gère l\'impression',
+
+    // Backup (additional)
+    'backup.selectDirectory': 'Sélectionner le répertoire de sauvegarde',
+    'backup.selectionError': 'Erreur lors de la sélection du répertoire',
+    'backup.directoryDesc': 'Répertoire où seront stockées les sauvegardes automatiques',
+    'backup.selectDirectoryPrompt': 'Veuillez sélectionner un répertoire de sauvegarde',
+    'backup.formatInfo': 'Les sauvegardes sont créées au format JSON',
+
+    // General (additional)
+    'general.continue': 'Continuer',
+    'general.yes': 'Oui',
+    'general.no': 'Non',
+    'general.required': 'requis',
+    'general.requiredFem': 'requise',
   },
   'en-US': {
     // Navigation
@@ -1255,6 +1355,106 @@ export const translations: Record<Language, Record<string, string>> = {
     'inventory.confirmDeleteMessage': 'Are you sure you want to delete {name}?',
     'inventory.saveError': 'Error saving',
     'inventory.deleteError': 'Error deleting',
+
+    // Payment (additional)
+    'payment.successTitle': 'Payment Successful!',
+    'payment.preparingReceipt': 'Preparing receipt...',
+    'payment.continue': 'Continue',
+    'payment.disabled': 'Disabled',
+    'payment.cardDisabledMessage': 'Card payment is disabled. Enable it in settings.',
+    'payment.cardDisabledTooltip': 'Card payment disabled in settings',
+
+    // Order (additional)
+    'order.itemsAbbr': 'item(s)',
+    'order.supplementsAbbr': 'supp.',
+    'order.deliveryFormInfo': 'Enter delivery information',
+    'order.deliveryPhonePlaceholder': '555-123-4567',
+    'order.deliveryAddressPlaceholder': '123 Example St',
+    'order.deliveryCustomerNamePlaceholder': 'Customer name',
+    'order.validateDelivery': 'Confirm delivery',
+    'order.noteLabel': 'Note:',
+    'order.itemLabel': 'item',
+    'order.itemLabelPlural': 'items',
+
+    // Category management (additional)
+    'category.management': 'Category management',
+    'category.deleteTitle': 'Delete category',
+    'category.productsCount': 'product(s)',
+
+    // Product (additional)
+    'product.deleteTitle': 'Delete product',
+
+    // CSV (additional)
+    'csv.number': 'Number',
+    'csv.time': 'Time',
+    'csv.status': 'Status',
+    'csv.type': 'Type',
+    'csv.paymentMethod': 'Payment Method',
+    'csv.cashier': 'Cashier',
+    'csv.subtotal': 'Subtotal',
+    'csv.discount': 'Discount',
+    'csv.total': 'Total',
+    'csv.items': 'Items',
+
+    // Receipt customization (additional)
+    'receipt.customizationTitle': 'Ticket & Receipt Customization',
+    'receipt.generalSettings': 'General settings',
+    'receipt.headerMessage': 'Header message',
+    'receipt.footerMessage': 'Footer message',
+    'receipt.showAddress': 'Show address',
+    'receipt.showPhone': 'Show phone',
+    'receipt.customSeparatorChar': 'Custom separator character',
+    'receipt.fontSize': 'Font size',
+    'receipt.fontSizeSmall': 'Small',
+    'receipt.fontSizeNormal': 'Normal',
+    'receipt.fontSizeLarge': 'Large',
+    'receipt.fontFamily': 'Font family',
+    'receipt.fontMono': 'Monospace (Courier)',
+    'receipt.fontSans': 'Sans-serif (Arial)',
+    'receipt.fontSerif': 'Serif (Times)',
+    'receipt.dateFormat': 'Date format',
+    'receipt.timeFormat': 'Time format',
+    'receipt.productNameStyle': 'Product name style',
+    'receipt.uppercase': 'UPPERCASE',
+    'receipt.lowercase': 'lowercase',
+    'receipt.separatorStyle': 'Separator style',
+    'receipt.kitchenTicketTitle': 'Ticket title',
+    'receipt.endMessage': 'End message',
+    'receipt.itemCountLabel': 'Item count',
+    'receipt.orderNumberLabel': 'Order number',
+    'receipt.dateLabel': 'Date',
+    'receipt.timeLabel': 'Time',
+    'receipt.orderTypeLabel': 'Order type',
+    'receipt.cashierLabel': 'Cashier',
+    'receipt.customLabels': 'Custom labels',
+
+    // Settings (additional)
+    'settings.uiScale': 'UI Scale',
+    'settings.uiScaleDesc': 'Adjust interface size for small screens',
+    'settings.shutdownDesc': 'Shuts down the computer after confirmation',
+    'settings.drawerDesc': 'Opens the cash drawer connected via RJ12 to the receipt printer',
+    'settings.dataStorageInfo': 'Data is stored locally on this computer',
+    'settings.productTemplateInfo': 'Export or import a products template',
+
+    // Printer (additional)
+    'printer.noCashierPrinter': 'No receipt printer configured',
+    'printer.incompleteConfig': 'Receipt printer not fully configured (missing IP or name)',
+    'printer.drawerDesc': 'Cash drawer',
+    'printer.daemonInfo': 'PrintDaemon C# is a separate process that manages printing',
+
+    // Backup (additional)
+    'backup.selectDirectory': 'Select backup directory',
+    'backup.selectionError': 'Error selecting directory',
+    'backup.directoryDesc': 'Directory where automatic backups will be stored',
+    'backup.selectDirectoryPrompt': 'Please select a backup directory',
+    'backup.formatInfo': 'Backups are created in JSON format',
+
+    // General (additional)
+    'general.continue': 'Continue',
+    'general.yes': 'Yes',
+    'general.no': 'No',
+    'general.required': 'required',
+    'general.requiredFem': 'required',
   },
   'ar-DZ': {
     // Navigation
@@ -1880,6 +2080,106 @@ export const translations: Record<Language, Record<string, string>> = {
     'supplements.updateDesc': 'إضافة إضافات بيتزا جديدة دون تعديل بياناتك الأخرى (الطلبات، الإعدادات، إلخ).',
     'supplements.noneSelectedAuto': 'لم يتم اختيار إضافات. سيتم تحديد الإضافات تلقائياً حسب الفئة.',
     'supplements.updateSuccess': '✅ تم تحديث الإضافات بنجاح!',
+
+    // Payment (additional)
+    'payment.successTitle': 'تم الدفع بنجاح!',
+    'payment.preparingReceipt': 'جاري تحضير الإيصال...',
+    'payment.continue': 'متابعة',
+    'payment.disabled': 'معطل',
+    'payment.cardDisabledMessage': 'الدفع بالبطاقة معطل. قم بتفعيله في الإعدادات.',
+    'payment.cardDisabledTooltip': 'الدفع بالبطاقة معطل في الإعدادات',
+
+    // Order (additional)
+    'order.itemsAbbr': 'عنصر',
+    'order.supplementsAbbr': 'إضافة',
+    'order.deliveryFormInfo': 'أدخل معلومات التوصيل',
+    'order.deliveryPhonePlaceholder': '05 12 34 56 78',
+    'order.deliveryAddressPlaceholder': 'العنوان الكامل',
+    'order.deliveryCustomerNamePlaceholder': 'اسم العميل',
+    'order.validateDelivery': 'تأكيد التوصيل',
+    'order.noteLabel': 'ملاحظة:',
+    'order.itemLabel': 'عنصر',
+    'order.itemLabelPlural': 'عناصر',
+
+    // Category management (additional)
+    'category.management': 'إدارة الفئات',
+    'category.deleteTitle': 'حذف الفئة',
+    'category.productsCount': 'منتج(ات)',
+
+    // Product (additional)
+    'product.deleteTitle': 'حذف المنتج',
+
+    // CSV (additional)
+    'csv.number': 'رقم',
+    'csv.time': 'الوقت',
+    'csv.status': 'الحالة',
+    'csv.type': 'النوع',
+    'csv.paymentMethod': 'طريقة الدفع',
+    'csv.cashier': 'أمين الصندوق',
+    'csv.subtotal': 'المجموع الفرعي',
+    'csv.discount': 'الخصم',
+    'csv.total': 'المجموع',
+    'csv.items': 'العناصر',
+
+    // Receipt customization (additional)
+    'receipt.customizationTitle': 'تخصيص التذاكر والإيصالات',
+    'receipt.generalSettings': 'الإعدادات العامة',
+    'receipt.headerMessage': 'رسالة الرأس',
+    'receipt.footerMessage': 'رسالة التذييل',
+    'receipt.showAddress': 'إظهار العنوان',
+    'receipt.showPhone': 'إظهار الهاتف',
+    'receipt.customSeparatorChar': 'حرف الفصل المخصص',
+    'receipt.fontSize': 'حجم الخط',
+    'receipt.fontSizeSmall': 'صغير',
+    'receipt.fontSizeNormal': 'عادي',
+    'receipt.fontSizeLarge': 'كبير',
+    'receipt.fontFamily': 'نوع الخط',
+    'receipt.fontMono': 'أحادي المسافة (Courier)',
+    'receipt.fontSans': 'بدون أسناد (Arial)',
+    'receipt.fontSerif': 'مع أسناد (Times)',
+    'receipt.dateFormat': 'تنسيق التاريخ',
+    'receipt.timeFormat': 'تنسيق الوقت',
+    'receipt.productNameStyle': 'أسلوب اسم المنتج',
+    'receipt.uppercase': 'أحرف كبيرة',
+    'receipt.lowercase': 'أحرف صغيرة',
+    'receipt.separatorStyle': 'نمط الفاصل',
+    'receipt.kitchenTicketTitle': 'عنوان التذكرة',
+    'receipt.endMessage': 'رسالة النهاية',
+    'receipt.itemCountLabel': 'عدد العناصر',
+    'receipt.orderNumberLabel': 'رقم الطلب',
+    'receipt.dateLabel': 'التاريخ',
+    'receipt.timeLabel': 'الوقت',
+    'receipt.orderTypeLabel': 'نوع الطلب',
+    'receipt.cashierLabel': 'الكاشير',
+    'receipt.customLabels': 'التسميات المخصصة',
+
+    // Settings (additional)
+    'settings.uiScale': 'مقياس الواجهة',
+    'settings.uiScaleDesc': 'اضبط حجم الواجهة للشاشات الصغيرة',
+    'settings.shutdownDesc': 'يوقف تشغيل الجهاز بعد التأكيد',
+    'settings.drawerDesc': 'يفتح درج النقدية المتصل بـ RJ12 بطابعة الإيصالات',
+    'settings.dataStorageInfo': 'يتم تخزين البيانات محلياً على هذا الجهاز',
+    'settings.productTemplateInfo': 'تصدير أو استيراد قالب المنتجات',
+
+    // Printer (additional)
+    'printer.noCashierPrinter': 'لا توجد طابعة إيصالات مكونة',
+    'printer.incompleteConfig': 'طابعة الإيصالات غير مكونة بالكامل (IP أو الاسم مفقود)',
+    'printer.drawerDesc': 'درج النقدية',
+    'printer.daemonInfo': 'PrintDaemon C# هو عملية منفصلة تدير الطباعة',
+
+    // Backup (additional)
+    'backup.selectDirectory': 'اختر مجلد النسخ الاحتياطي',
+    'backup.selectionError': 'خطأ في اختيار المجلد',
+    'backup.directoryDesc': 'المجلد الذي سيتم فيه تخزين النسخ الاحتياطية التلقائية',
+    'backup.selectDirectoryPrompt': 'يرجى اختيار مجلد النسخ الاحتياطي',
+    'backup.formatInfo': 'يتم إنشاء النسخ الاحتياطية بتنسيق JSON',
+
+    // General (additional)
+    'general.continue': 'متابعة',
+    'general.yes': 'نعم',
+    'general.no': 'لا',
+    'general.required': 'مطلوب',
+    'general.requiredFem': 'مطلوبة',
   },
 };
 

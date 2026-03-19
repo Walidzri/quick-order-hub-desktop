@@ -266,7 +266,7 @@ export function ProductsManagement({
       {/* Categories Management */}
       <div className="bg-muted/30 rounded-xl p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Gestion des catégories</h3>
+          <h3 className="text-lg font-semibold">{t('category.management')}</h3>
           <Button
             onClick={() => {
               setEditingCategory(null);
@@ -300,7 +300,7 @@ export function ProductsManagement({
                   <div>
                     <div className="font-medium">{category.name}</div>
                     <div className="text-xs text-muted-foreground">
-                      {productsCount} produit{productsCount !== 1 ? 's' : ''} • Ordre: {category.sortOrder}
+                      {productsCount} {t('category.productsCount')} • Ordre: {category.sortOrder}
                     </div>
                   </div>
                 </div>
@@ -321,10 +321,10 @@ export function ProductsManagement({
                     size="icon"
                     onClick={async () => {
                       const confirmed = await showDialog({
-                        title: 'Supprimer la catégorie',
+                        title: t('category.deleteTitle'),
                         description: `${t('category.deleteConfirm')} "${category.name}" ?`,
-                        confirmText: 'Supprimer',
-                        cancelText: 'Annuler',
+                        confirmText: t('general.delete'),
+                        cancelText: t('general.cancel'),
                         variant: 'destructive',
                       });
                       if (confirmed) {
@@ -462,10 +462,10 @@ export function ProductsManagement({
                   <button
                     onClick={async () => {
                       const confirmed = await showDialog({
-                        title: 'Supprimer le produit',
+                        title: t('product.deleteTitle'),
                         description: `${t('products.deleteConfirm')} "${product.name}" ?`,
-                        confirmText: 'Supprimer',
-                        cancelText: 'Annuler',
+                        confirmText: t('general.delete'),
+                        cancelText: t('general.cancel'),
                         variant: 'destructive',
                       });
                       if (confirmed) {

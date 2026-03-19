@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Keyboard, X } from 'lucide-react';
 import { Input } from './input';
 import { cn } from '@/lib/utils';
@@ -28,7 +28,6 @@ export function TouchInput({
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [globalKeyboardVisible, setGlobalKeyboardVisible] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState<Language>(language);
-  const inputRef = useRef<HTMLInputElement>(null);
   
   // Detect language from document
   useEffect(() => {
@@ -93,21 +92,6 @@ export function TouchInput({
     }
   }, [value, showKeyboard, globalKeyboardVisible, onChange, placeholder, showQuickSuggestions, quickSuggestions]);
 
-  const handleFocus = () => {
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    if (isTouchDevice && type !== 'number') {
-      inputRef.current?.blur();
-      setShowKeyboard(true);
-    }
-  };
-
-  const handleClick = () => {
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    if (isTouchDevice && type !== 'number' && !showKeyboard) {
-      setShowKeyboard(true);
-    }
-  };
-
   const toggleKeyboard = () => {
     setShowKeyboard(!showKeyboard);
   };
@@ -116,14 +100,11 @@ export function TouchInput({
     <div className={cn("space-y-2", className)}>
       <div className="relative">
         <Input
-          ref={inputRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           type={type}
           className={cn(globalKeyboardVisible ? "pr-3" : "pr-10", className)}
-          onFocus={handleFocus}
-          onClick={handleClick}
         />
         {!globalKeyboardVisible && (
           <button

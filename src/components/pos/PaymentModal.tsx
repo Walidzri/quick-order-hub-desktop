@@ -326,10 +326,10 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
               <Check className="w-10 h-10 text-success-foreground" />
             </motion.div>
             <h2 className="text-2xl font-bold text-success mb-2">
-              Paiement Réussi!
+              {t('payment.successTitle')}
             </h2>
             <p className="text-muted-foreground">
-              Préparation du reçu...
+              {t('payment.preparingReceipt')}
             </p>
           </div>
         ) : step === 'processing' ? (
@@ -399,7 +399,7 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
                           ? "border-primary bg-primary/10"
                           : "border-border hover:border-primary/50"
                     )}
-                    title={!settings?.cardPaymentEnabled ? "Paiement par carte désactivé dans les paramètres" : undefined}
+                    title={!settings?.cardPaymentEnabled ? t('payment.cardDisabledTooltip') : undefined}
                   >
                     <CreditCard className={cn(
                       "w-10 h-10",
@@ -413,7 +413,7 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
                     </span>
                     {!settings?.cardPaymentEnabled && (
                       <span className="absolute top-2 right-2 text-xs bg-muted-foreground/20 text-muted-foreground px-2 py-0.5 rounded">
-                        Désactivé
+                        {t('payment.disabled')}
                       </span>
                     )}
                   </button>
@@ -425,11 +425,11 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
                     disabled={method === 'card' && !settings?.cardPaymentEnabled}
                     className="w-full h-14 text-base sm:text-lg font-bold gradient-primary border-0"
                   >
-                    {method === 'cash' ? 'Continuer' : t('payment.confirm')}
+                    {method === 'cash' ? t('payment.continue') : t('payment.confirm')}
                   </Button>
                   {method === 'card' && !settings?.cardPaymentEnabled && (
                     <p className="text-xs text-muted-foreground text-center mt-2">
-                      Le paiement par carte est désactivé. Activez-le dans les paramètres.
+                      {t('payment.cardDisabledMessage')}
                     </p>
                   )}
                 </div>
