@@ -102,6 +102,8 @@ export interface Settings {
   backupDirectory?: string; // Répertoire de sauvegarde
   /** Paiement par carte */
   cardPaymentEnabled?: boolean; // Activer/désactiver le paiement par carte (défaut: false)
+  /** Synchronisation cloud */
+  cloudSyncEnabled?: boolean; // Activer/désactiver la sync vers le VPS (défaut: false)
 }
 
 export interface NumberingCounter {

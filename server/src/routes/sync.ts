@@ -27,6 +27,7 @@ export async function syncRoutes(fastify: FastifyInstance) {
     `).get() as { pending: number; synced: number; error: number; lastSyncedAt: string | null };
 
     return reply.send({
+      running: syncService.isRunning(),
       orders: {
         pending:      orderStats.pending   ?? 0,
         synced:       orderStats.synced    ?? 0,

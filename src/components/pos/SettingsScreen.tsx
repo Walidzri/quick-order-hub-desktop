@@ -97,6 +97,12 @@ export function SettingsScreen() {
   } | null>(null);
   const [isCheckingDaemon, setIsCheckingDaemon] = useState(false);
   const [isOpeningDrawer, setIsOpeningDrawer] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<{
+    running: boolean;
+    orders: { pending: number; synced: number; error: number; lastSyncedAt: string | null };
+    products: { pending: number; synced: number; error: number; lastSyncedAt: string | null };
+  } | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Check PrintDaemon C# status via HTTP
   const checkDaemonStatus = useCallback(async () => {
@@ -162,6 +168,32 @@ export function SettingsScreen() {
       return () => clearInterval(interval);
     }
   }, [activeSection, checkDaemonStatus]);
+
+  // Charge le statut de sync cloud quand la section 'data' est active
+  const fetchSyncStatus = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:3002/api/sync/status');
+      if (res.ok) setSyncStatus(await res.json());
+    } catch {
+      // Silently ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === 'data') {
+      fetchSyncStatus();
+    }
+  }, [activeSection, fetchSyncStatus]);
+
+  const handleSyncNow = async () => {
+    setIsSyncing(true);
+    try {
+      await fetch('http://localhost:3002/api/sync/now', { method: 'POST' });
+      await fetchSyncStatus();
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const handleRestartDaemon = async () => {
     // PrintDaemon C# runs as a separate process - just refresh status
@@ -1093,7 +1125,77 @@ export function SettingsScreen() {
               className="space-y-4 sm:space-y-6"
             >
               <h2 className="text-xl sm:text-2xl font-bold">{t('settings.data')}</h2>
-              
+
+              {/* Cloud Sync */}
+              <div className="p-3 sm:p-4 bg-primary/10 border-2 border-primary/20 rounded-xl">
+                <h3 className="font-medium text-primary mb-3 text-sm sm:text-base flex items-center gap-2">
+                  <Wifi className="w-4 h-4" />
+                  {t('data.cloudSync')}
+                </h3>
+
+                {/* Toggle activer/désactiver */}
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg mb-3">
+                  <div className="flex-1 pr-4">
+                    <p className="text-sm font-medium">
+                      {settings?.cloudSyncEnabled ? t('data.cloudSyncEnabled') : t('data.cloudSyncDisabled')}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{t('data.cloudSyncDesc')}</p>
+                  </div>
+                  <Switch
+                    checked={settings?.cloudSyncEnabled || false}
+                    onCheckedChange={async (checked) => {
+                      await updateSettings({ cloudSyncEnabled: checked });
+                      await fetchSyncStatus();
+                    }}
+                  />
+                </div>
+
+                {/* Statut sync */}
+                {settings?.cloudSyncEnabled && (
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      {syncStatus ? (
+                        <>
+                          <span className="px-2 py-1 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 rounded">
+                            {t('data.cloudSyncPending').replace('{count}', String((syncStatus.orders.pending ?? 0) + (syncStatus.products.pending ?? 0)))}
+                          </span>
+                          {syncStatus.orders.error + syncStatus.products.error > 0 && (
+                            <span className="px-2 py-1 bg-destructive/10 text-destructive rounded">
+                              {syncStatus.orders.error + syncStatus.products.error} erreur(s)
+                            </span>
+                          )}
+                          <span className="px-2 py-1 bg-muted rounded text-muted-foreground">
+                            {syncStatus.orders.lastSyncedAt || syncStatus.products.lastSyncedAt
+                              ? t('data.cloudSyncLastSync').replace('{date}', new Date(syncStatus.orders.lastSyncedAt || syncStatus.products.lastSyncedAt!).toLocaleTimeString())
+                              : t('data.cloudSyncNever')}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSyncNow}
+                      disabled={isSyncing}
+                    >
+                      {isSyncing ? (
+                        <>
+                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                          {t('data.cloudSyncSyncing')}
+                        </>
+                      ) : (
+                        <>
+                          <Wifi className="w-3 h-3 mr-2" />
+                          {t('data.cloudSyncNow')}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
               {/* Backup & Restore */}
               <div className="p-3 sm:p-4 bg-info/10 border-2 border-info/20 rounded-xl">
                 <h3 className="font-medium text-info mb-2 text-sm sm:text-base">{t('data.backupRestore')}</h3>

@@ -17,6 +17,7 @@ import { cuisineRoutes } from './routes/cuisine';
 import { displayRoutes } from './routes/display';
 import { syncRoutes } from './routes/sync';
 import { initDatabase, closeDatabase, getDefaultDbPath } from './db/connection';
+import { settingsService } from './services/settingsService';
 import { syncService } from './services/syncService';
 
 const fastify = Fastify({
@@ -87,15 +88,20 @@ export async function startServer(port = 3002, dbPath?: string): Promise<typeof 
   console.log(`[FASTIFY]   Tablette cuisine : http://[IP-LAN]:${port}/cuisine`);
   console.log(`[FASTIFY]   Télé salle       : http://[IP-LAN]:${port}/display`);
 
-  // Démarrer la synchronisation cloud si configurée
-  const cloudUrl = process.env.CLOUD_API_URL || 'http://172.18.0.6:4000';
-  const cloudKey = process.env.CLOUD_API_KEY || '';
-  syncService.start({
-    vpsUrl: cloudUrl,
-    apiKey: cloudKey,
-    syncInterval: 30_000,
-    retryMaxDelay: 300_000,
-  });
+  // Démarrer la synchronisation cloud seulement si activée dans les paramètres
+  const currentSettings = settingsService.get();
+  if (currentSettings?.cloudSyncEnabled) {
+    const cloudUrl = process.env.CLOUD_API_URL || 'http://172.18.0.6:4000';
+    const cloudKey = process.env.CLOUD_API_KEY || '';
+    syncService.start({
+      vpsUrl: cloudUrl,
+      apiKey: cloudKey,
+      syncInterval: 30_000,
+      retryMaxDelay: 300_000,
+    });
+  } else {
+    console.log('[FASTIFY] Sync cloud désactivée (cloudSyncEnabled: false)');
+  }
 
   return fastify;
 }

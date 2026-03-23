@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { settingsService } from '../services/settingsService';
+import { syncService } from '../services/syncService';
 import { productService } from '../services/productService';
 import { orderService } from '../services/orderService';
 import { promotionService } from '../services/promotionService';
@@ -14,7 +15,21 @@ export async function settingsRoutes(fastify: FastifyInstance) {
   });
 
   fastify.patch('/api/settings', async (request, reply) => {
-    return settingsService.update(request.body as any);
+    const body = request.body as Record<string, unknown>;
+    const updated = settingsService.update(body as any);
+
+    // Démarrer/arrêter la sync cloud en live si le toggle change
+    if ('cloudSyncEnabled' in body) {
+      if (body.cloudSyncEnabled && !syncService.isRunning()) {
+        const cloudUrl = process.env.CLOUD_API_URL || 'http://172.18.0.6:4000';
+        const cloudKey = process.env.CLOUD_API_KEY || '';
+        syncService.start({ vpsUrl: cloudUrl, apiKey: cloudKey, syncInterval: 30_000, retryMaxDelay: 300_000 });
+      } else if (!body.cloudSyncEnabled && syncService.isRunning()) {
+        syncService.stop();
+      }
+    }
+
+    return updated;
   });
 
   fastify.get('/api/printers', async (request, reply) => {

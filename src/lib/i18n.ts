@@ -462,7 +462,16 @@ export const translations: Record<Language, Record<string, string>> = {
     'data.export': 'Exporter',
     'data.importing': 'Import...',
     'data.import': 'Importer',
-    
+    'data.cloudSync': 'Synchronisation Cloud',
+    'data.cloudSyncDesc': 'Synchronise automatiquement les commandes et produits vers le VPS',
+    'data.cloudSyncEnabled': 'Sync cloud activée',
+    'data.cloudSyncDisabled': 'Sync cloud désactivée',
+    'data.cloudSyncPending': '{count} en attente',
+    'data.cloudSyncLastSync': 'Dernière sync : {date}',
+    'data.cloudSyncNever': 'Jamais synchronisé',
+    'data.cloudSyncNow': 'Synchroniser maintenant',
+    'data.cloudSyncSyncing': 'Synchronisation...',
+
     // Receipt Customization
     'receipt.resetCustomizations': 'Réinitialiser les personnalisations',
     'receipt.resetConfirm': 'Réinitialiser toutes les personnalisations aux valeurs par défaut ?',
@@ -1184,7 +1193,16 @@ export const translations: Record<Language, Record<string, string>> = {
     'data.export': 'Export',
     'data.importing': 'Importing...',
     'data.import': 'Import',
-    
+    'data.cloudSync': 'Cloud Synchronization',
+    'data.cloudSyncDesc': 'Automatically syncs orders and products to the VPS',
+    'data.cloudSyncEnabled': 'Cloud sync enabled',
+    'data.cloudSyncDisabled': 'Cloud sync disabled',
+    'data.cloudSyncPending': '{count} pending',
+    'data.cloudSyncLastSync': 'Last sync: {date}',
+    'data.cloudSyncNever': 'Never synced',
+    'data.cloudSyncNow': 'Sync now',
+    'data.cloudSyncSyncing': 'Syncing...',
+
     // Receipt Customization
     'receipt.resetCustomizations': 'Reset customizations',
     'receipt.resetConfirm': 'Reset all customizations to default values?',
@@ -1957,7 +1975,16 @@ export const translations: Record<Language, Record<string, string>> = {
     'data.export': 'تصدير',
     'data.importing': 'جاري الاستيراد...',
     'data.import': 'استيراد',
-    
+    'data.cloudSync': 'المزامنة السحابية',
+    'data.cloudSyncDesc': 'يزامن الطلبات والمنتجات تلقائياً مع الخادم',
+    'data.cloudSyncEnabled': 'المزامنة السحابية مفعّلة',
+    'data.cloudSyncDisabled': 'المزامنة السحابية معطّلة',
+    'data.cloudSyncPending': '{count} في الانتظار',
+    'data.cloudSyncLastSync': 'آخر مزامنة: {date}',
+    'data.cloudSyncNever': 'لم تتم المزامنة',
+    'data.cloudSyncNow': 'مزامنة الآن',
+    'data.cloudSyncSyncing': 'جارٍ المزامنة...',
+
     // Receipt Customization
     'receipt.resetCustomizations': 'إعادة تعيين التخصيصات',
     'receipt.resetConfirm': 'إعادة تعيين جميع التخصيصات إلى القيم الافتراضية؟',

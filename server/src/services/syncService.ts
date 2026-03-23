@@ -49,7 +49,13 @@ class SyncService {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
+    this.config = null;
     console.log('[SyncService] Arrêté');
+  }
+
+  /** Indique si la boucle de sync est active. */
+  isRunning(): boolean {
+    return this.intervalId !== null;
   }
 
   private get headers(): Record<string, string> {
