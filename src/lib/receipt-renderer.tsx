@@ -32,58 +32,47 @@ export function renderReceiptHTML({
 }: ReceiptRendererProps): React.ReactElement {
   const isKitchen = type === 'kitchen';
   
-  // Format date and time according to customization
+  // Effective formatting — kitchen uses its own independent settings
+  const dateFormat      = isKitchen ? customization.kitchenDateFormat      : customization.dateFormat;
+  const timeFormat      = isKitchen ? customization.kitchenTimeFormat      : customization.timeFormat;
+  const headerAlign     = isKitchen ? customization.kitchenHeaderAlignment : customization.headerAlignment;
+  const productNameStyle= isKitchen ? customization.kitchenProductNameStyle: customization.productNameStyle;
+  const separatorStyle  = isKitchen ? customization.kitchenSeparatorStyle  : customization.separatorStyle;
+  const rawSepChar      = isKitchen ? customization.kitchenSeparatorChar   : customization.separatorChar;
+
+  // Labels — kitchen uses its own independent labels
+  const labelOrderNumber = isKitchen ? customization.kitchenLabelOrderNumber : customization.labelOrderNumber;
+  const labelDate        = isKitchen ? customization.kitchenLabelDate        : customization.labelDate;
+  const labelTime        = isKitchen ? customization.kitchenLabelTime        : customization.labelTime;
+  const labelOrderType   = isKitchen ? customization.kitchenLabelOrderType   : customization.labelOrderType;
+  const labelCashier     = isKitchen ? customization.kitchenLabelCashier     : customization.labelCashier;
+
+  // Format date and time according to effective settings
   const dateObj = new Date(order.createdAt);
-  const formattedDate = DirectPrinter.formatDate(dateObj, customization.dateFormat);
-  const formattedTime = DirectPrinter.formatDate(dateObj, customization.timeFormat);
-  
+  const formattedDate = DirectPrinter.formatDate(dateObj, dateFormat);
+  const formattedTime = DirectPrinter.formatDate(dateObj, timeFormat);
+
   const orderNumberDisplay = order.orderNumber;
-  
+
   // Get separator character (use ASCII dash for compatibility)
-  const separatorChar = customization.separatorStyle === 'none' ? '' : 
-    (customization.separatorChar === '─' ? '-' : customization.separatorChar || '-');
-  
+  const separatorChar = separatorStyle === 'none' ? '' :
+    (rawSepChar === '─' ? '-' : rawSepChar || '-');
+
   // Get alignment class
-  const headerAlignClass = customization.headerAlignment === 'left' ? 'text-left' : 
-                           customization.headerAlignment === 'right' ? 'text-right' : 
+  const headerAlignClass = headerAlign === 'left' ? 'text-left' :
+                           headerAlign === 'right' ? 'text-right' :
                            'text-center';
-  
-  // Get font styles
-  const fontFamily = customization.fontFamily === 'monospace' ? 'Courier New, monospace' : 
-                     customization.fontFamily === 'sans-serif' ? 'Arial, sans-serif' : 
-                     'Times New Roman, serif';
-  const fontSize = customization.fontSize === 'small' ? '11px' : 
-                   customization.fontSize === 'large' ? '15px' : 
-                   '13px';
-  
-  // Separator component that spans full width
+
+  // Separator component
   const Separator = () => {
-    if (customization.separatorStyle === 'none') return null;
+    if (separatorStyle === 'none') return null;
     return (
-      <div 
-        className="divider my-3 text-gray-400" 
-        style={{ 
-          fontFamily: 'monospace',
-          width: '100%',
-          display: 'block',
-          lineHeight: '1',
-          letterSpacing: '0',
-          overflow: 'hidden',
-          position: 'relative',
-          height: '1em'
-        }}
+      <div
+        className="my-3 overflow-hidden text-gray-400 select-none"
+        style={{ fontFamily: 'monospace', letterSpacing: 0, lineHeight: 1 }}
+        aria-hidden="true"
       >
-        <div style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: '50%',
-          transform: 'translateY(-50%)',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden'
-        }}>
-          {separatorChar.repeat(500)}
-        </div>
+        {separatorChar.repeat(48)}
       </div>
     );
   };
@@ -134,13 +123,13 @@ export function renderReceiptHTML({
             <div className="section">
               <div className="order-info">
                 {showDate && (
-                  <div><strong>{customization.labelDate}:</strong> {formattedDate}</div>
+                  <div><strong>{labelDate}:</strong> {formattedDate}</div>
                 )}
                 {showTime && (
-                  <div><strong>{customization.labelTime}:</strong> {formattedTime}</div>
+                  <div><strong>{labelTime}:</strong> {formattedTime}</div>
                 )}
                 {showCashier && cashierName && (
-                  <div><strong>{customization.labelCashier}:</strong> {cashierName}</div>
+                  <div><strong>{labelCashier}:</strong> {cashierName}</div>
                 )}
                 {kitchenShowItemCount && (
                   <div><strong>{customization.kitchenLabelItemCount || customization.labelItemCount}:</strong> {order.lines.reduce((sum, line) => sum + line.quantity, 0)}</div>
@@ -157,7 +146,7 @@ export function renderReceiptHTML({
             <div className="section">
               {order.lines.map((line, index) => {
                 const lineTotal = (line.unitPrice + line.modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0)) * line.quantity;
-                const productName = DirectPrinter.applyTextStyle(line.productName, customization.productNameStyle);
+                const productName = DirectPrinter.applyTextStyle(line.productName, productNameStyle);
                 return (
                   <div key={index} className="order-line">
                     <div className="line-header">
@@ -197,33 +186,7 @@ export function renderReceiptHTML({
                         </div>
                       </div>
                     )}
-                    {index < order.lines.length - 1 && customization.separatorStyle !== 'none' && (
-                      <div 
-                        className="mt-2 text-gray-400" 
-                        style={{ 
-                          fontFamily: 'monospace',
-                          width: '100%',
-                          display: 'block',
-                          lineHeight: '1',
-                          letterSpacing: '0',
-                          overflow: 'hidden',
-                          position: 'relative',
-                          height: '1em'
-                        }}
-                      >
-                        <div style={{
-                          position: 'absolute',
-                          left: 0,
-                          right: 0,
-                          top: '50%',
-                          transform: 'translateY(-50%)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden'
-                        }}>
-                          {customization.separatorChar.repeat(500)}
-                        </div>
-                      </div>
-                    )}
+                    {index < order.lines.length - 1 && <Separator />}
                   </div>
                 );
               })}
@@ -320,19 +283,19 @@ export function renderReceiptHTML({
             <div className="order-info text-xs space-y-1">
               {customization.showDate && (
                 <div className="flex justify-between">
-                  <span className="font-semibold">{customization.labelDate}:</span>
+                  <span className="font-semibold">{labelDate}:</span>
                   <span>{formattedDate}</span>
                 </div>
               )}
               {customization.showTime && (
                 <div className="flex justify-between">
-                  <span className="font-semibold">{customization.labelTime}:</span>
+                  <span className="font-semibold">{labelTime}:</span>
                   <span>{formattedTime}</span>
                 </div>
               )}
               {customization.showOrderType && (
                 <div className="flex justify-between">
-                  <span className="font-semibold">{customization.labelOrderType}:</span>
+                  <span className="font-semibold">{labelOrderType}:</span>
                   <span>{typeLabel}</span>
                 </div>
               )}
@@ -344,7 +307,7 @@ export function renderReceiptHTML({
               )}
               {customization.showCashier && cashierName && (
                 <div className="flex justify-between">
-                  <span className="font-semibold">{customization.labelCashier}:</span>
+                  <span className="font-semibold">{labelCashier}:</span>
                   <span>{cashierName}</span>
                 </div>
               )}
@@ -367,7 +330,7 @@ export function renderReceiptHTML({
             {order.lines.map((line, index) => {
               const unitPriceWithModifiers = line.unitPrice + line.modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0);
               const lineTotal = unitPriceWithModifiers * line.quantity;
-              const productName = DirectPrinter.applyTextStyle(line.productName, customization.productNameStyle);
+              const productName = DirectPrinter.applyTextStyle(line.productName, productNameStyle);
               return (
                 <div key={index} className="order-line">
                   <div className="line-header font-semibold uppercase text-sm mb-1">
@@ -411,33 +374,7 @@ export function renderReceiptHTML({
                       </div>
                     </div>
                   )}
-                  {index < order.lines.length - 1 && customization.separatorStyle !== 'none' && (
-                    <div 
-                      className="mt-2 text-gray-400" 
-                      style={{ 
-                        fontFamily: 'monospace',
-                        width: '100%',
-                        display: 'block',
-                        lineHeight: '1',
-                        letterSpacing: '0',
-                        overflow: 'hidden',
-                        position: 'relative',
-                        height: '1em'
-                      }}
-                    >
-                      <div style={{
-                        position: 'absolute',
-                        left: 0,
-                        right: 0,
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden'
-                      }}>
-                        {customization.separatorChar.repeat(500)}
-                      </div>
-                    </div>
-                  )}
+                  {index < order.lines.length - 1 && <Separator />}
                 </div>
               );
             })}

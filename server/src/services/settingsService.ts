@@ -23,7 +23,13 @@ const DEFAULT_SETTINGS: Settings = {
 
 function rowToSettings(row: { id: string; data: string }): Settings {
   try {
-    return JSON.parse(row.data) as Settings;
+    const parsed = JSON.parse(row.data) as Settings;
+    // Merge receiptCustomization with defaults so new fields are always present
+    // even on settings saved before those fields existed
+    if (parsed.receiptCustomization) {
+      parsed.receiptCustomization = { ...defaultReceiptCustomization, ...parsed.receiptCustomization };
+    }
+    return parsed;
   } catch {
     return DEFAULT_SETTINGS;
   }

@@ -752,19 +752,125 @@ export function SettingsScreen() {
           )}
 
           {activeSection === 'products' && (
-            <ProductsManagement
-              categories={categories}
-              products={products}
-              variants={variants}
-              currency={currency}
-              getVariantsByProduct={getVariantsByProduct}
-              saveProduct={saveProduct}
-              deleteProduct={deleteProduct}
-              loadProducts={loadProducts}
-              saveCategory={saveCategory}
-              deleteCategory={deleteCategory}
-              loadCategories={loadCategories}
-            />
+            <>
+              <ProductsManagement
+                categories={categories}
+                products={products}
+                variants={variants}
+                currency={currency}
+                getVariantsByProduct={getVariantsByProduct}
+                saveProduct={saveProduct}
+                deleteProduct={deleteProduct}
+                loadProducts={loadProducts}
+                saveCategory={saveCategory}
+                deleteCategory={deleteCategory}
+                loadCategories={loadCategories}
+              />
+
+              {/* Template des Produits */}
+              <div className="mt-4 p-3 sm:p-4 bg-blue-500/10 border-2 border-blue-500/20 rounded-xl">
+                <h3 className="font-medium text-blue-600 dark:text-blue-400 mb-2 text-sm sm:text-base">Template des Produits</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                  {t('settings.productTemplateInfo')}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      const isElectron = typeof window !== 'undefined' && window.electronAPI;
+                      if (!isElectron) {
+                        await showAlert('L\'API Electron n\'est pas disponible.\n\nAssurez-vous que vous utilisez la version desktop de l\'application.', 'Erreur');
+                        return;
+                      }
+                      setIsExportingTemplate(true);
+                      try {
+                        const templateData = await exportProductsTemplate();
+                        const jsonData = JSON.stringify(templateData, null, 2);
+                        const fileName = `products-template-${new Date().toISOString().split('T')[0]}.json`;
+                        const result = await window.electronAPI.showSaveDialog({
+                          title: 'Exporter le template des produits',
+                          defaultPath: fileName,
+                          filters: [{ name: 'Fichiers JSON', extensions: ['json'] }, { name: 'Tous les fichiers', extensions: ['*'] }],
+                        });
+                        if (!result.canceled && result.filePath) {
+                          await window.electronAPI.saveBackup(jsonData, result.filePath);
+                          await showAlert('Template des produits exporté avec succès !', 'Succès');
+                        }
+                      } catch (error) {
+                        console.error('Export template error:', error);
+                        await showAlert('Erreur lors de l\'export du template: ' + (error instanceof Error ? error.message : 'Erreur inconnue'), 'Erreur');
+                      } finally {
+                        setIsExportingTemplate(false);
+                      }
+                    }}
+                    disabled={isExportingTemplate || isImportingTemplate}
+                    className="flex-1"
+                  >
+                    {isExportingTemplate ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Export...</>
+                    ) : (
+                      <><Download className="w-4 h-4 mr-2" />Exporter</>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      const isElectron = typeof window !== 'undefined' && window.electronAPI;
+                      if (!isElectron) {
+                        await showAlert('L\'API Electron n\'est pas disponible.\n\nAssurez-vous que vous utilisez la version desktop de l\'application.', 'Erreur');
+                        return;
+                      }
+                      const confirmed = await showDialog({
+                        title: 'Importer un template',
+                        description: 'L\'importation d\'un template remplacera les produits, catégories, variantes et modifiers existants. Les autres données (commandes, paramètres, etc.) ne seront pas affectées.\n\nÊtes-vous sûr de vouloir continuer ?',
+                        confirmText: 'Continuer',
+                        cancelText: 'Annuler',
+                        variant: 'default',
+                      });
+                      if (!confirmed) return;
+                      setIsImportingTemplate(true);
+                      try {
+                        const result = await window.electronAPI.showOpenDialog({
+                          title: t('data.importTemplateProducts'),
+                          filters: [{ name: 'Fichiers JSON', extensions: ['json'] }, { name: 'Tous les fichiers', extensions: ['*'] }],
+                          properties: ['openFile'],
+                        });
+                        if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+                          setIsImportingTemplate(false);
+                          return;
+                        }
+                        const loadResult = await window.electronAPI.loadBackup(result.filePaths[0]);
+                        if (!loadResult.success || !loadResult.data) throw new Error('Impossible de lire le fichier template');
+                        const templateData = JSON.parse(loadResult.data);
+                        if (!templateData.categories && !templateData.products) {
+                          if (templateData.data && (templateData.data.categories || templateData.data.products)) {
+                            await importProductsTemplate(templateData.data);
+                          } else {
+                            throw new Error('Format de template invalide. Le fichier doit contenir des catégories et/ou produits.');
+                          }
+                        } else {
+                          await importProductsTemplate(templateData);
+                        }
+                        await showAlert('Template des produits importé avec succès !', 'Succès');
+                      } catch (error) {
+                        console.error('Import template error:', error);
+                        await showAlert('Erreur lors de l\'import du template: ' + (error instanceof Error ? error.message : 'Erreur inconnue'), 'Erreur');
+                      } finally {
+                        setIsImportingTemplate(false);
+                      }
+                    }}
+                    disabled={isExportingTemplate || isImportingTemplate}
+                    className="flex-1"
+                  >
+                    {isImportingTemplate ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Import...</>
+                    ) : (
+                      <><Upload className="w-4 h-4 mr-2" />Importer</>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </>
           )}
 
           {activeSection === 'theme' && (
@@ -1028,13 +1134,68 @@ export function SettingsScreen() {
           />
 
           {activeSection === 'printers' && (
-            <PrinterSettings 
-              printers={printers}
-              updatePrinter={updatePrinter}
-              deletePrinter={deletePrinter}
-              t={t}
-              showDialog={showDialog}
-            />
+            <>
+              <PrinterSettings
+                printers={printers}
+                updatePrinter={updatePrinter}
+                deletePrinter={deletePrinter}
+                t={t}
+                showDialog={showDialog}
+              />
+
+              {/* PrintDaemon C# Status */}
+              <div className="mt-4 p-3 sm:p-4 bg-primary/10 border-2 border-primary/20 rounded-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Server className="w-5 h-5 text-primary" />
+                    <h3 className="font-medium text-primary text-sm sm:text-base">Statut du PrintDaemon C#</h3>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={checkDaemonStatus} disabled={isCheckingDaemon}>
+                    {isCheckingDaemon ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                  </Button>
+                </div>
+
+                {daemonStatus ? (
+                  <div className="space-y-2">
+                    <div className={`p-3 rounded-lg border ${daemonStatus.running ? 'bg-success/10 border-success/20' : 'bg-destructive/10 border-destructive/20'}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className={`w-3 h-3 rounded-full ${daemonStatus.running ? 'bg-success animate-pulse' : 'bg-destructive'}`} />
+                        <p className="text-sm font-medium">{daemonStatus.running ? 'Daemon actif' : 'Daemon inactif'}</p>
+                      </div>
+                      {daemonStatus.running ? (
+                        <div className="text-xs space-y-1">
+                          {daemonStatus.status && <p><strong>Statut:</strong> {daemonStatus.status}</p>}
+                          {daemonStatus.message && <p><strong>Message:</strong> {daemonStatus.message}</p>}
+                          {daemonStatus.version && <p><strong>Version:</strong> {daemonStatus.version}</p>}
+                          {daemonStatus.daemonProcess?.pid && <p><strong>PID:</strong> {daemonStatus.daemonProcess.pid}</p>}
+                          <p className="text-muted-foreground mt-2">
+                            PrintDaemon C# écoute sur <code className="bg-background px-1 rounded">http://127.0.0.1:9100</code>
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-xs space-y-1">
+                          {daemonStatus.error && <p className="text-destructive"><strong>Erreur:</strong> {daemonStatus.error}</p>}
+                          <p className="text-muted-foreground mt-2">Le daemon d'impression n'est pas accessible. L'impression peut ne pas fonctionner.</p>
+                        </div>
+                      )}
+                    </div>
+                    {!daemonStatus.running && (
+                      <Button variant="default" size="sm" onClick={handleRestartDaemon} className="w-full">
+                        <RefreshCw className="w-4 h-4 mr-2" />Vérifier le statut
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground">Cliquez sur le bouton actualiser pour vérifier le statut.</p>
+                  </div>
+                )}
+
+                <div className="mt-3 p-2 bg-muted/30 rounded text-xs text-muted-foreground">
+                  <p><strong>Test manuel :</strong> <code className="bg-background px-1 rounded">curl http://127.0.0.1:9100/health</code></p>
+                </div>
+              </div>
+            </>
           )}
 
           {activeSection === 'inventory' && (
@@ -1157,14 +1318,12 @@ export function SettingsScreen() {
             >
               <h2 className="text-xl sm:text-2xl font-bold">{t('settings.data')}</h2>
 
-              {/* Cloud Sync */}
+              {/* 1. Cloud Sync */}
               <div className="p-3 sm:p-4 bg-primary/10 border-2 border-primary/20 rounded-xl">
                 <h3 className="font-medium text-primary mb-3 text-sm sm:text-base flex items-center gap-2">
                   <Wifi className="w-4 h-4" />
                   {t('data.cloudSync')}
                 </h3>
-
-                {/* Toggle activer/désactiver */}
                 <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg mb-3">
                   <div className="flex-1 pr-4">
                     <p className="text-sm font-medium">
@@ -1180,8 +1339,6 @@ export function SettingsScreen() {
                     }}
                   />
                 </div>
-
-                {/* Statut sync */}
                 {settings?.cloudSyncEnabled && (
                   <div className="space-y-2">
                     <div className="flex flex-wrap gap-2 text-xs">
@@ -1205,418 +1362,237 @@ export function SettingsScreen() {
                         <span className="text-muted-foreground">—</span>
                       )}
                     </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSyncNow}
-                      disabled={isSyncing}
-                    >
+                    <Button variant="outline" size="sm" onClick={handleSyncNow} disabled={isSyncing}>
                       {isSyncing ? (
-                        <>
-                          <Loader2 className="w-3 h-3 mr-2 animate-spin" />
-                          {t('data.cloudSyncSyncing')}
-                        </>
+                        <><Loader2 className="w-3 h-3 mr-2 animate-spin" />{t('data.cloudSyncSyncing')}</>
                       ) : (
-                        <>
-                          <Wifi className="w-3 h-3 mr-2" />
-                          {t('data.cloudSyncNow')}
-                        </>
+                        <><Wifi className="w-3 h-3 mr-2" />{t('data.cloudSyncNow')}</>
                       )}
                     </Button>
                   </div>
                 )}
               </div>
 
-              {/* Backup & Restore */}
+              {/* 2. Sauvegarde & Restauration (manuel + automatique) */}
               <div className="p-3 sm:p-4 bg-info/10 border-2 border-info/20 rounded-xl">
-                <h3 className="font-medium text-info mb-2 text-sm sm:text-base">{t('data.backupRestore')}</h3>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button
-                    variant="default"
-                    onClick={handleExportBackup}
-                    disabled={isExporting || isImporting}
-                    className="flex-1"
-                  >
+                <h3 className="font-medium text-info mb-3 text-sm sm:text-base flex items-center gap-2">
+                  <Save className="w-4 h-4" />
+                  {t('data.backupRestore')}
+                </h3>
+
+                {/* Export / Import manuel */}
+                <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                  <Button variant="default" onClick={handleExportBackup} disabled={isExporting || isImporting} className="flex-1">
                     {isExporting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t('data.exporting')}
-                      </>
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t('data.exporting')}</>
                     ) : (
-                      <>
-                        <Download className="w-4 h-4 mr-2" />
-                        {t('data.exportBackup')}
-                      </>
+                      <><Download className="w-4 h-4 mr-2" />{t('data.exportBackup')}</>
                     )}
                   </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleImportBackup}
-                    disabled={isExporting || isImporting}
-                    className="flex-1"
-                  >
+                  <Button variant="outline" onClick={handleImportBackup} disabled={isExporting || isImporting} className="flex-1">
                     {isImporting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        {t('data.importing')}
-                      </>
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t('data.importing')}</>
                     ) : (
-                      <>
-                        <Upload className="w-4 h-4 mr-2" />
-                        {t('data.importBackup')}
-                      </>
+                      <><Upload className="w-4 h-4 mr-2" />{t('data.importBackup')}</>
                     )}
                   </Button>
                 </div>
-              </div>
 
-              {/* Automatic Backup Configuration */}
-              <div className="p-3 sm:p-4 bg-primary/10 border-2 border-primary/20 rounded-xl">
-                <h3 className="font-medium text-primary mb-2 text-sm sm:text-base">{t('data.autoBackup')}</h3>
-                
-                {/* Enable/Disable Automatic Backup */}
-                <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg mb-4">
-                  <div className="flex-1 pr-4">
-                    <p className="text-sm font-medium">{t('data.autoBackup')}</p>
-                  </div>
-                  <Switch
-                    checked={settings.backupEnabled || false}
-                    onCheckedChange={(checked) => updateSettings({ backupEnabled: checked })}
-                  />
-                </div>
-
-                {settings.backupEnabled && (
-                  <>
-                    {/* Backup Schedule Type */}
-                    <div className="mb-4">
-                      <Select
-                        value={settings.backupScheduleType || 'interval'}
-                        onValueChange={(value) => {
-                          updateSettings({ backupScheduleType: value as 'interval' | 'daily' | 'weekly' | 'monthly' });
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="interval">{t('period.day')}</SelectItem>
-                          <SelectItem value="daily">{t('period.day')}</SelectItem>
-                          <SelectItem value="weekly">{t('period.week')}</SelectItem>
-                          <SelectItem value="monthly">{t('period.month')}</SelectItem>
-                        </SelectContent>
-                      </Select>
+                {/* Sauvegarde automatique */}
+                <div className="border-t border-info/20 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-medium">{t('data.autoBackup')}</p>
+                      <p className="text-xs text-muted-foreground">{t('backup.directoryDesc')}</p>
                     </div>
+                    <Switch
+                      checked={settings.backupEnabled || false}
+                      onCheckedChange={(checked) => updateSettings({ backupEnabled: checked })}
+                    />
+                  </div>
 
-                    {/* Interval Schedule */}
-                    {(!settings.backupScheduleType || settings.backupScheduleType === 'interval') && (
+                  {settings.backupEnabled && (
+                    <>
                       <div className="mb-4">
-                        <label className="text-sm font-medium text-muted-foreground block mb-2">
-                          Intervalle de sauvegarde (en minutes)
-                        </label>
-                        <NumericInput
-                          value={settings.backupInterval || 60}
-                          onChange={(value) => {
-                            const numValue = typeof value === 'number' ? value : parseFloat(value);
-                            if (numValue > 0) {
-                              updateSettings({ backupInterval: numValue });
-                            }
-                          }}
-                          placeholder="60"
-                          allowDecimal={false}
-                          min={1}
-                          max={10080}
-                          className="font-mono"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Intervalle entre chaque sauvegarde automatique (minimum: 1 minute, maximum: 10080 minutes = 7 jours)
-                        </p>
+                        <Select
+                          value={settings.backupScheduleType || 'interval'}
+                          onValueChange={(value) => updateSettings({ backupScheduleType: value as 'interval' | 'daily' | 'weekly' | 'monthly' })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="interval">Périodique (intervalle)</SelectItem>
+                            <SelectItem value="daily">Quotidien</SelectItem>
+                            <SelectItem value="weekly">Hebdomadaire</SelectItem>
+                            <SelectItem value="monthly">Mensuel</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
-                    )}
 
-                    {/* Daily Schedule */}
-                    {settings.backupScheduleType === 'daily' && (
-                      <div className="mb-4">
-                        <label className="text-sm font-medium text-muted-foreground block mb-2">
-                          Heure de sauvegarde quotidienne
-                        </label>
-                        <Input
-                          type="time"
-                          value={settings.backupDailyTime || '02:00'}
-                          onChange={(e) => updateSettings({ backupDailyTime: e.target.value })}
-                          className="font-mono"
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Heure à laquelle la sauvegarde sera effectuée chaque jour (format HH:MM)
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Weekly Schedule */}
-                    {settings.backupScheduleType === 'weekly' && (
-                      <>
+                      {(!settings.backupScheduleType || settings.backupScheduleType === 'interval') && (
                         <div className="mb-4">
                           <label className="text-sm font-medium text-muted-foreground block mb-2">
-                            Jour de la semaine
-                          </label>
-                          <Select
-                            value={settings.backupWeeklyDay?.toString() || '0'}
-                            onValueChange={(value) => {
-                              updateSettings({ backupWeeklyDay: parseInt(value, 10) });
-                            }}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="0">Dimanche</SelectItem>
-                              <SelectItem value="1">Lundi</SelectItem>
-                              <SelectItem value="2">Mardi</SelectItem>
-                              <SelectItem value="3">Mercredi</SelectItem>
-                              <SelectItem value="4">Jeudi</SelectItem>
-                              <SelectItem value="5">Vendredi</SelectItem>
-                              <SelectItem value="6">Samedi</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="mb-4">
-                          <label className="text-sm font-medium text-muted-foreground block mb-2">
-                            Heure de sauvegarde
-                          </label>
-                          <Input
-                            type="time"
-                            value={settings.backupWeeklyTime || '02:00'}
-                            onChange={(e) => updateSettings({ backupWeeklyTime: e.target.value })}
-                            className="font-mono"
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Heure à laquelle la sauvegarde sera effectuée (format HH:MM)
-                          </p>
-                        </div>
-                      </>
-                    )}
-
-                    {/* Monthly Schedule */}
-                    {settings.backupScheduleType === 'monthly' && (
-                      <>
-                        <div className="mb-4">
-                          <label className="text-sm font-medium text-muted-foreground block mb-2">
-                            Jour du mois
+                            Intervalle (minutes)
                           </label>
                           <NumericInput
-                            value={settings.backupMonthlyDay || 1}
+                            value={settings.backupInterval || 60}
                             onChange={(value) => {
                               const numValue = typeof value === 'number' ? value : parseFloat(value);
-                              if (numValue >= 1 && numValue <= 31) {
-                                updateSettings({ backupMonthlyDay: numValue });
-                              }
+                              if (numValue > 0) updateSettings({ backupInterval: numValue });
                             }}
-                            placeholder="1"
+                            placeholder="60"
                             allowDecimal={false}
                             min={1}
-                            max={31}
+                            max={10080}
                             className="font-mono"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Jour du mois où la sauvegarde sera effectuée (1-31)
-                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">Min 1 min — max 10 080 min (7 jours)</p>
                         </div>
+                      )}
+
+                      {settings.backupScheduleType === 'daily' && (
                         <div className="mb-4">
-                          <label className="text-sm font-medium text-muted-foreground block mb-2">
-                            Heure de sauvegarde
-                          </label>
+                          <label className="text-sm font-medium text-muted-foreground block mb-2">Heure</label>
                           <Input
                             type="time"
-                            value={settings.backupMonthlyTime || '02:00'}
-                            onChange={(e) => updateSettings({ backupMonthlyTime: e.target.value })}
+                            value={settings.backupDailyTime || '02:00'}
+                            onChange={(e) => updateSettings({ backupDailyTime: e.target.value })}
                             className="font-mono"
                           />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Heure à laquelle la sauvegarde sera effectuée (format HH:MM)
-                          </p>
                         </div>
-                      </>
-                    )}
+                      )}
 
-                    {/* Backup Directory */}
-                    <div className="mb-4">
-                      <label className="text-sm font-medium text-muted-foreground block mb-2">
-                        {t('backup.selectDirectory')}
-                      </label>
-                      <div className="flex gap-2">
-                        <Input
-                          value={settings.backupDirectory || ''}
-                          onChange={(e) => updateSettings({ backupDirectory: e.target.value })}
-                          placeholder="C:\Backups\POS"
-                          className="flex-1"
-                        />
-                        <Button
-                          variant="outline"
-                          onClick={async () => {
-                            if (typeof window !== 'undefined' && window.electronAPI) {
-                              try {
-                                const result = await window.electronAPI.showOpenDialog({
-                                  title: t('backup.selectDirectory'),
-                                  properties: ['openDirectory'],
-                                });
-                                if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
-                                  await updateSettings({ backupDirectory: result.filePaths[0] });
+                      {settings.backupScheduleType === 'weekly' && (
+                        <>
+                          <div className="mb-4">
+                            <label className="text-sm font-medium text-muted-foreground block mb-2">Jour de la semaine</label>
+                            <Select
+                              value={settings.backupWeeklyDay?.toString() || '0'}
+                              onValueChange={(value) => updateSettings({ backupWeeklyDay: parseInt(value, 10) })}
+                            >
+                              <SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="0">Dimanche</SelectItem>
+                                <SelectItem value="1">Lundi</SelectItem>
+                                <SelectItem value="2">Mardi</SelectItem>
+                                <SelectItem value="3">Mercredi</SelectItem>
+                                <SelectItem value="4">Jeudi</SelectItem>
+                                <SelectItem value="5">Vendredi</SelectItem>
+                                <SelectItem value="6">Samedi</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="mb-4">
+                            <label className="text-sm font-medium text-muted-foreground block mb-2">Heure</label>
+                            <Input
+                              type="time"
+                              value={settings.backupWeeklyTime || '02:00'}
+                              onChange={(e) => updateSettings({ backupWeeklyTime: e.target.value })}
+                              className="font-mono"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {settings.backupScheduleType === 'monthly' && (
+                        <>
+                          <div className="mb-4">
+                            <label className="text-sm font-medium text-muted-foreground block mb-2">Jour du mois (1–31)</label>
+                            <NumericInput
+                              value={settings.backupMonthlyDay || 1}
+                              onChange={(value) => {
+                                const numValue = typeof value === 'number' ? value : parseFloat(value);
+                                if (numValue >= 1 && numValue <= 31) updateSettings({ backupMonthlyDay: numValue });
+                              }}
+                              placeholder="1"
+                              allowDecimal={false}
+                              min={1}
+                              max={31}
+                              className="font-mono"
+                            />
+                          </div>
+                          <div className="mb-4">
+                            <label className="text-sm font-medium text-muted-foreground block mb-2">Heure</label>
+                            <Input
+                              type="time"
+                              value={settings.backupMonthlyTime || '02:00'}
+                              onChange={(e) => updateSettings({ backupMonthlyTime: e.target.value })}
+                              className="font-mono"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      <div className="mb-4">
+                        <label className="text-sm font-medium text-muted-foreground block mb-2">
+                          {t('backup.selectDirectory')}
+                        </label>
+                        <div className="flex gap-2">
+                          <Input
+                            value={settings.backupDirectory || ''}
+                            onChange={(e) => updateSettings({ backupDirectory: e.target.value })}
+                            placeholder="C:\Backups\POS"
+                            className="flex-1"
+                          />
+                          <Button
+                            variant="outline"
+                            onClick={async () => {
+                              if (typeof window !== 'undefined' && window.electronAPI) {
+                                try {
+                                  const result = await window.electronAPI.showOpenDialog({
+                                    title: t('backup.selectDirectory'),
+                                    properties: ['openDirectory'],
+                                  });
+                                  if (!result.canceled && result.filePaths && result.filePaths.length > 0) {
+                                    await updateSettings({ backupDirectory: result.filePaths[0] });
+                                  }
+                                } catch (error) {
+                                  console.error('Error selecting directory:', error);
+                                  await showAlert(t('backup.selectionError'), t('general.error'));
                                 }
-                              } catch (error) {
-                                console.error('Error selecting directory:', error);
-                                await showAlert(t('backup.selectionError'), t('general.error'));
+                              } else {
+                                await showAlert('L\'API Electron n\'est pas disponible.', 'Erreur');
                               }
-                            } else {
-                              await showAlert('L\'API Electron n\'est pas disponible. Veuillez utiliser la version desktop.', 'Erreur');
-                            }
-                          }}
-                        >
-                          <FolderOpen className="w-4 h-4 mr-2" />
-                          {t('general.continue')}
-                        </Button>
+                            }}
+                          >
+                            <FolderOpen className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {t('backup.directoryDesc')}
-                      </p>
-                    </div>
 
-                    {/* Status Info */}
-                    <div className="p-3 bg-info/10 border border-info/20 rounded-lg">
-                      <p className="text-xs text-info">
-                        <strong>Statut:</strong> {settings.backupDirectory ? (
-                          <>
-                            {(() => {
-                              const scheduleType = settings.backupScheduleType || 'interval';
-                              if (scheduleType === 'interval') {
-                                return `${t('data.autoBackupActive')} - ${t('data.everyMinutes').replace('{minutes}', String(settings.backupInterval || 60))}`;
-                              } else if (scheduleType === 'daily') {
-                                return `${t('data.autoBackupActive')} - ${t('data.dailyAt').replace('{time}', settings.backupDailyTime || '02:00')}`;
-                              } else if (scheduleType === 'weekly') {
-                                const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-                                const day = days[settings.backupWeeklyDay || 0];
-                                return `${t('data.autoBackupActive')} - ${t('data.weeklyOn').replace('{day}', day).replace('{time}', settings.backupWeeklyTime || '02:00')}`;
-                              } else if (scheduleType === 'monthly') {
-                                return `${t('data.autoBackupActive')} - ${t('data.monthlyOn').replace('{day}', String(settings.backupMonthlyDay || 1)).replace('{time}', settings.backupMonthlyTime || '02:00')}`;
-                              }
-                              return t('data.autoBackupActive');
-                            })()}
-                          </>
-                        ) : (
-                          <>{t('backup.selectDirectoryPrompt')}</>
-                        )}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {t('backup.formatInfo')}
-                      </p>
-                    </div>
-                  </>
-                )}
+                      <div className="p-3 bg-info/10 border border-info/20 rounded-lg">
+                        <p className="text-xs text-info">
+                          <strong>Statut :</strong>{' '}
+                          {settings.backupDirectory ? (() => {
+                            const scheduleType = settings.backupScheduleType || 'interval';
+                            if (scheduleType === 'interval') return `${t('data.autoBackupActive')} — ${t('data.everyMinutes').replace('{minutes}', String(settings.backupInterval || 60))}`;
+                            if (scheduleType === 'daily') return `${t('data.autoBackupActive')} — ${t('data.dailyAt').replace('{time}', settings.backupDailyTime || '02:00')}`;
+                            if (scheduleType === 'weekly') {
+                              const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+                              return `${t('data.autoBackupActive')} — ${t('data.weeklyOn').replace('{day}', days[settings.backupWeeklyDay || 0]).replace('{time}', settings.backupWeeklyTime || '02:00')}`;
+                            }
+                            if (scheduleType === 'monthly') return `${t('data.autoBackupActive')} — ${t('data.monthlyOn').replace('{day}', String(settings.backupMonthlyDay || 1)).replace('{time}', settings.backupMonthlyTime || '02:00')}`;
+                            return t('data.autoBackupActive');
+                          })() : t('backup.selectDirectoryPrompt')}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-2">{t('backup.formatInfo')}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
 
-              {/* PrintDaemon C# Status */}
-              {(
-                <div className="p-3 sm:p-4 bg-primary/10 border-2 border-primary/20 rounded-xl">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <Server className="w-5 h-5 text-primary" />
-                      <h3 className="font-medium text-primary text-sm sm:text-base">Statut du PrintDaemon C#</h3>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={checkDaemonStatus}
-                      disabled={isCheckingDaemon}
-                    >
-                      {isCheckingDaemon ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </div>
-                  
-                  {daemonStatus ? (
-                    <div className="space-y-2">
-                      <div className={`p-3 rounded-lg border ${daemonStatus.running ? 'bg-success/10 border-success/20' : 'bg-destructive/10 border-destructive/20'}`}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className={`w-3 h-3 rounded-full ${daemonStatus.running ? 'bg-success animate-pulse' : 'bg-destructive'}`} />
-                          <p className="text-sm font-medium">
-                            {daemonStatus.running ? 'Daemon actif' : 'Daemon inactif'}
-                          </p>
-                        </div>
-                        
-                        {daemonStatus.running ? (
-                          <div className="text-xs space-y-1">
-                            {daemonStatus.status && (
-                              <p><strong>Statut:</strong> {daemonStatus.status}</p>
-                            )}
-                            {daemonStatus.message && (
-                              <p><strong>Message:</strong> {daemonStatus.message}</p>
-                            )}
-                            {daemonStatus.version && (
-                              <p><strong>Version:</strong> {daemonStatus.version}</p>
-                            )}
-                            {daemonStatus.daemonProcess?.pid && (
-                              <p><strong>PID:</strong> {daemonStatus.daemonProcess.pid}</p>
-                            )}
-                            <p className="text-muted-foreground mt-2">
-                              PrintDaemon C# écoute sur <code className="bg-background px-1 rounded">http://127.0.0.1:9100</code>
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="text-xs space-y-1">
-                            {daemonStatus.error && (
-                              <p className="text-destructive"><strong>Erreur:</strong> {daemonStatus.error}</p>
-                            )}
-                            {daemonStatus.daemonProcess && (
-                              <p><strong>Processus:</strong> PID {daemonStatus.daemonProcess.pid || 'N/A'} - {daemonStatus.daemonProcess.killed ? 'Arrêté' : 'Inconnu'}</p>
-                            )}
-                            <p className="text-muted-foreground mt-2">
-                              Le daemon d'impression n'est pas accessible. L'impression peut ne pas fonctionner.
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {!daemonStatus.running && (
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={handleRestartDaemon}
-                          className="w-full"
-                        >
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                          Vérifier le statut
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-xs text-muted-foreground">
-                        Vérification du statut en cours...
-                      </p>
-                    </div>
-                  )}
-                  
-                  <div className="mt-3 p-2 bg-muted/30 rounded text-xs text-muted-foreground">
-                    <p><strong>Comment tester manuellement :</strong></p>
-                    <ol className="list-decimal list-inside mt-1 space-y-1">
-                      <li>Ouvrir PowerShell ou CMD</li>
-                      <li>Exécuter : <code className="bg-background px-1 rounded">curl http://127.0.0.1:9100/health</code></li>
-                      <li>Ou dans un navigateur : <code className="bg-background px-1 rounded">http://127.0.0.1:9100/health</code></li>
-                    </ol>
-                  </div>
-                </div>
-              )}
-
-              {/* Data Location Info */}
+              {/* 3. Emplacement des données */}
               {typeof window !== 'undefined' && window.electronAPI && (
-                <div className="p-3 sm:p-4 bg-gray-500/10 border-2 border-gray-500/20 rounded-xl">
-                  <h3 className="font-medium text-gray-700 dark:text-gray-300 mb-2 text-sm sm:text-base">Emplacement des Données</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">
-                    {t('settings.dataStorageInfo')}
-                  </p>
+                <div className="p-3 sm:p-4 bg-muted/50 border-2 border-border rounded-xl">
+                  <h3 className="font-medium mb-2 text-sm sm:text-base flex items-center gap-2">
+                    <FolderOpen className="w-4 h-4" />
+                    Emplacement des données
+                  </h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-3">{t('settings.dataStorageInfo')}</p>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="sm"
                     onClick={async () => {
                       if (window.electronAPI) {
@@ -1624,10 +1600,7 @@ export function SettingsScreen() {
                           const userDataPath = await window.electronAPI.getUserDataPath();
                           const indexedDBPath = await window.electronAPI.getIndexedDBPath();
                           await showAlert(
-                            `Emplacement des données :\n\n` +
-                            `Dossier utilisateur :\n${userDataPath}\n\n` +
-                            `Base de données (IndexedDB) :\n${indexedDBPath}\n\n` +
-                            `Note : En développement, la base de données peut être dans un sous-dossier IndexedDB avec un nom basé sur l'URL.`,
+                            `Dossier utilisateur :\n${userDataPath}\n\nBase de données :\n${indexedDBPath}`,
                             'Emplacement des données'
                           );
                         } catch (error) {
@@ -1635,155 +1608,25 @@ export function SettingsScreen() {
                         }
                       }
                     }}
-                    className="w-full text-left justify-start"
                   >
-                    📁 Afficher l'emplacement des données
+                    <FolderOpen className="w-4 h-4 mr-2" />
+                    Afficher l'emplacement
                   </Button>
                 </div>
               )}
 
-              {/* Export/Import Products Template */}
-              <div className="p-3 sm:p-4 bg-blue-500/10 border-2 border-blue-500/20 rounded-xl">
-                <h3 className="font-medium text-blue-600 dark:text-blue-400 mb-2 text-sm sm:text-base">Template des Produits</h3>
-                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                  {t('settings.productTemplateInfo')}
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      const isElectron = typeof window !== 'undefined' && window.electronAPI;
-                      
-                      if (!isElectron) {
-                        await showAlert(
-                          'L\'API Electron n\'est pas disponible.\n\n' +
-                          'Assurez-vous que vous utilisez la version desktop de l\'application.',
-                          'Erreur'
-                        );
-                        return;
-                      }
-
-                      setIsExportingTemplate(true);
-                      try {
-                        const templateData = await exportProductsTemplate();
-                        const jsonData = JSON.stringify(templateData, null, 2);
-                        const fileName = `products-template-${new Date().toISOString().split('T')[0]}.json`;
-
-                        const result = await window.electronAPI.showSaveDialog({
-                          title: 'Exporter le template des produits',
-                          defaultPath: fileName,
-                          filters: [
-                            { name: 'Fichiers JSON', extensions: ['json'] },
-                            { name: 'Tous les fichiers', extensions: ['*'] },
-                          ],
-                        });
-
-                        if (!result.canceled && result.filePath) {
-                          await window.electronAPI.saveBackup(jsonData, result.filePath);
-                          await showAlert('Template des produits exporté avec succès !', 'Succès');
-                        }
-                      } catch (error) {
-                        console.error('Export template error:', error);
-                        await showAlert('Erreur lors de l\'export du template: ' + (error instanceof Error ? error.message : 'Erreur inconnue'), 'Erreur');
-                      } finally {
-                        setIsExportingTemplate(false);
-                      }
-                    }}
-                    disabled={isExportingTemplate || isImportingTemplate}
-                    className="flex-1"
-                  >
-                    {isExportingTemplate ? 'Export...' : 'Exporter'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      const isElectron = typeof window !== 'undefined' && window.electronAPI;
-                      
-                      if (!isElectron) {
-                        await showAlert(
-                          'L\'API Electron n\'est pas disponible.\n\n' +
-                          'Assurez-vous que vous utilisez la version desktop de l\'application.',
-                          'Erreur'
-                        );
-                        return;
-                      }
-
-                      const confirmed = await showDialog({
-                        title: 'Importer un template',
-                        description: 'L\'importation d\'un template remplacera les produits, catégories, variantes et modifiers existants. Les autres données (commandes, paramètres, etc.) ne seront pas affectées.\n\nÊtes-vous sûr de vouloir continuer ?',
-                        confirmText: 'Continuer',
-                        cancelText: 'Annuler',
-                        variant: 'default',
-                      });
-
-                      if (!confirmed) return;
-
-                      setIsImportingTemplate(true);
-                      try {
-                        const result = await window.electronAPI.showOpenDialog({
-                          title: t('data.importTemplateProducts'),
-                          filters: [
-                            { name: 'Fichiers JSON', extensions: ['json'] },
-                            { name: 'Tous les fichiers', extensions: ['*'] },
-                          ],
-                          properties: ['openFile'],
-                        });
-
-                        if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
-                          setIsImportingTemplate(false);
-                          return;
-                        }
-
-                        const filePath = result.filePaths[0];
-                        const loadResult = await window.electronAPI.loadBackup(filePath);
-
-                        if (!loadResult.success || !loadResult.data) {
-                          throw new Error('Impossible de lire le fichier template');
-                        }
-
-                        const templateData = JSON.parse(loadResult.data);
-
-                        // Validate template structure
-                        if (!templateData.categories && !templateData.products) {
-                          // Try nested structure (from full backup)
-                          if (templateData.data && (templateData.data.categories || templateData.data.products)) {
-                            await importProductsTemplate(templateData.data);
-                          } else {
-                            throw new Error('Format de template invalide. Le fichier doit contenir des catégories et/ou produits.');
-                          }
-                        } else {
-                          await importProductsTemplate(templateData);
-                        }
-
-                        await showAlert('Template des produits importé avec succès !', 'Succès');
-                      } catch (error) {
-                        console.error('Import template error:', error);
-                        await showAlert('Erreur lors de l\'import du template: ' + (error instanceof Error ? error.message : 'Erreur inconnue'), 'Erreur');
-                      } finally {
-                        setIsImportingTemplate(false);
-                      }
-                    }}
-                    disabled={isExportingTemplate || isImportingTemplate}
-                    className="flex-1"
-                  >
-                    {isImportingTemplate ? 'Import...' : 'Importer'}
-                  </Button>
-                </div>
-              </div>
-
-
-              {/* Database Reset */}
+              {/* 4. Zone de danger */}
               <div className="p-3 sm:p-4 bg-destructive/10 border-2 border-destructive/20 rounded-xl">
                 <h3 className="font-medium text-destructive mb-2 text-sm sm:text-base">Zone de danger</h3>
                 <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                  La réinitialisation de la base de données supprimera TOUTES les données (commandes, produits, catégories, paramètres, etc.) et rendra le logiciel complètement vierge. Cette action est irréversible.
+                  La réinitialisation supprimera TOUTES les données (commandes, produits, catégories, paramètres). Cette action est irréversible.
                 </p>
                 <Button
                   variant="destructive"
                   onClick={async () => {
                     const confirmed1 = await showDialog({
                       title: '⚠️ ATTENTION',
-                      description: 'Vous êtes sur le point de supprimer TOUTES les données. Le logiciel sera complètement vierge (aucun produit, aucune catégorie). Cette action est irréversible.\n\nAssurez-vous d\'avoir exporté le template des produits si nécessaire.\n\nÊtes-vous vraiment sûr de vouloir continuer ?',
+                      description: 'Vous êtes sur le point de supprimer TOUTES les données. Cette action est irréversible.\n\nAssurez-vous d\'avoir exporté une sauvegarde.\n\nÊtes-vous vraiment sûr de vouloir continuer ?',
                       confirmText: 'Continuer',
                       cancelText: 'Annuler',
                       variant: 'destructive',
@@ -1796,9 +1639,7 @@ export function SettingsScreen() {
                         cancelText: 'Annuler',
                         variant: 'destructive',
                       });
-                      if (confirmed2) {
-                        await resetDatabase();
-                      }
+                      if (confirmed2) await resetDatabase();
                     }
                   }}
                   className="w-full"

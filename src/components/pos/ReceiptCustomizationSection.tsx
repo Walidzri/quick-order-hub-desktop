@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Settings, ReceiptCustomization, Order } from '@shared/types';
 import { motion } from 'framer-motion';
 import { 
@@ -33,9 +33,10 @@ interface ReceiptCustomizationSectionProps {
 
 export function ReceiptCustomizationSection({ settings, updateSettings, t }: ReceiptCustomizationSectionProps) {
   const { currency } = usePOS();
-  const { showDialog, showAlert, DialogComponent } = useDialog();
+  const { showDialog, DialogComponent } = useDialog();
+  // Merge with defaults so new fields are always present even on old saved settings
   const customization = useMemo(() => {
-    return settings.receiptCustomization || DirectPrinter.getDefaultCustomization();
+    return { ...DirectPrinter.getDefaultCustomization(), ...(settings.receiptCustomization || {}) };
   }, [settings.receiptCustomization]);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     receipt: false,
@@ -55,7 +56,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
   
   const sampleOrderNumber = '#001';
 
-  const sampleOrder: Order = {
+  const sampleOrder: Order = useMemo(() => ({
     id: 'preview-order',
     orderNumber: sampleOrderNumber,
     status: 'paid',
@@ -111,7 +112,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
     createdAt: new Date(),
     updatedAt: new Date(),
     paidAt: new Date(),
-  };
+  }), []);
 
   const updateCustomization = async (updates: Partial<ReceiptCustomization>) => {
     await updateSettings({
@@ -383,7 +384,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                       <CollapsibleContent className="mt-3 space-y-4">
                       <div>
                         <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.dateFormat')}</label>
-                        <Select value={customization.dateFormat} onValueChange={(v) => updateCustomization({ dateFormat: v })}>
+                        <Select value={customization.kitchenDateFormat} onValueChange={(v) => updateCustomization({ kitchenDateFormat: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
@@ -395,7 +396,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                       </div>
                       <div>
                         <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.timeFormat')}</label>
-                        <Select value={customization.timeFormat} onValueChange={(v) => updateCustomization({ timeFormat: v })}>
+                        <Select value={customization.kitchenTimeFormat} onValueChange={(v) => updateCustomization({ kitchenTimeFormat: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="HH:mm">24h (HH:mm)</SelectItem>
@@ -416,14 +417,14 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                       <div>
                         <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.headerAlignment')}</label>
                         <div className="flex gap-2">
-                          <Button variant={customization.headerAlignment === 'left' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'left' })}><AlignLeft className="w-4 h-4 mr-2" />{t('receipt.left')}</Button>
-                          <Button variant={customization.headerAlignment === 'center' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'center' })}><AlignCenter className="w-4 h-4 mr-2" />{t('receipt.center')}</Button>
-                          <Button variant={customization.headerAlignment === 'right' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ headerAlignment: 'right' })}><AlignRight className="w-4 h-4 mr-2" />{t('receipt.right')}</Button>
+                          <Button variant={customization.kitchenHeaderAlignment === 'left' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ kitchenHeaderAlignment: 'left' })}><AlignLeft className="w-4 h-4 mr-2" />{t('receipt.left')}</Button>
+                          <Button variant={customization.kitchenHeaderAlignment === 'center' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ kitchenHeaderAlignment: 'center' })}><AlignCenter className="w-4 h-4 mr-2" />{t('receipt.center')}</Button>
+                          <Button variant={customization.kitchenHeaderAlignment === 'right' ? 'default' : 'outline'} size="sm" className="flex-1" onClick={() => updateCustomization({ kitchenHeaderAlignment: 'right' })}><AlignRight className="w-4 h-4 mr-2" />{t('receipt.right')}</Button>
                         </div>
                       </div>
                       <div>
                         <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.productNameStyle')}</label>
-                        <Select value={customization.productNameStyle} onValueChange={(v: 'normal'|'uppercase'|'lowercase') => updateCustomization({ productNameStyle: v })}>
+                        <Select value={customization.kitchenProductNameStyle} onValueChange={(v: 'normal'|'uppercase'|'lowercase') => updateCustomization({ kitchenProductNameStyle: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="normal">Normal</SelectItem>
@@ -434,9 +435,9 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                       </div>
                       <div>
                         <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.separatorStyle')}</label>
-                        <Select value={customization.separatorStyle} onValueChange={(v: 'dashes'|'dots'|'equals'|'line'|'none') => {
+                        <Select value={customization.kitchenSeparatorStyle} onValueChange={(v: 'dashes'|'dots'|'equals'|'line'|'none') => {
                           const chars: Record<string, string> = { dashes: '─', dots: '·', equals: '═', line: '─', none: ' ' };
-                          updateCustomization({ separatorStyle: v, separatorChar: chars[v] });
+                          updateCustomization({ kitchenSeparatorStyle: v, kitchenSeparatorChar: chars[v] });
                         }}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -448,15 +449,15 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                           </SelectContent>
                         </Select>
                       </div>
-                      {customization.separatorStyle !== 'none' && (
+                      {customization.kitchenSeparatorStyle !== 'none' && (
                         <div>
                           <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.customSeparatorChar')}</label>
-                          <TouchInput value={customization.separatorChar} onChange={(value) => updateCustomization({ separatorChar: value || '─' })} maxLength={1} className="w-32 font-mono text-2xl text-center" placeholder="─" />
+                          <TouchInput value={customization.kitchenSeparatorChar} onChange={(value) => updateCustomization({ kitchenSeparatorChar: value || '─' })} maxLength={1} className="w-32 font-mono text-2xl text-center" placeholder="─" />
                         </div>
                       )}
                       <div>
                         <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.fontSize')}</label>
-                        <Select value={customization.fontSize} onValueChange={(v: 'small'|'normal'|'large') => updateCustomization({ fontSize: v })}>
+                        <Select value={customization.kitchenFontSize} onValueChange={(v: 'small'|'normal'|'large') => updateCustomization({ kitchenFontSize: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="small">{t('receipt.fontSizeSmall')}</SelectItem>
@@ -467,7 +468,7 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                       </div>
                       <div>
                         <label className="text-xs sm:text-sm font-medium text-muted-foreground block mb-2">{t('receipt.fontFamily')}</label>
-                        <Select value={customization.fontFamily} onValueChange={(v: 'monospace'|'sans-serif'|'serif') => updateCustomization({ fontFamily: v })}>
+                        <Select value={customization.kitchenFontFamily} onValueChange={(v: 'monospace'|'sans-serif'|'serif') => updateCustomization({ kitchenFontFamily: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="monospace">{t('receipt.fontMono')}</SelectItem>
@@ -489,12 +490,12 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <LabelInput label={t('receipt.kitchenTicketTitle')} value={customization.labelKitchenTicket} onChange={(v) => updateCustomization({ labelKitchenTicket: v })} />
                         <LabelInput label={t('receipt.endMessage')} value={customization.labelBonAppetit} onChange={(v) => updateCustomization({ labelBonAppetit: v })} />
-                        <LabelInput label={t('receipt.itemCountLabel')} value={customization.kitchenLabelItemCount || customization.labelItemCount} onChange={(v) => updateCustomization({ kitchenLabelItemCount: v })} />
-                        <LabelInput label={t('receipt.orderNumberLabel')} value={customization.labelOrderNumber} onChange={(v) => updateCustomization({ labelOrderNumber: v })} />
-                        <LabelInput label={t('receipt.dateLabel')} value={customization.labelDate} onChange={(v) => updateCustomization({ labelDate: v })} />
-                        <LabelInput label={t('receipt.timeLabel')} value={customization.labelTime} onChange={(v) => updateCustomization({ labelTime: v })} />
-                        <LabelInput label={t('receipt.orderTypeLabel')} value={customization.labelOrderType} onChange={(v) => updateCustomization({ labelOrderType: v })} />
-                        <LabelInput label={t('receipt.cashierLabel')} value={customization.labelCashier} onChange={(v) => updateCustomization({ labelCashier: v })} />
+                        <LabelInput label={t('receipt.itemCountLabel')} value={customization.kitchenLabelItemCount} onChange={(v) => updateCustomization({ kitchenLabelItemCount: v })} />
+                        <LabelInput label={t('receipt.orderNumberLabel')} value={customization.kitchenLabelOrderNumber} onChange={(v) => updateCustomization({ kitchenLabelOrderNumber: v })} />
+                        <LabelInput label={t('receipt.dateLabel')} value={customization.kitchenLabelDate} onChange={(v) => updateCustomization({ kitchenLabelDate: v })} />
+                        <LabelInput label={t('receipt.timeLabel')} value={customization.kitchenLabelTime} onChange={(v) => updateCustomization({ kitchenLabelTime: v })} />
+                        <LabelInput label={t('receipt.orderTypeLabel')} value={customization.kitchenLabelOrderType} onChange={(v) => updateCustomization({ kitchenLabelOrderType: v })} />
+                        <LabelInput label={t('receipt.cashierLabel')} value={customization.kitchenLabelCashier} onChange={(v) => updateCustomization({ kitchenLabelCashier: v })} />
                       </div>
                       </CollapsibleContent>
                     </Collapsible>
@@ -514,56 +515,93 @@ export function ReceiptCustomizationSection({ settings, updateSettings, t }: Rec
           {/* Preview - droite (desktop) */}
           <div className="hidden lg:block w-[50%] lg:min-w-[600px] flex-shrink-0">
             <div className="sticky top-4">
-              <div className="bg-background rounded-xl p-4 border border-border">
-                <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
-                  <Eye className="w-5 h-5" />
-                  {t('receipt.preview')}
-                </h3>
-                <Tabs defaultValue="receipt" className="w-full">
-                  <TabsList className="w-full mb-4">
-                    <TabsTrigger value="receipt" className="flex-1">{t('print.receipt')}</TabsTrigger>
-                    <TabsTrigger value="kitchen" className="flex-1">{t('print.kitchenTicket')}</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="receipt" className="mt-0">
-                    <div className="bg-white text-black p-6 rounded-lg shadow-inner overflow-auto max-h-[calc(100vh-300px)] max-w-full" style={{ fontFamily: customization.fontFamily === 'monospace' ? 'Courier New, monospace' : customization.fontFamily === 'sans-serif' ? 'Arial, sans-serif' : 'Times New Roman, serif', fontSize: customization.fontSize === 'small' ? '11px' : customization.fontSize === 'large' ? '15px' : '13px', lineHeight: '1.5', letterSpacing: '0.5px', minWidth: '300px' }}>
-                      {renderReceiptHTML({ order: sampleOrder, settings, currency, customization, cashierName: 'Admin', amountReceived: sampleOrder.paymentMethod === 'cash' ? sampleOrder.total + 5 : undefined, change: sampleOrder.paymentMethod === 'cash' ? 5 : undefined, t, type: 'receipt' })}
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="kitchen" className="mt-0">
-                    <div className="bg-white text-black p-6 rounded-lg shadow-inner overflow-auto max-h-[calc(100vh-300px)] max-w-full" style={{ fontFamily: customization.fontFamily === 'monospace' ? 'Courier New, monospace' : customization.fontFamily === 'sans-serif' ? 'Arial, sans-serif' : 'Times New Roman, serif', fontSize: customization.fontSize === 'small' ? '11px' : customization.fontSize === 'large' ? '15px' : '13px', lineHeight: '1.5', letterSpacing: '0.5px', minWidth: '300px' }}>
-                      {renderReceiptHTML({ order: sampleOrder, settings, currency, customization, cashierName: 'Admin', t, type: 'kitchen' })}
-                    </div>
-                  </TabsContent>
-                </Tabs>
-              </div>
+              <ReceiptPreviewTabs
+                customization={customization}
+                sampleOrder={sampleOrder}
+                settings={settings}
+                currency={currency}
+                t={t}
+                maxHeight="calc(100vh-300px)"
+              />
             </div>
           </div>
         </div>
 
         {/* Preview mobile - en dessous */}
         <div className="lg:hidden mt-6">
-          <div className="bg-background rounded-xl p-4 border border-border">
-            <h3 className="font-semibold text-base mb-4 flex items-center gap-2"><Eye className="w-5 h-5" />{t('receipt.preview')}</h3>
-            <Tabs defaultValue="receipt" className="w-full">
-              <TabsList className="w-full mb-4">
-                <TabsTrigger value="receipt" className="flex-1">{t('print.receipt')}</TabsTrigger>
-                <TabsTrigger value="kitchen" className="flex-1">{t('print.kitchenTicket')}</TabsTrigger>
-              </TabsList>
-              <TabsContent value="receipt" className="mt-0">
-                <div className="bg-white text-black p-6 rounded-lg shadow-inner overflow-auto max-h-96 max-w-full" style={{ fontFamily: customization.fontFamily === 'monospace' ? 'Courier New, monospace' : customization.fontFamily === 'sans-serif' ? 'Arial, sans-serif' : 'Times New Roman, serif', fontSize: customization.fontSize === 'small' ? '11px' : customization.fontSize === 'large' ? '15px' : '13px', lineHeight: '1.5', letterSpacing: '0.5px', minWidth: '300px' }}>
-                  {renderReceiptHTML({ order: sampleOrder, settings, currency, customization, cashierName: 'Admin', amountReceived: sampleOrder.paymentMethod === 'cash' ? sampleOrder.total + 5 : undefined, change: sampleOrder.paymentMethod === 'cash' ? 5 : undefined, t, type: 'receipt' })}
-                </div>
-              </TabsContent>
-              <TabsContent value="kitchen" className="mt-0">
-                <div className="bg-white text-black p-6 rounded-lg shadow-inner overflow-auto max-h-96 max-w-full" style={{ fontFamily: customization.fontFamily === 'monospace' ? 'Courier New, monospace' : customization.fontFamily === 'sans-serif' ? 'Arial, sans-serif' : 'Times New Roman, serif', fontSize: customization.fontSize === 'small' ? '11px' : customization.fontSize === 'large' ? '15px' : '13px', lineHeight: '1.5', letterSpacing: '0.5px', minWidth: '300px' }}>
-                  {renderReceiptHTML({ order: sampleOrder, settings, currency, customization, cashierName: 'Admin', t, type: 'kitchen' })}
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
+          <ReceiptPreviewTabs
+            customization={customization}
+            sampleOrder={sampleOrder}
+            settings={settings}
+            currency={currency}
+            t={t}
+            maxHeight="384px"
+          />
         </div>
       </motion.div>
     </>
+  );
+}
+
+function resolveFont(family: string): string {
+  if (family === 'monospace') return 'Courier New, monospace';
+  if (family === 'sans-serif') return 'Arial, sans-serif';
+  return 'Times New Roman, serif';
+}
+
+function resolveFontSize(size: string): string {
+  if (size === 'small') return '11px';
+  if (size === 'large') return '15px';
+  return '13px';
+}
+
+interface ReceiptPreviewTabsProps {
+  customization: ReceiptCustomization;
+  sampleOrder: Order;
+  settings: Settings;
+  currency: Currency;
+  t: (key: string) => string;
+  maxHeight: string;
+}
+
+function ReceiptPreviewTabs({ customization, sampleOrder, settings, currency, t, maxHeight }: ReceiptPreviewTabsProps) {
+  const receiptStyle: React.CSSProperties = {
+    fontFamily: resolveFont(customization.fontFamily),
+    fontSize: resolveFontSize(customization.fontSize),
+    lineHeight: '1.5',
+    letterSpacing: '0.5px',
+    minWidth: '300px',
+  };
+  const kitchenStyle: React.CSSProperties = {
+    fontFamily: resolveFont(customization.kitchenFontFamily),
+    fontSize: resolveFontSize(customization.kitchenFontSize),
+    lineHeight: '1.5',
+    letterSpacing: '0.5px',
+    minWidth: '300px',
+  };
+  return (
+    <div className="bg-background rounded-xl p-4 border border-border">
+      <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
+        <Eye className="w-5 h-5" />
+        {t('receipt.preview')}
+      </h3>
+      <Tabs defaultValue="receipt" className="w-full">
+        <TabsList className="w-full mb-4">
+          <TabsTrigger value="receipt" className="flex-1">{t('print.receipt')}</TabsTrigger>
+          <TabsTrigger value="kitchen" className="flex-1">{t('print.kitchenTicket')}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="receipt" className="mt-0">
+          <div className="bg-white text-black p-6 rounded-lg shadow-inner overflow-auto max-w-full" style={{ ...receiptStyle, maxHeight }}>
+            {renderReceiptHTML({ order: sampleOrder, settings, currency, customization, cashierName: 'Admin', amountReceived: sampleOrder.total + 5, change: 5, t, type: 'receipt' })}
+          </div>
+        </TabsContent>
+        <TabsContent value="kitchen" className="mt-0">
+          <div className="bg-white text-black p-6 rounded-lg shadow-inner overflow-auto max-w-full" style={{ ...kitchenStyle, maxHeight }}>
+            {renderReceiptHTML({ order: sampleOrder, settings, currency, customization, cashierName: 'Admin', t, type: 'kitchen' })}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
 

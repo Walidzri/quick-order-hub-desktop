@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { Order, Settings, Printer as PrinterType, PrinterConnectionType } from '@shared/types';
 import { formatCurrency, Currency } from '@/lib/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Printer, Download, FileText, Wifi, AlertCircle } from 'lucide-react';
+import { X, Printer, Download, AlertCircle, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DirectPrinter, PrinterConnection } from '@/lib/printer';
@@ -41,6 +41,7 @@ export function PrintPreviewModal({
   const { showAlert, DialogComponent } = useDialog();
   const printRef = useRef<HTMLDivElement>(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [printSuccess, setPrintSuccess] = useState(false);
   const [printError, setPrintError] = useState<string | null>(null);
 
   // Print kitchen ticket separately
@@ -349,9 +350,9 @@ export function PrintPreviewModal({
       }
 
       setIsPrinting(false);
-      
-      // Auto-close modal after successful print after 2 seconds
+      setPrintSuccess(true);
       setTimeout(() => {
+        setPrintSuccess(false);
         onClose();
       }, 2000);
     } catch (error) {
@@ -419,7 +420,7 @@ export function PrintPreviewModal({
           initial={{ scale: 0.95, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          className="bg-card rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
+          className="bg-card rounded-2xl w-full max-w-md max-h-[90vh] overflow-hidden shadow-2xl flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -455,18 +456,17 @@ export function PrintPreviewModal({
 
           {/* Print Content - Scrollable */}
           <div className="flex-1 overflow-y-auto p-4">
-            <div 
+            <div
               ref={printRef}
-              className="bg-white text-black p-6 rounded-lg shadow-inner max-w-sm mx-auto"
-              style={{ 
-                fontFamily: customization.fontFamily === 'monospace' ? 'Courier New, monospace' : 
-                           customization.fontFamily === 'sans-serif' ? 'Arial, sans-serif' : 
-                           'Times New Roman, serif',
-                fontSize: customization.fontSize === 'small' ? '11px' : 
-                         customization.fontSize === 'large' ? '15px' : 
-                         '13px',
+              className="bg-white text-black p-6 rounded-lg shadow-inner"
+              style={{
+                fontFamily: customization.fontFamily === 'monospace' ? 'Courier New, monospace' :
+                            customization.fontFamily === 'sans-serif' ? 'Arial, sans-serif' :
+                            'Times New Roman, serif',
+                fontSize: customization.fontSize === 'small' ? '11px' :
+                          customization.fontSize === 'large' ? '15px' : '13px',
                 lineHeight: '1.5',
-                letterSpacing: '0.5px'
+                letterSpacing: '0.5px',
               }}
             >
               {renderReceiptHTML({
@@ -484,39 +484,37 @@ export function PrintPreviewModal({
           </div>
 
           {/* Action Buttons */}
-          <div className="p-4 border-t border-border space-y-3 no-print">
+          <div className="p-4 border-t border-border space-y-2 no-print">
             {printError && (
               <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
-                <AlertCircle className="w-5 h-5" />
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
                 <span>{printError}</span>
               </div>
             )}
-            
-            <div className="flex gap-3">
-              <Button
-                onClick={handleDownload}
-                variant="outline"
-                className="flex-1 h-12 text-base font-medium"
-                size="lg"
-              >
-                <Download className="w-5 h-5 mr-2" />
+
+            {/* Bouton principal — Imprimer */}
+            <Button
+              onClick={handleDirectPrint}
+              disabled={isPrinting || printSuccess}
+              className="w-full h-14 text-base font-semibold"
+              size="lg"
+            >
+              {isPrinting ? (
+                <><Loader2 className="w-5 h-5 mr-2 animate-spin" />{t('print.printing')}</>
+              ) : printSuccess ? (
+                <><Check className="w-5 h-5 mr-2" />Impression envoyée</>
+              ) : (
+                <><Printer className="w-5 h-5 mr-2" />{t('print.print')}</>
+              )}
+            </Button>
+
+            {/* Boutons secondaires */}
+            <div className="flex gap-2">
+              <Button onClick={handleDownload} variant="outline" className="flex-1" size="sm">
+                <Download className="w-4 h-4 mr-2" />
                 {t('pdf.download')}
               </Button>
-              <Button
-                onClick={handleDirectPrint}
-                disabled={isPrinting}
-                className="flex-1 h-12 text-base font-medium"
-                size="lg"
-              >
-                <Printer className="w-5 h-5 mr-2" />
-                {isPrinting ? t('print.printing') : t('print.print')}
-              </Button>
-              <Button
-                onClick={onClose}
-                variant="outline"
-                className="flex-1 h-12 text-base font-medium"
-                size="lg"
-              >
+              <Button onClick={onClose} variant="outline" className="flex-1" size="sm">
                 {t('general.close')}
               </Button>
             </div>

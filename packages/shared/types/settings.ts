@@ -49,11 +49,11 @@ export interface ReceiptCustomization {
   labelChange: string;
   labelThankYou: string;
 
-  // Kitchen ticket specific
+  // Kitchen ticket specific — display options
   labelKitchenTicket: string;
   labelBonAppetit: string;
-  kitchenLabelItemCount: string; // Libellé personnalisé pour le nombre d'articles sur le ticket cuisine
-  kitchenShowItemCount: boolean; // Afficher le nombre d'articles sur le ticket cuisine
+  kitchenLabelItemCount: string;
+  kitchenShowItemCount: boolean;
   kitchenShowOrderNumber: boolean;
   kitchenShowDate: boolean;
   kitchenShowTime: boolean;
@@ -63,6 +63,23 @@ export interface ReceiptCustomization {
   kitchenShowProductPrices: boolean;
   kitchenShowModifiers: boolean;
   kitchenShowNotes: boolean;
+
+  // Kitchen ticket specific — formatting (independent from receipt)
+  kitchenDateFormat: string;
+  kitchenTimeFormat: string;
+  kitchenHeaderAlignment: 'left' | 'center' | 'right';
+  kitchenProductNameStyle: 'normal' | 'uppercase' | 'lowercase';
+  kitchenSeparatorStyle: 'dashes' | 'dots' | 'equals' | 'line' | 'none';
+  kitchenSeparatorChar: string;
+  kitchenFontSize: 'small' | 'normal' | 'large';
+  kitchenFontFamily: 'monospace' | 'sans-serif' | 'serif';
+
+  // Kitchen ticket specific — labels (independent from receipt labels)
+  kitchenLabelOrderNumber: string;
+  kitchenLabelDate: string;
+  kitchenLabelTime: string;
+  kitchenLabelOrderType: string;
+  kitchenLabelCashier: string;
 }
 
 export interface SavedReceiptTemplate {
@@ -167,4 +184,17 @@ export const defaultReceiptCustomization: ReceiptCustomization = {
   kitchenShowProductPrices: false,
   kitchenShowModifiers: true,
   kitchenShowNotes: true,
+  kitchenDateFormat: 'DD/MM/YYYY',
+  kitchenTimeFormat: 'HH:mm',
+  kitchenHeaderAlignment: 'center',
+  kitchenProductNameStyle: 'uppercase',
+  kitchenSeparatorStyle: 'dashes',
+  kitchenSeparatorChar: '─',
+  kitchenFontSize: 'normal',
+  kitchenFontFamily: 'monospace',
+  kitchenLabelOrderNumber: 'COMMANDE N°',
+  kitchenLabelDate: 'DATE',
+  kitchenLabelTime: 'HEURE',
+  kitchenLabelOrderType: 'TYPE',
+  kitchenLabelCashier: 'CAISSIER',
 };

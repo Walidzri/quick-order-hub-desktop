@@ -3,14 +3,13 @@ import { usePOS } from '@/contexts/POSContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/i18n';
 import { motion } from 'framer-motion';
-import { 
+import {
   TrendingUp,
   TrendingDown,
-  ShoppingCart, 
-  DollarSign, 
+  ShoppingCart,
+  DollarSign,
   Download,
-  Calendar,
-  Package,
+  ShoppingBag,
   BarChart3,
   Users,
   Clock,
@@ -27,15 +26,52 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 
 type PeriodType = 'day' | 'week' | 'month' | 'year';
 
+interface CashierStats {
+  user: User;
+  totalWorkTime: number;
+  totalOrders: number;
+  totalRevenue: number;
+  avgOrderValue: number;
+  sessions: UserSession[];
+}
+
+interface ProductStats {
+  name: string;
+  totalQuantity: number;
+  totalRevenue: number;
+  orderCount: number;
+}
+
+interface CategoryStats {
+  name: string;
+  value: number;
+  quantity: number;
+  color: string;
+}
+
+const CHART_COLORS = [
+  '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#ec4899', '#06b6d4', '#f97316', '#84cc16', '#6366f1',
+];
+
+function csvEscape(val: unknown): string {
+  const str = String(val ?? '');
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
 export function ReportsScreen() {
   const { loadOrdersByDateRange, currency, t, language } = usePOS();
-  const { users, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const [period, setPeriod] = useState<PeriodType>('day');
   const [userSessions, setUserSessions] = useState<UserSession[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [periodOrders, setPeriodOrders] = useState<Order[]>([]);
   const [prevPeriodOrders, setPrevPeriodOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showAllOrders, setShowAllOrders] = useState(false);
 
   const loadCashierStats = useCallback(async () => {
     try {
@@ -133,6 +169,7 @@ export function ReportsScreen() {
     
     loadData();
     loadCashierStats();
+    setShowAllOrders(false);
   }, [startDate, endDate, prevStartDate, prevEndDate, loadOrdersByDateRange, loadCashierStats]);
 
   const paidOrders = periodOrders.filter(o => o.status === 'paid');
@@ -156,15 +193,6 @@ export function ReportsScreen() {
   const avgChange = calcChange(avgOrderValue, prevAvgOrderValue);
 
   // Calculate cashier statistics
-  interface CashierStats {
-    user: User;
-    totalWorkTime: number; // in milliseconds
-    totalOrders: number;
-    totalRevenue: number;
-    avgOrderValue: number;
-    sessions: UserSession[];
-  }
-
   const cashierStats = useMemo(() => {
     const statsMap = new Map<string, CashierStats>();
     const cashiers = allUsers.filter(u => u.role === 'caissier');
@@ -223,95 +251,58 @@ export function ReportsScreen() {
     return `${hours}h ${minutes}min`;
   };
 
-  // Calculate top products
-  interface ProductStats {
-    name: string;
-    totalQuantity: number;
-    totalRevenue: number;
-    orderCount: number;
-  }
-
-  const productStatsMap = new Map<string, ProductStats>();
-
-  paidOrders.forEach(order => {
-    order.lines.forEach(line => {
-      const key = line.productName + (line.variantSize ? ` (${line.variantSize})` : '');
-      
-      if (!productStatsMap.has(key)) {
-        productStatsMap.set(key, {
-          name: key,
-          totalQuantity: 0,
-          totalRevenue: 0,
-          orderCount: 0,
-        });
-      }
-
-      const stats = productStatsMap.get(key)!;
-      const lineTotal = (line.unitPrice + (line.modifiers?.reduce((sum, m) => sum + m.priceAdjustment, 0) || 0)) * line.quantity;
-      
-      stats.totalQuantity += line.quantity;
-      stats.totalRevenue += lineTotal;
-      stats.orderCount += 1;
+  // Calculate top products (memoized)
+  const productStatsMap = useMemo(() => {
+    const map = new Map<string, ProductStats>();
+    paidOrders.forEach(order => {
+      order.lines.forEach(line => {
+        const key = line.productName + (line.variantSize ? ` (${line.variantSize})` : '');
+        if (!map.has(key)) {
+          map.set(key, { name: key, totalQuantity: 0, totalRevenue: 0, orderCount: 0 });
+        }
+        const stats = map.get(key)!;
+        const lineTotal = (line.unitPrice + (line.modifiers?.reduce((sum, m) => sum + m.priceAdjustment, 0) || 0)) * line.quantity;
+        stats.totalQuantity += line.quantity;
+        stats.totalRevenue += lineTotal;
+        stats.orderCount += 1;
+      });
     });
-  });
+    return map;
+  }, [paidOrders]);
 
   const topProducts = Array.from(productStatsMap.values())
     .sort((a, b) => b.totalQuantity - a.totalQuantity)
-    .slice(0, 10); // Top 10
+    .slice(0, 10);
 
   const maxQuantity = topProducts.length > 0 ? topProducts[0].totalQuantity : 1;
 
-  // Calculate category breakdown for donut chart
+  // Calculate category breakdown for donut chart (memoized)
   const { categories: allCategories } = usePOS();
-  
-  interface CategoryStats {
-    name: string;
-    value: number; // revenue
-    quantity: number;
-    color: string;
-  }
 
-  const CHART_COLORS = [
-    '#3b82f6', // blue
-    '#10b981', // green
-    '#f59e0b', // amber
-    '#ef4444', // red
-    '#8b5cf6', // violet
-    '#ec4899', // pink
-    '#06b6d4', // cyan
-    '#f97316', // orange
-    '#84cc16', // lime
-    '#6366f1', // indigo
-  ];
-
-  const categoryStatsMap = new Map<string, CategoryStats>();
-
-  paidOrders.forEach(order => {
-    order.lines.forEach(line => {
-      const categoryId = line.categoryId || 'unknown';
-      const category = allCategories.find(c => c.id === categoryId);
-      const categoryName = category?.name || t('reports.otherCategory');
-      
-      if (!categoryStatsMap.has(categoryId)) {
-        categoryStatsMap.set(categoryId, {
-          name: categoryName,
-          value: 0,
-          quantity: 0,
-          color: CHART_COLORS[categoryStatsMap.size % CHART_COLORS.length],
-        });
-      }
-
-      const stats = categoryStatsMap.get(categoryId)!;
-      const lineTotal = (line.unitPrice + (line.modifiers?.reduce((sum, m) => sum + m.priceAdjustment, 0) || 0)) * line.quantity;
-      stats.value += lineTotal;
-      stats.quantity += line.quantity;
+  const { categoryData, totalCategoryRevenue } = useMemo(() => {
+    const map = new Map<string, CategoryStats>();
+    paidOrders.forEach(order => {
+      order.lines.forEach(line => {
+        const categoryId = line.categoryId || 'unknown';
+        const category = allCategories.find(c => c.id === categoryId);
+        const categoryName = category?.name || t('reports.otherCategory');
+        if (!map.has(categoryId)) {
+          map.set(categoryId, {
+            name: categoryName,
+            value: 0,
+            quantity: 0,
+            color: CHART_COLORS[map.size % CHART_COLORS.length],
+          });
+        }
+        const stats = map.get(categoryId)!;
+        const lineTotal = (line.unitPrice + (line.modifiers?.reduce((sum, m) => sum + m.priceAdjustment, 0) || 0)) * line.quantity;
+        stats.value += lineTotal;
+        stats.quantity += line.quantity;
+      });
     });
-  });
-
-  const categoryData = Array.from(categoryStatsMap.values())
-    .sort((a, b) => b.value - a.value);
-  
-  const totalCategoryRevenue = categoryData.reduce((sum, c) => sum + c.value, 0);
+    const data = Array.from(map.values()).sort((a, b) => b.value - a.value);
+    return { categoryData: data, totalCategoryRevenue: data.reduce((sum, c) => sum + c.value, 0) };
+  }, [paidOrders, allCategories, t]);
 
   // Get locale based on language
   const getLocale = (): string => {
@@ -395,17 +386,18 @@ export function ReportsScreen() {
     {
       title: t('reports.avgOrder'),
       value: formatCurrency(avgOrderValue, currency),
-      icon: <Calendar className="w-6 h-6" />,
+      icon: <ShoppingBag className="w-6 h-6" />,
       color: 'bg-warning/10 text-warning',
       change: avgChange,
     },
   ];
 
   const handleExportCSV = () => {
-    const headers = ['Order Number', 'Date', 'Status', 'Items', 'Subtotal', 'Discount', 'Total', 'Payment Method'];
+    const now = new Date();
+    const headers = ['N° Commande', 'Date', 'Statut', 'Articles', 'Sous-total', 'Remise', 'Total', 'Paiement'];
     const rows = periodOrders.map(o => [
       o.orderNumber,
-      new Date(o.createdAt).toLocaleString(),
+      new Date(o.createdAt).toLocaleString(getLocale()),
       o.status,
       o.lines.length,
       o.subtotal,
@@ -415,20 +407,21 @@ export function ReportsScreen() {
     ]);
 
     const csv = [
-      headers.join(','),
-      ...rows.map(r => r.join(',')),
+      headers.map(csvEscape).join(','),
+      ...rows.map(r => r.map(csvEscape).join(',')),
     ].join('\n');
 
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const periodSuffix = period === 'day' ? new Date().toISOString().split('T')[0] :
-                         period === 'week' ? `week_${startDate.toISOString().split('T')[0]}` :
+    const periodSuffix = period === 'day' ? now.toISOString().split('T')[0] :
+                         period === 'week' ? `semaine_${startDate.toISOString().split('T')[0]}` :
                          period === 'month' ? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}` :
                          `${now.getFullYear()}`;
-    a.download = `orders_${periodSuffix}.csv`;
+    a.download = `commandes_${periodSuffix}.csv`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -478,7 +471,7 @@ export function ReportsScreen() {
               key={stat.title}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.1 }}
+              transition={{ delay: Math.min(index * 0.1, 0.3) }}
             >
               <Card>
                 <CardContent className="p-4 sm:p-6">
@@ -549,7 +542,7 @@ export function ReportsScreen() {
                         key={category.name}
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
+                        transition={{ delay: Math.min(index * 0.05, 0.3) }}
                         className="flex items-center justify-between p-2 sm:p-3 bg-muted/50 rounded-lg"
                       >
                         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
@@ -587,18 +580,13 @@ export function ReportsScreen() {
               </CardTitle>
             </CardHeader>
             <CardContent className="p-4 sm:p-6 pt-0">
-              {topProducts.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  Aucune donnée disponible
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {topProducts.map((product, index) => (
+              <div className="space-y-4">
+                {topProducts.map((product, index) => (
                     <motion.div
                       key={product.name}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
+                      transition={{ delay: Math.min(index * 0.05, 0.3) }}
                       className="space-y-2"
                     >
                       <div className="flex items-center justify-between gap-3">
@@ -624,14 +612,13 @@ export function ReportsScreen() {
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${(product.totalQuantity / maxQuantity) * 100}%` }}
-                          transition={{ delay: index * 0.05 + 0.2, duration: 0.5 }}
+                          transition={{ delay: Math.min(index * 0.05, 0.25) + 0.05, duration: 0.5 }}
                           className="h-full bg-primary rounded-full"
                         />
                       </div>
                     </motion.div>
-                  ))}
-                </div>
-              )}
+                ))}
+              </div>
             </CardContent>
           </Card>
         )}
@@ -654,7 +641,7 @@ export function ReportsScreen() {
                       key={stats.user.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
+                      transition={{ delay: Math.min(index * 0.1, 0.3) }}
                       className="p-4 bg-muted/50 rounded-xl space-y-3"
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -718,40 +705,55 @@ export function ReportsScreen() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="space-y-4">
-              {paidOrders.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">
-                  {t('reports.noSalesPeriod')}
-                </p>
-              ) : (
-                paidOrders
-                  .sort((a, b) => new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime())
-                  .map((order) => (
-                  <div
-                    key={order.id}
-                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-muted/50 rounded-lg gap-2"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm sm:text-base">{order.orderNumber}</div>
-                      <div className="text-xs sm:text-sm text-muted-foreground">
-                        {new Date(order.paidAt || order.createdAt).toLocaleString(getLocale(), {
-                          day: 'numeric',
-                          month: 'short',
-                          year: period === 'year' ? 'numeric' : undefined,
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                        {' • '}
-                        {order.paymentMethod === 'cash' ? t('payment.cash') : t('payment.card')}
+            {paidOrders.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">
+                {t('reports.noSalesPeriod')}
+              </p>
+            ) : (() => {
+              const sorted = [...paidOrders].sort((a, b) =>
+                new Date(b.paidAt || b.createdAt).getTime() - new Date(a.paidAt || a.createdAt).getTime()
+              );
+              const PAGE = 50;
+              const visible = showAllOrders ? sorted : sorted.slice(0, PAGE);
+              const remaining = sorted.length - PAGE;
+              return (
+                <div className="space-y-2">
+                  {visible.map((order) => (
+                    <div
+                      key={order.id}
+                      className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-muted/50 rounded-lg gap-2"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm sm:text-base">{order.orderNumber}</div>
+                        <div className="text-xs sm:text-sm text-muted-foreground">
+                          {new Date(order.paidAt || order.createdAt).toLocaleString(getLocale(), {
+                            day: 'numeric',
+                            month: 'short',
+                            year: period === 'year' ? 'numeric' : undefined,
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                          {' • '}
+                          {order.paymentMethod === 'cash' ? t('payment.cash') : t('payment.card')}
+                        </div>
+                      </div>
+                      <div className="text-base sm:text-lg font-bold text-primary">
+                        {formatCurrency(order.total, currency)}
                       </div>
                     </div>
-                    <div className="text-base sm:text-lg font-bold text-primary">
-                      {formatCurrency(order.total, currency)}
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+                  ))}
+                  {!showAllOrders && sorted.length > PAGE && (
+                    <Button
+                      variant="outline"
+                      className="w-full mt-2"
+                      onClick={() => setShowAllOrders(true)}
+                    >
+                      Voir les {remaining} commandes suivantes
+                    </Button>
+                  )}
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>

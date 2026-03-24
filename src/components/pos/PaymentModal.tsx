@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/i18n';
 import { PaymentMethod, Order, PrinterConnectionType } from '@shared/types';
 import { motion } from 'framer-motion';
-import { X, Banknote, CreditCard, Check, Trash2, ArrowLeft } from 'lucide-react';
+import { X, Banknote, CreditCard, Check, Trash2, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -37,6 +37,8 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
   const [step, setStep] = useState<'method' | 'cash' | 'processing' | 'done'>('method');
   const [paymentAmountReceived, setPaymentAmountReceived] = useState<number>(0);
   const [paymentChange, setPaymentChange] = useState<number>(0);
+  const [kitchenPrintErrors, setKitchenPrintErrors] = useState<string[]>([]);
+  const [paidOrder, setPaidOrder] = useState<Order | null>(null);
 
   const change = (parseFloat(amountReceived) || 0) - total;
 
@@ -65,7 +67,8 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
   const printKitchenTicketAutomatically = async (
     order: Order,
     onOpenDrawerIfCash?: () => Promise<void>
-  ) => {
+  ): Promise<string[]> => {
+    const errors: string[] = [];
     try {
       // Ouvrir le tiroir caisse au moment où le ticket cuisine est lancé (si paiement espèces)
       if (order.paymentMethod === 'cash' && onOpenDrawerIfCash) {
@@ -80,7 +83,8 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
       console.log('[AUTO-KITCHEN] Imprimantes cuisine actives =', kitchenPrinters);
       if (!kitchenPrinters || kitchenPrinters.length === 0) {
         console.log('[AUTO-KITCHEN] Aucune imprimante cuisine ACTIVE définie.');
-        return;
+        errors.push('Aucune imprimante cuisine configurée');
+        return errors;
       }
 
       // Get customization settings for kitchen ticket
@@ -196,17 +200,18 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
               kitchenPrinter.name
             );
           } catch (err) {
-            console.error(
-              '[AUTO-KITCHEN] Erreur sur une imprimante cuisine (non bloquant):',
-              err
-            );
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error('[AUTO-KITCHEN] Erreur sur une imprimante cuisine:', err);
+            errors.push(`${kitchenPrinter.name || 'Imprimante cuisine'} : ${msg}`);
           }
         })
       );
     } catch (error) {
-      // Silent fail - don't block payment if kitchen printer fails
+      const msg = error instanceof Error ? error.message : String(error);
       console.error('Kitchen ticket auto-print error (non-blocking):', error);
+      errors.push(msg);
     }
+    return errors;
   };
 
   // Open cash drawer (RJ12) when paying cash - uses first receipt printer
@@ -273,20 +278,22 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
       // Mark as paid
       const paidOrderData = await markAsPaid(order.id, method);
       
-      // Automatically print kitchen ticket after payment (l'impulsion tiroir est lancée au début du ticket cuisine)
-      printKitchenTicketAutomatically(paidOrderData, openCashDrawerIfNeeded).catch(err => {
-        console.error('Kitchen ticket print failed (non-blocking):', err);
-      });
-      
       setStep('done');
-      
-      // Notify parent and close payment modal after short delay (pass computed values, not state - state update is async)
+      setPaidOrder(paidOrderData);
+
+      // Automatically print kitchen ticket after payment (l'impulsion tiroir est lancée au début du ticket cuisine)
+      const printErrs = await printKitchenTicketAutomatically(paidOrderData, openCashDrawerIfNeeded);
+      if (printErrs.length > 0) {
+        // Keep modal open — user must close manually after reading the error
+        setKitchenPrintErrors(printErrs);
+        return;
+      }
+
+      // No errors — close after short delay
       setTimeout(() => {
-        if (onPaymentSuccess) {
-          onPaymentSuccess(paidOrderData, received, change);
-        }
-        onClose(); // Close payment modal
-      }, 500);
+        if (onPaymentSuccess) onPaymentSuccess(paidOrderData, received, change);
+        onClose();
+      }, 2000);
     } catch (error) {
       console.error('Payment error:', error);
       setStep('method');
@@ -331,6 +338,32 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
             <p className="text-muted-foreground">
               {t('payment.preparingReceipt')}
             </p>
+            {kitchenPrintErrors.length > 0 && (
+              <div className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-left space-y-1">
+                <div className="flex items-center gap-2 text-destructive font-semibold text-sm">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  <span>Erreur impression cuisine</span>
+                </div>
+                {kitchenPrintErrors.map((err, i) => (
+                  <p key={i} className="text-xs text-destructive/80 pl-6">{err}</p>
+                ))}
+                <div className="pt-2 pl-6">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (onPaymentSuccess && paidOrder) {
+                        onPaymentSuccess(paidOrder, paymentAmountReceived, paymentChange);
+                      }
+                      onClose();
+                    }}
+                    className="w-full"
+                  >
+                    Fermer
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         ) : step === 'processing' ? (
           <div className="p-8 text-center">
