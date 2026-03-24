@@ -630,6 +630,16 @@ ipcMain.handle('app:getUserDataPath', () => {
   return getUserDataPath();
 });
 
+// IPC Handler — auto-démarrage Windows
+ipcMain.handle('app:getLoginItemSettings', () => {
+  return app.getLoginItemSettings();
+});
+
+ipcMain.handle('app:setOpenAtLogin', (_event, openAtLogin: boolean) => {
+  app.setLoginItemSettings({ openAtLogin });
+  return app.getLoginItemSettings();
+});
+
 // IPC Handler for getting IndexedDB path
 ipcMain.handle('app:getIndexedDBPath', () => {
   return getIndexedDBPath();

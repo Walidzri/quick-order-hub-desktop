@@ -117,7 +117,6 @@
       "target": [
         "nsis"
       ],
-      "icon": "build/icon.ico",
       "sign": null,
       "verifyUpdateCodeSignature": false,
       "signingHashAlgorithms": []
@@ -137,23 +136,15 @@
         "to": "PrintDaemon/PrintDaemon.exe"
       }
     ],
-    "mac": {
-      "target": [
-        "dmg"
-      ],
-      "icon": "build/icon.icns",
-      "category": "public.app-category.business"
-    },
-    "linux": {
-      "target": [
-        "AppImage"
-      ],
-      "icon": "build/icon.png",
-      "category": "Office"
-    },
-    "nsis": {
+"nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Quick Order Hub",
+      "runAfterFinish": true,
+      "installerIcon": null,
+      "uninstallerIcon": null
     }
   }
 }

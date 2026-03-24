@@ -37,6 +37,10 @@ try {
     getUserDataPath: () => ipcRenderer.invoke('app:getUserDataPath'),
     getIndexedDBPath: () => ipcRenderer.invoke('app:getIndexedDBPath'),
     shutdownPC: () => ipcRenderer.invoke('app:shutdownPC'),
+
+    // Auto-démarrage Windows
+    getLoginItemSettings: () => ipcRenderer.invoke('app:getLoginItemSettings'),
+    setOpenAtLogin: (openAtLogin) => ipcRenderer.invoke('app:setOpenAtLogin', openAtLogin),
   });
   
   if (process.env.NODE_ENV === 'development') {

@@ -103,6 +103,16 @@ export function SettingsScreen() {
     products: { pending: number; synced: number; error: number; lastSyncedAt: string | null };
   } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [openAtLogin, setOpenAtLogin] = useState(false);
+
+  // Charger l'état auto-démarrage Windows au montage
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.electronAPI?.getLoginItemSettings) {
+      window.electronAPI.getLoginItemSettings().then((s: { openAtLogin: boolean }) => {
+        setOpenAtLogin(s?.openAtLogin ?? false);
+      }).catch(() => {});
+    }
+  }, []);
 
   // Check PrintDaemon C# status via HTTP
   const checkDaemonStatus = useCallback(async () => {
@@ -554,6 +564,27 @@ export function SettingsScreen() {
                   {isOpeningDrawer ? t('general.processing') : t('order.openDrawer')}
                 </Button>
               </div>
+
+              {/* Démarrer avec Windows (Electron uniquement) */}
+              {typeof window !== 'undefined' && window.electronAPI && (
+                <div className="flex items-center justify-between p-3 sm:p-4 bg-muted/50 rounded-xl">
+                  <div>
+                    <span className="font-medium text-sm sm:text-base">{t('settings.openAtLogin') || 'Démarrer avec Windows'}</span>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      {openAtLogin
+                        ? (t('settings.openAtLoginOn') || 'L\'application démarre automatiquement avec Windows')
+                        : (t('settings.openAtLoginOff') || 'L\'application ne démarre pas automatiquement')}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={openAtLogin}
+                    onCheckedChange={async (checked) => {
+                      const result = await window.electronAPI.setOpenAtLogin(checked);
+                      setOpenAtLogin(result?.openAtLogin ?? checked);
+                    }}
+                  />
+                </div>
+              )}
 
               {/* Éteindre le PC (Electron uniquement) */}
               {typeof window !== 'undefined' && window.electronAPI && (
