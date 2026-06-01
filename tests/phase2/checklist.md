@@ -1,8 +1,10 @@
 # Checklist Phase 2 — Validation migration IDB → SQLite
 
-> Vérification manuelle de toutes les fonctionnalités après migration complète.
-> Cocher chaque item après vérification dans l'app Electron.
-> Tous les items doivent être ✅ avant de valider la Phase 2 et passer à la Phase 3.
+> **STATUT : VALIDÉE — 88/88 items**
+
+> ~~Vérification manuelle de toutes les fonctionnalités après migration complète.~~
+> ~~Cocher chaque item après vérification dans l'app Electron.~~
+> ~~Tous les items doivent être ✅ avant de valider la Phase 2 et passer à la Phase 3.~~
 
 ---
 

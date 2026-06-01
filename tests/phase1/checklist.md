@@ -1,8 +1,10 @@
 # Checklist manuelle — Phase 1
 
-> Vérifier chaque item après le démarrage de l'application.
-> Cocher `[x]` quand c'est validé.
-> La Phase 1 est validée quand TOUS les items sont cochés.
+> **STATUT : VALIDÉE — 83/83 items (30/30 tests curl PASS)**
+
+> ~~Vérifier chaque item après le démarrage de l'application.~~
+> ~~Cocher `[x]` quand c'est validé.~~
+> ~~La Phase 1 est validée quand TOUS les items sont cochés.~~
 
 ---
 

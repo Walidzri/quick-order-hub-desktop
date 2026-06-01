@@ -1,10 +1,11 @@
 # Checklist Phase 3 — Tablette cuisine + Télé salle
 
-> Vérification manuelle du flux temps réel complet.
-> Pré-requis : app Electron ouverte, POS connecté au réseau local.
-> URL à utiliser depuis les appareils : `http://[IP-DU-PC]:3002/cuisine` et `/display`
->
-> Pour trouver l'IP du PC POS : `ipconfig` (Windows) ou `ip a` (Linux) → adresse 192.168.x.x
+> **STATUT : VALIDÉE — 49/49 items**
+
+> ~~Vérification manuelle du flux temps réel complet.~~
+> ~~Pré-requis : app Electron ouverte, POS connecté au réseau local.~~
+> ~~URL à utiliser depuis les appareils : `http://[IP-DU-PC]:3002/cuisine` et `/display`~~
+> ~~Pour trouver l'IP du PC POS : `ipconfig` (Windows) ou `ip a` (Linux) → adresse 192.168.x.x~~
 
 ---
 
