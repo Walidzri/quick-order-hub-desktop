@@ -13,7 +13,7 @@
 | # | Vérification | Statut |
 |---|---|---|
 | 0.1 | L'app Electron démarre sans erreur dans la console | [ ] |
-| 0.2 | Le serveur Fastify démarre sur le port 3001 (log `[FASTIFY] Server listening`) | [ ] |
+| 0.2 | Le serveur Fastify démarre sur le port 3002 (log `[FASTIFY] Server listening`) | [ ] |
 | 0.3 | Aucune erreur rouge dans la DevTools Console au démarrage | [ ] |
 | 0.4 | L'écran de login / setup s'affiche correctement | [ ] |
 

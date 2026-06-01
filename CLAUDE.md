@@ -69,7 +69,7 @@ Le code est en mode "spaghetti" :
 │  │   RENDERER PROCESS   │      │       MAIN PROCESS           │ │
 │  │   (Frontend)         │      │       (Backend embarqué)     │ │
 │  │                      │      │                              │ │
-│  │  React + TypeScript  │      │  Fastify :3001               │ │
+│  │  React + TypeScript  │      │  Fastify :3002               │ │
 │  │  └── Pages           │ HTTP │  ├── /api/orders             │ │
 │  │  └── Components      │◄────►│  ├── /api/products           │ │
 │  │  └── Contexts légers │      │  ├── /api/settings           │ │
@@ -207,12 +207,12 @@ et des scripts curl pour tester chaque route Fastify dès qu'elle est créée.
 ```bash
 # Format standard de chaque test curl
 echo "--- TEST: GET /api/orders ---"
-curl -s -X GET http://localhost:3001/api/orders \
+curl -s -X GET http://localhost:3002/api/orders \
   -H "Content-Type: application/json" | jq .
 # Résultat attendu : tableau JSON (vide ou avec commandes)
 
 echo "--- TEST: POST /api/orders ---"
-curl -s -X POST http://localhost:3001/api/orders \
+curl -s -X POST http://localhost:3002/api/orders \
   -H "Content-Type: application/json" \
   -d '{"type": "dine-in", "lines": []}' | jq .
 # Résultat attendu : objet commande avec id généré
@@ -350,7 +350,7 @@ Cette section peut amender le plan d'action si l'analyse révèle des surprises.
 - [ ] Lancer Fastify depuis `electron/main.ts`
 
 #### Étape 1.3 — Créer la couche services frontend
-- [ ] Créer `src/services/api.ts` — config base URL `http://localhost:3001`
+- [ ] Créer `src/services/api.ts` — config base URL `http://localhost:3002`
 - [ ] Créer `src/services/orderService.ts`
 - [ ] Créer `src/services/productService.ts`
 - [ ] Créer `src/services/settingsService.ts`

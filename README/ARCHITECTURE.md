@@ -64,11 +64,14 @@ Le routeur est le seul à gérer la connexion WireGuard vers le VPS. Tous les ap
 Un serveur DNS local (Pi-hole ou Adguard Home) pour éviter de retenir les IPs :
 
 ```
-pos.local       → 192.168.1.2
-cuisine.local   → 192.168.1.3
-display.local   → 192.168.1.4
-vps.local       → 10.0.0.1 (IP WireGuard du VPS)
+pos.local       → 192.168.1.2   # POS = seul serveur, toutes les pages viennent de lui
+cuisine.local   → 192.168.1.2   # alias vers le POS (la page /cuisine est servie par Fastify sur le POS)
+display.local   → 192.168.1.2   # alias vers le POS (la page /display est servie par Fastify sur le POS)
+vps.local       → 10.0.0.1      # IP WireGuard du VPS
 ```
+
+> Les tablettes/TV n'hébergent rien — elles consomment uniquement des pages servies par le POS.
+> `cuisine.local` et `display.local` pointent vers le POS, pas vers les appareils eux-mêmes.
 
 ---
 
@@ -81,7 +84,7 @@ C'est le serveur principal du réseau local. Il héberge Fastify qui sert à la 
 ```
 PC tactile
 ├── Electron (interface caisse)     ~200MB RAM
-├── Fastify :3001                   ~50MB RAM
+├── Fastify :3002                   ~50MB RAM
 │     ├── API REST (/api/*)
 │     ├── Page cuisine (/cuisine)
 │     ├── Page salle (/display)
@@ -120,8 +123,8 @@ Afficher les commandes en cours pour le cuisinier. Permettre de marquer une comm
 ```
 Tablette (n'importe quel appareil avec un navigateur)
 └── Chrome / Safari / Firefox
-      └── http://cuisine.local:3001/cuisine
-            └── WebSocket ws://cuisine.local:3001/ws/events
+      └── http://pos.local:3002/cuisine
+            └── WebSocket ws://pos.local:3002/ws/events
                   └── reçoit les nouvelles commandes en temps réel
 ```
 
@@ -148,7 +151,7 @@ Afficher les numéros de commandes prêtes à être récupérées par les client
 ```
 Télé / écran (n'importe quel appareil avec un navigateur)
 └── Chrome / navigateur intégré Smart TV
-      └── http://display.local:3001/display
+      └── http://pos.local:3002/display
             └── WebSocket temps réel
                   └── affiche/retire les numéros automatiquement
 ```
