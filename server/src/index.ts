@@ -19,6 +19,8 @@ import { syncRoutes } from './routes/sync';
 import { initDatabase, closeDatabase, getDefaultDbPath } from './db/connection';
 import { settingsService } from './services/settingsService';
 import { syncService } from './services/syncService';
+import { orderService } from './services/orderService';
+import { wsService } from './services/wsService';
 
 const fastify = Fastify({
   logger: {
@@ -82,6 +84,31 @@ export async function startServer(port = 3002, dbPath?: string): Promise<typeof 
   fastify.get('/api/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
   });
+
+  // ── Purge automatique à minuit ────────────────────────────────────────────
+  function scheduleMidnightPurge() {
+    const now  = new Date();
+    const next = new Date(now);
+    next.setDate(next.getDate() + 1);
+    next.setHours(0, 0, 30, 0); // 00:00:30 lendemain (30s de marge)
+    const delay = next.getTime() - now.getTime();
+
+    setTimeout(() => {
+      try {
+        const purged = orderService.purgeStaleKitchenOrders();
+        wsService.broadcast('kitchen:purged', { purged, timestamp: new Date().toISOString() });
+        console.log(`[PURGE] Cuisine : ${purged} commande(s) bloquée(s) purgée(s) à minuit`);
+      } catch (e) {
+        console.error('[PURGE] Erreur purge cuisine minuit :', e);
+      }
+      scheduleMidnightPurge(); // reprogrammer pour le lendemain
+    }, delay);
+
+    const h = Math.floor(delay / 3600000);
+    const m = Math.floor((delay % 3600000) / 60000);
+    console.log(`[PURGE] Prochaine purge cuisine dans ${h}h${m}m`);
+  }
+  scheduleMidnightPurge();
 
   await fastify.listen({ port, host: '0.0.0.0' });
   console.log(`[FASTIFY] Server listening on 0.0.0.0:${port} (http://127.0.0.1:${port} / réseau local)`);

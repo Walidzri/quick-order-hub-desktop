@@ -169,12 +169,31 @@ const HTML = /* html */`<!DOCTYPE html>
   </main>
 
   <script>
-    const READY_STATUS  = 'ready';
-    const PREP_STATUSES = ['sentToKitchen'];
+    const READY_STATUS       = 'ready';
+    const READY_DISPLAY_MS   = 5 * 60 * 1000; // 5 min sur l'affichage salle
 
     let readyOrders     = {};  // id → order
     let preparingOrders = {};  // id → order
     let ws = null;
+
+    // ── Date du jour (pour filtre et reset minuit) ────────────────────────────
+    function todayStart() {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d.toISOString();
+    }
+
+    // Reset automatique à minuit
+    let currentDay = new Date().toDateString();
+    setInterval(() => {
+      const today = new Date().toDateString();
+      if (today !== currentDay) {
+        currentDay = today;
+        readyOrders = {};
+        preparingOrders = {};
+        loadOrders();
+      }
+    }, 60000);
 
     // ── Horloge ───────────────────────────────────────────────────────────────
     function updateClock() {
@@ -218,27 +237,37 @@ const HTML = /* html */`<!DOCTYPE html>
       return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
 
+    // ── Auto-suppression des commandes "prêtes" après READY_DISPLAY_MS ──────────
+    function scheduleReadyRemoval(id, delayMs) {
+      setTimeout(() => {
+        if (readyOrders[id]) {
+          delete readyOrders[id];
+          renderReady();
+        }
+      }, delayMs);
+    }
+
     // ── Appliquer un event d'ordre ─────────────────────────────────────────────
     function applyOrder(order) {
       const { id, status } = order;
 
       if (status === READY_STATUS) {
-        // Toujours afficher dans "Prêtes", même si déjà payé (comptoir)
         delete preparingOrders[id];
         readyOrders[id] = order;
         renderReady();
         renderPreparing();
+        // Disparaît automatiquement après READY_DISPLAY_MS (gère aussi commandes comptoir déjà payées)
+        scheduleReadyRemoval(id, READY_DISPLAY_MS);
 
-      } else if (PREP_STATUSES.includes(status)) {
+      } else if (order.sentToKitchenAt && !order.kitchenReadyAt && status !== 'cancelled') {
         preparingOrders[id] = order;
         delete readyOrders[id];
         renderReady();
         renderPreparing();
 
       } else if (status === 'paid') {
-        // Retirer de "Prêtes" si la commande y était (client vient chercher sa commande)
-        // NE PAS retirer de "En préparation" : commande comptoir payée
-        // immédiatement mais cuisinier prépare encore
+        // Retirer de "Prêtes" si la commande y était (client vient chercher avant le timer)
+        // NE PAS retirer de "En préparation" : commande comptoir payée avant que le chef finisse
         if (readyOrders[id]) {
           delete readyOrders[id];
           renderReady();
@@ -257,7 +286,7 @@ const HTML = /* html */`<!DOCTYPE html>
       try {
         const [settingsRes, ordersRes] = await Promise.all([
           fetch('/api/settings'),
-          fetch('/api/orders'),
+          fetch('/api/orders?start=' + encodeURIComponent(todayStart())),
         ]);
 
         // Nom du restaurant
@@ -275,8 +304,18 @@ const HTML = /* html */`<!DOCTYPE html>
           readyOrders     = {};
           preparingOrders = {};
           for (const o of list) {
-            if (o.status === READY_STATUS)             readyOrders[o.id]    = o;
-            else if (PREP_STATUSES.includes(o.status)) preparingOrders[o.id] = o;
+            if (o.status === READY_STATUS) {
+              const readyAt  = o.kitchenReadyAt || o.updatedAt;
+              const age      = Date.now() - new Date(readyAt).getTime();
+              const remaining = READY_DISPLAY_MS - age;
+              if (remaining > 0) {
+                readyOrders[o.id] = o;
+                scheduleReadyRemoval(o.id, remaining); // reprend le compte à rebours
+              }
+              // Si trop ancien (> 5 min), on l'ignore silencieusement
+            } else if (o.sentToKitchenAt && !o.kitchenReadyAt && o.status !== 'cancelled') {
+              preparingOrders[o.id] = o;
+            }
           }
           renderReady();
           renderPreparing();
@@ -307,6 +346,10 @@ const HTML = /* html */`<!DOCTYPE html>
             applyOrder(payload);
           } else if (type === 'order:status') {
             applyOrder({ ...payload.order, status: payload.status });
+          } else if (type === 'kitchen:purged') {
+            readyOrders = {};
+            preparingOrders = {};
+            loadOrders();
           }
         } catch {}
       };

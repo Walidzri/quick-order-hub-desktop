@@ -131,9 +131,26 @@ const HTML = /* html */`<!DOCTYPE html>
   <div id="grid"></div>
 
   <script>
-    const KITCHEN_STATUSES = ['sentToKitchen'];
     let orders = {};
     let ws = null;
+
+    // ── Date du jour (pour filtre et reset minuit) ────────────────────────────
+    function todayStart() {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d.toISOString();
+    }
+
+    // Reset automatique à minuit : vider l'affichage et recharger
+    let currentDay = new Date().toDateString();
+    setInterval(() => {
+      const today = new Date().toDateString();
+      if (today !== currentDay) {
+        currentDay = today;
+        orders = {};
+        loadOrders();
+      }
+    }, 60000);
 
     // ── Utils ─────────────────────────────────────────────────────────────────
     const TYPE_LABEL  = { 'dine-in': 'Sur place', takeaway: 'À emporter', delivery: 'Livraison' };
@@ -258,11 +275,14 @@ const HTML = /* html */`<!DOCTYPE html>
     // ── Chargement initial ────────────────────────────────────────────────────
     async function loadOrders() {
       try {
-        const data = await fetch('/api/orders').then(r => r.json());
+        const data = await fetch('/api/orders?start=' + encodeURIComponent(todayStart())).then(r => r.json());
         const list = data.orders || data;
         orders = {};
         for (const o of list) {
-          if (KITCHEN_STATUSES.includes(o.status)) orders[o.id] = o;
+          // Afficher si envoyé en cuisine ET pas encore marqué prêt par le chef
+          if (o.sentToKitchenAt && !o.kitchenReadyAt && o.status !== 'cancelled') {
+            orders[o.id] = o;
+          }
         }
         renderOrders();
       } catch (e) {
@@ -294,24 +314,26 @@ const HTML = /* html */`<!DOCTYPE html>
           const { type, payload } = JSON.parse(event.data);
 
           if (type === 'order:created') {
-            if (KITCHEN_STATUSES.includes(payload.status)) {
+            if (payload.sentToKitchenAt && !payload.kitchenReadyAt && payload.status !== 'cancelled') {
               orders[payload.id] = payload;
               renderOrders();
               playBeep();
             }
           } else if (type === 'order:status') {
-            if (KITCHEN_STATUSES.includes(payload.status)) {
-              orders[payload.id] = payload.order;
+            const o = payload.order;
+            if (!o) return;
+            if (o.sentToKitchenAt && !o.kitchenReadyAt && o.status !== 'cancelled') {
+              const isNew = !orders[o.id];
+              orders[o.id] = o;
               renderOrders();
-              playBeep();
-            } else if (payload.status === 'ready' || payload.status === 'cancelled') {
-              if (orders[payload.id]) {
-                delete orders[payload.id];
-                renderOrders();
-              }
+              if (isNew) playBeep();
+            } else if (orders[payload.id]) {
+              delete orders[payload.id];
+              renderOrders();
             }
-            // 'paid' et autres statuts ne retirent PAS la commande de la cuisine
-            // (commande comptoir : payée immédiatement mais le cuisinier doit quand même la préparer)
+          } else if (type === 'kitchen:purged') {
+            orders = {};
+            loadOrders();
           }
         } catch {}
       };

@@ -260,6 +260,10 @@ function applyColumnMigrations(db: Database.Database): void {
     db.exec(`ALTER TABLE orders ADD COLUMN synced_at TEXT`);
     console.log('[DB] Migration : orders.synced_at ajouté');
   }
+  if (!hasColumn('orders', 'kitchen_ready_at')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN kitchen_ready_at TEXT`);
+    console.log('[DB] Migration : orders.kitchen_ready_at ajouté');
+  }
   if (!hasColumn('products', 'sync_status')) {
     db.exec(`ALTER TABLE products ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'`);
     console.log('[DB] Migration : products.sync_status ajouté');

@@ -102,4 +102,11 @@ export async function ordersRoutes(fastify: FastifyInstance) {
     for (const o of all) orderService.delete(o.id);
     return { deleted: all.length };
   });
+
+  // Purge des commandes cuisine bloquées (jours précédents)
+  fastify.post('/api/orders/purge-kitchen', async (_request, reply) => {
+    const purged = orderService.purgeStaleKitchenOrders();
+    wsService.broadcast('kitchen:purged', { purged, timestamp: new Date().toISOString() });
+    return { purged };
+  });
 }

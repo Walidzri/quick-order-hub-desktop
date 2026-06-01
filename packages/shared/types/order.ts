@@ -40,6 +40,7 @@ export interface Order {
   updatedAt: Date;
   paidAt?: Date;
   sentToKitchenAt?: Date;
+  kitchenReadyAt?: Date;
   /** Infos livraison (si type === 'delivery') */
   deliveryAddress?: string;
   deliveryPhone?: string;
