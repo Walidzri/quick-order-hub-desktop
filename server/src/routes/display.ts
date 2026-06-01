@@ -319,8 +319,16 @@ const HTML = /* html */`<!DOCTYPE html>
 </body>
 </html>`;
 
+import { settingsService } from '../services/settingsService';
+
 export async function displayRoutes(fastify: FastifyInstance) {
   fastify.get('/display', async (_request, reply) => {
+    const settings = settingsService.get();
+    if (settings.displayEnabled === false) {
+      return reply.status(503).type('text/html').send(
+        '<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:4rem;background:#0f172a;color:#94a3b8"><h1>📺 Télé salle désactivée</h1><p>Ce service est désactivé dans les paramètres du POS.</p></body></html>'
+      );
+    }
     reply.type('text/html').send(HTML);
   });
 }

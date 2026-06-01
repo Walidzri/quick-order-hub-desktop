@@ -121,6 +121,9 @@ export interface Settings {
   cardPaymentEnabled?: boolean; // Activer/désactiver le paiement par carte (défaut: false)
   /** Synchronisation cloud */
   cloudSyncEnabled?: boolean; // Activer/désactiver la sync vers le VPS (défaut: false)
+  /** Services réseau locaux */
+  cuisineEnabled?: boolean; // Activer/désactiver la page tablette cuisine (défaut: true)
+  displayEnabled?: boolean; // Activer/désactiver la page télé salle (défaut: true)
 }
 
 export interface NumberingCounter {

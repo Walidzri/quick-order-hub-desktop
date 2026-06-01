@@ -83,16 +83,6 @@ export function LockScreen() {
     }
   };
 
-  // Auto-submit PIN when complete
-  useEffect(() => {
-    if (mode === 'pin' && pin.length >= 4 && pin.length <= 6) {
-      const timeout = setTimeout(() => {
-        handlePinSubmit();
-      }, 300);
-      return () => clearTimeout(timeout);
-    }
-  }, [pin, mode]);
-
   const handlePinKeyPress = (key: string) => {
     if (lockoutTime > 0) return;
     
@@ -212,6 +202,21 @@ export function LockScreen() {
                     </button>
                   ))}
                 </div>
+
+                {/* Bouton OK — visible dès 4 chiffres */}
+                {pin.length >= 4 && (
+                  <button
+                    onClick={handlePinSubmit}
+                    disabled={isLoading || lockoutTime > 0}
+                    className={cn(
+                      "w-full mt-3 h-12 rounded-xl font-bold text-lg transition-all",
+                      "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95",
+                      "disabled:opacity-50 disabled:cursor-not-allowed"
+                    )}
+                  >
+                    {isLoading ? '...' : 'OK ✓'}
+                  </button>
+                )}
 
                 {/* Actions */}
                 <div className="mt-6 flex items-center justify-between">

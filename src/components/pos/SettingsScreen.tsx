@@ -545,6 +545,37 @@ export function SettingsScreen() {
                 </div>
               </div>
 
+              {/* Services réseau locaux */}
+              <div className="space-y-3">
+                <label className="text-xs sm:text-sm font-medium text-muted-foreground block">
+                  Services réseau locaux
+                </label>
+                <div className="flex items-center justify-between p-3 sm:p-4 bg-muted/50 rounded-xl">
+                  <div>
+                    <span className="font-medium text-sm sm:text-base">🍳 Tablette cuisine</span>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      {settings.cuisineEnabled === false ? 'Désactivé' : 'Accessible sur http://[IP]:3002/cuisine'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.cuisineEnabled !== false}
+                    onCheckedChange={(checked) => updateSettings({ cuisineEnabled: checked })}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 sm:p-4 bg-muted/50 rounded-xl">
+                  <div>
+                    <span className="font-medium text-sm sm:text-base">📺 Télé salle</span>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      {settings.displayEnabled === false ? 'Désactivé' : 'Accessible sur http://[IP]:3002/display'}
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.displayEnabled !== false}
+                    onCheckedChange={(checked) => updateSettings({ displayEnabled: checked })}
+                  />
+                </div>
+              </div>
+
               {/* Tiroir caisse */}
               <div className="p-4 bg-muted/50 rounded-lg border border-border">
                 <label className="text-sm font-medium block mb-1">
@@ -569,11 +600,9 @@ export function SettingsScreen() {
               {typeof window !== 'undefined' && window.electronAPI && (
                 <div className="flex items-center justify-between p-3 sm:p-4 bg-muted/50 rounded-xl">
                   <div>
-                    <span className="font-medium text-sm sm:text-base">{t('settings.openAtLogin') || 'Démarrer avec Windows'}</span>
+                    <span className="font-medium text-sm sm:text-base">{t('settings.openAtLogin')}</span>
                     <p className="text-xs sm:text-sm text-muted-foreground">
-                      {openAtLogin
-                        ? (t('settings.openAtLoginOn') || 'L\'application démarre automatiquement avec Windows')
-                        : (t('settings.openAtLoginOff') || 'L\'application ne démarre pas automatiquement')}
+                      {openAtLogin ? t('settings.openAtLoginOn') : t('settings.openAtLoginOff')}
                     </p>
                   </div>
                   <Switch
@@ -840,18 +869,17 @@ export function SettingsScreen() {
                           return;
                         }
                         const loadResult = await window.electronAPI.loadBackup(result.filePaths[0]);
-                        if (!loadResult.success || !loadResult.data) throw new Error('Impossible de lire le fichier template');
-                        const templateData = JSON.parse(loadResult.data);
-                        if (!templateData.categories && !templateData.products) {
-                          if (templateData.data && (templateData.data.categories || templateData.data.products)) {
-                            await importProductsTemplate(templateData.data);
-                          } else {
-                            throw new Error('Format de template invalide. Le fichier doit contenir des catégories et/ou produits.');
-                          }
-                        } else {
-                          await importProductsTemplate(templateData);
+                        if (!loadResult.success || !loadResult.data) throw new Error('Impossible de lire le fichier');
+                        let templateData = JSON.parse(loadResult.data);
+                        // Compatibilité ancien format avec wrap .data
+                        if (!templateData.categories && !templateData.products && templateData.data) {
+                          templateData = templateData.data;
                         }
-                        await showAlert('Template des produits importé avec succès !', 'Succès');
+                        if (!templateData.categories && !templateData.products) {
+                          throw new Error('Format invalide — le fichier doit contenir des catégories et/ou des produits.');
+                        }
+                        await importProductsTemplate(templateData);
+                        await showAlert('Catalogue importé avec succès !', 'Succès');
                       } catch (error) {
                         console.error('Import template error:', error);
                         await showAlert('Erreur lors de l\'import du template: ' + (error instanceof Error ? error.message : 'Erreur inconnue'), 'Erreur');

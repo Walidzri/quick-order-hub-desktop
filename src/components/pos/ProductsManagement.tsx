@@ -4,12 +4,11 @@ import { formatCurrency, Currency } from '@/lib/i18n';
 import { usePOS } from '@/contexts/POSContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  X, 
-  Upload, 
-  Download, 
+  Plus,
+  Edit,
+  Trash2,
+  X,
+  Upload,
   Save,
   Check,
   XCircle,
@@ -74,123 +73,6 @@ export function ProductsManagement({
     });
   }, [products, searchTerm, selectedCategory, showAvailableOnly]);
 
-  const handleExportJSON = () => {
-    const productsData = products.map(p => ({
-      ...p,
-      variants: getVariantsByProduct(p.id),
-    }));
-    const dataStr = JSON.stringify(productsData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `products-${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast({ title: t('products.exportSuccess'), description: t('products.exportJSONDesc') });
-  };
-
-  const handleExportCSV = () => {
-    const headers = [t('csv.id'), t('csv.category'), t('csv.name'), t('csv.basePrice'), t('csv.available'), t('csv.variants'), t('csv.description')];
-    const rows = products.map(p => {
-      const productVariants = getVariantsByProduct(p.id);
-      const variantsStr = productVariants.map(v => `${v.size}:${v.price}`).join(';');
-      return [
-        p.id,
-        categories.find(c => c.id === p.categoryId)?.name || p.categoryId,
-        p.name,
-        p.basePrice?.toString() || '',
-        p.available !== false ? t('general.confirm') : t('general.cancel'),
-        variantsStr,
-        p.description || '',
-      ].map(cell => `"${cell}"`).join(',');
-    });
-    const csv = [headers.map(h => `"${h}"`).join(','), ...rows].join('\n');
-    const dataBlob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `products-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast({ title: t('products.exportSuccess'), description: t('products.exportCSVDesc') });
-  };
-
-  const handleImportJSON = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const importedProducts: (Product & { variants?: ProductVariant[] })[] = JSON.parse(text);
-      
-      for (const productData of importedProducts) {
-        const { variants: productVariants, ...product } = productData;
-        const productId = product.id || `${product.categoryId}-${product.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`;
-        await saveProduct({ ...product, id: productId }, productVariants || []);
-      }
-      
-      await loadProducts();
-      toast({ title: t('general.success'), description: `${importedProducts.length} ${t('products.title').toLowerCase()} ${t('general.loading').toLowerCase()}` });
-    } catch (error) {
-      toast({ title: t('general.error'), description: t('general.error'), variant: 'destructive' });
-    }
-  };
-
-  const handleImportCSV = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(l => l.trim());
-      const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, ''));
-      
-      for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.replace(/^"|"$/g, ''));
-        const row: Record<string, string> = {};
-        headers.forEach((header, index) => {
-          row[header] = values[index] || '';
-        });
-
-        const categoryId = categories.find(c => c.name === row[t('products.category')])?.id || row[t('products.category')];
-        const productId = row['ID'] || `${categoryId}-${row[t('products.name')].toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')}`;
-        
-        const variants: ProductVariant[] = [];
-        if (row[t('products.variants')]) {
-          const variantPairs = row[t('products.variants')].split(';');
-          variantPairs.forEach(pair => {
-            const [size, price] = pair.split(':');
-            if (size && price) {
-              variants.push({
-                id: `${productId}-${size}`,
-                productId,
-                size,
-                price: parseFloat(price),
-              });
-            }
-          });
-        }
-
-        const product: Product = {
-          id: productId,
-          categoryId,
-          name: row[t('products.name')],
-          basePrice: row[t('products.basePrice')] ? parseFloat(row[t('products.basePrice')]) : undefined,
-          available: row[t('products.available')] === t('general.confirm') || row[t('products.available')] === '',
-          description: row[t('products.description')] || undefined,
-          sortOrder: i,
-        };
-
-        await saveProduct(product, variants);
-      }
-
-      await loadProducts();
-      toast({ title: t('general.success'), description: `${products.length - 1} ${t('products.title').toLowerCase()} importé(s)` });
-    } catch (error) {
-      toast({ title: t('general.error'), description: t('general.error'), variant: 'destructive' });
-    }
-  };
 
   return (
     <>
@@ -202,34 +84,16 @@ export function ProductsManagement({
     >
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">{t('products.title')}</h2>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={handleExportJSON}
-            className="gap-2"
-          >
-            <Download className="w-4 h-4" />
-            {t('products.exportJSON')}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportCSV}
-            className="gap-2"
-          >
-            <Download className="w-4 h-4" />
-            {t('products.exportCSV')}
-          </Button>
-          <Button
-            onClick={() => {
-              setEditingProduct(null);
-              setShowProductModal(true);
-            }}
-            className="gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            {t('products.add')}
-          </Button>
-        </div>
+        <Button
+          onClick={() => {
+            setEditingProduct(null);
+            setShowProductModal(true);
+          }}
+          className="gap-2"
+        >
+          <Plus className="w-4 h-4" />
+          {t('products.add')}
+        </Button>
       </div>
 
       {/* Filters */}
@@ -352,40 +216,6 @@ export function ProductsManagement({
             );
           })}
         </div>
-      </div>
-
-      {/* Import buttons */}
-      <div className="flex gap-2">
-        <input
-          type="file"
-          accept=".json"
-          onChange={handleImportJSON}
-          className="hidden"
-          id="import-json"
-        />
-        <label htmlFor="import-json">
-          <Button variant="outline" asChild className="gap-2 cursor-pointer">
-            <span>
-              <Upload className="w-4 h-4" />
-              {t('products.importJSON')}
-            </span>
-          </Button>
-        </label>
-        <input
-          type="file"
-          accept=".csv"
-          onChange={handleImportCSV}
-          className="hidden"
-          id="import-csv"
-        />
-        <label htmlFor="import-csv">
-          <Button variant="outline" asChild className="gap-2 cursor-pointer">
-            <span>
-              <Upload className="w-4 h-4" />
-              {t('products.importCSV')}
-            </span>
-          </Button>
-        </label>
       </div>
 
       {/* Products list */}

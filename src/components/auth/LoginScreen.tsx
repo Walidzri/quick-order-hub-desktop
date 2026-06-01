@@ -116,16 +116,6 @@ export function LoginScreen() {
     }
   };
 
-  // Auto-submit PIN when complete
-  useEffect(() => {
-    if (mode === 'pin' && pin.length >= 4 && pin.length <= 6 && selectedUser) {
-      const timeout = setTimeout(() => {
-        handlePinSubmit();
-      }, 300);
-      return () => clearTimeout(timeout);
-    }
-  }, [pin, mode, selectedUser]);
-
   const handlePinKeyPress = (key: string) => {
     if (lockoutTime > 0) return;
     
@@ -366,6 +356,21 @@ export function LoginScreen() {
                     </button>
                   ))}
                 </div>
+
+                {/* Bouton OK — visible dès 4 chiffres */}
+                {pin.length >= 4 && (
+                  <button
+                    onClick={handlePinSubmit}
+                    disabled={isLoading || lockoutTime > 0}
+                    className={cn(
+                      "w-full mt-3 h-14 rounded-xl font-bold text-lg transition-all",
+                      "bg-primary text-primary-foreground hover:bg-primary/90 active:scale-95",
+                      "disabled:opacity-50 disabled:cursor-not-allowed"
+                    )}
+                  >
+                    {isLoading ? '...' : 'OK ✓'}
+                  </button>
+                )}
 
                 {/* Switch to password - only for admin */}
                 {selectedUser.role === 'admin' && (

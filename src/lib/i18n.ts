@@ -131,6 +131,9 @@ export const translations: Record<Language, Record<string, string>> = {
     'settings.kioskMode': 'Mode Kiosque',
     'settings.kioskOn': 'Activé (Plein écran)',
     'settings.kioskOff': 'Désactivé',
+    'settings.openAtLogin': 'Démarrer avec Windows',
+    'settings.openAtLoginOn': 'L\'application démarre automatiquement avec Windows',
+    'settings.openAtLoginOff': 'L\'application ne démarre pas automatiquement',
     'settings.users': 'Utilisateurs',
     'settings.data': 'Données',
     
@@ -863,6 +866,9 @@ export const translations: Record<Language, Record<string, string>> = {
     'settings.kioskMode': 'Kiosk Mode',
     'settings.kioskOn': 'Enabled (Fullscreen)',
     'settings.kioskOff': 'Disabled',
+    'settings.openAtLogin': 'Start with Windows',
+    'settings.openAtLoginOn': 'Application starts automatically with Windows',
+    'settings.openAtLoginOff': 'Application does not start automatically',
     'settings.users': 'Users',
     'settings.data': 'Data',
     
@@ -1596,6 +1602,9 @@ export const translations: Record<Language, Record<string, string>> = {
     'settings.kioskMode': 'وضع الكشك',
     'settings.kioskOn': 'مفعل (ملء الشاشة)',
     'settings.kioskOff': 'معطل',
+    'settings.openAtLogin': 'بدء التشغيل مع ويندوز',
+    'settings.openAtLoginOn': 'يبدأ التطبيق تلقائياً مع ويندوز',
+    'settings.openAtLoginOff': 'لا يبدأ التطبيق تلقائياً',
     'settings.users': 'المستخدمون',
     'settings.data': 'البيانات',
     
