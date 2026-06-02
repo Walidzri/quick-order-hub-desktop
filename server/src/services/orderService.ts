@@ -168,14 +168,19 @@ export const orderService = {
     if (!current) throw new Error(`Commande introuvable : ${id}`);
 
     const now = new Date().toISOString();
-    const paidAt          = status === 'paid'           ? now : (current.paidAt          ? new Date(current.paidAt).toISOString()          : null);
-    const sentToKitchenAt = status === 'sentToKitchen'  ? now : (current.sentToKitchenAt ? new Date(current.sentToKitchenAt).toISOString() : null);
-    const kitchenReadyAt  = status === 'ready'          ? now : (current.kitchenReadyAt  ? new Date(current.kitchenReadyAt).toISOString()  : null);
+
+    // "paid" est immuable : si la cuisine marque "ready" sur une commande déjà payée,
+    // on pose kitchenReadyAt mais on ne régresse pas le statut de paiement.
+    const effectiveStatus = current.status === 'paid' && status === 'ready' ? 'paid' : status;
+
+    const paidAt          = effectiveStatus === 'paid'          ? (current.paidAt          ? new Date(current.paidAt).toISOString()          : now) : null;
+    const sentToKitchenAt = effectiveStatus === 'sentToKitchen' ? now                                                                                  : (current.sentToKitchenAt ? new Date(current.sentToKitchenAt).toISOString() : null);
+    const kitchenReadyAt  = status === 'ready'                  ? now                                                                                  : (current.kitchenReadyAt  ? new Date(current.kitchenReadyAt).toISOString()  : null);
 
     db.prepare(`
       UPDATE orders SET status=?, updatedAt=?, paidAt=?, sentToKitchenAt=?, kitchen_ready_at=?,
         sync_status='pending' WHERE id=?
-    `).run(status, now, paidAt, sentToKitchenAt, kitchenReadyAt, id);
+    `).run(effectiveStatus, now, paidAt, sentToKitchenAt, kitchenReadyAt, id);
 
     syncService.syncOrders().catch(() => {});
     return orderService.getById(id)!;

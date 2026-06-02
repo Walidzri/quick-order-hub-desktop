@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { usePOS } from '@/contexts/POSContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/i18n';
@@ -37,6 +37,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
+function KitchenBadge({ order }: { order: Order }) {
+  if (!order.sentToKitchenAt) return null;
+  if (order.kitchenReadyAt) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
+        <CheckCircle2 className="w-3 h-3" />
+        Cuisine OK
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">
+      <ChefHat className="w-3 h-3" />
+      En préparation
+    </span>
+  );
+}
 
 const statusIcons: Record<OrderStatus, React.ReactNode> = {
   draft: <Clock className="w-4 h-4" />,
@@ -129,6 +147,48 @@ export function OrdersScreen() {
     setTotalPages(result.totalPages);
     setTotalOrders(result.total);
   };
+
+  // Toujours garder une ref à jour de refreshOrders pour éviter les closures périmées dans le WS
+  const refreshOrdersRef = useRef(refreshOrders);
+  useEffect(() => { refreshOrdersRef.current = refreshOrders; });
+
+  // Live refresh via WebSocket — patch en place sans rechargement HTTP
+  useEffect(() => {
+    let destroyed = false;
+    let ws: WebSocket | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function connect() {
+      if (destroyed) return;
+      ws = new WebSocket('ws://127.0.0.1:3002/ws/events');
+
+      ws.onmessage = (event) => {
+        try {
+          const { type, payload } = JSON.parse(event.data) as { type: string; payload: Record<string, unknown> };
+          if (type === 'order:status' || type === 'order:updated') {
+            const updated = ((payload['order'] ?? payload) as Order);
+            if (!updated?.id) return;
+            setPaginatedOrders(prev => prev.map(o => o.id === updated.id ? updated : o));
+            setSelectedOrder(prev => prev?.id === updated.id ? updated : prev);
+          } else if (type === 'order:created') {
+            refreshOrdersRef.current();
+          }
+        } catch {}
+      };
+
+      ws.onclose = () => {
+        if (!destroyed) retryTimer = setTimeout(connect, 3000);
+      };
+    }
+
+    connect();
+
+    return () => {
+      destroyed = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      if (ws) ws.close();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Filter orders client-side (for search and status filter on current page)
   const filteredOrders = paginatedOrders.filter(order => {
@@ -475,6 +535,9 @@ export function OrdersScreen() {
                               {t('orders.cashierLabel')} {getCashierName(order.createdBy)}
                             </div>
                           )}
+                          <div className="mt-1">
+                            <KitchenBadge order={order} />
+                          </div>
                         </div>
                       </div>
                       
@@ -594,13 +657,16 @@ export function OrdersScreen() {
             <div className="p-4 border-b border-border">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold">{selectedOrder.orderNumber}</h2>
-                <span className={cn(
-                  "px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1",
-                  statusColors[selectedOrder.status]
-                )}>
-                  {statusIcons[selectedOrder.status]}
-                  {t(`status.${selectedOrder.status}`)}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <span className={cn(
+                    "px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1",
+                    statusColors[selectedOrder.status]
+                  )}>
+                    {statusIcons[selectedOrder.status]}
+                    {t(`status.${selectedOrder.status}`)}
+                  </span>
+                  <KitchenBadge order={selectedOrder} />
+                </div>
               </div>
               <p className="text-sm text-muted-foreground mt-1">
                 {new Date(selectedOrder.createdAt).toLocaleString()}
@@ -616,7 +682,7 @@ export function OrdersScreen() {
                 <div className="mt-3 pt-3 border-t border-border">
                   <p className="text-xs text-muted-foreground mb-2">{t('orders.changeStatus')}</p>
                   <div className="flex flex-wrap gap-1">
-                    {(['draft', 'sentToKitchen', 'ready', 'paid', 'cancelled'] as const).map((status) => (
+                    {(['draft', 'paid', 'cancelled'] as const).map((status) => (
                       <button
                         key={status}
                         onClick={() => {

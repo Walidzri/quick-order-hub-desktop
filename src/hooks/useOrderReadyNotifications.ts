@@ -9,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 export function useOrderReadyNotifications() {
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notifiedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let destroyed = false;
@@ -21,13 +22,21 @@ export function useOrderReadyNotifications() {
 
       ws.onmessage = (event) => {
         try {
-          const { type, payload } = JSON.parse(event.data);
-          if (type === 'order:status' && payload.status === 'ready') {
-            const num = payload.order?.orderNumber || payload.id?.slice(-4) || '?';
-            toast({
-              title: '🔔 Commande prête !',
-              description: `La commande N°${num} est prête à être récupérée.`,
-            });
+          const { type, payload } = JSON.parse(event.data) as {
+            type: string;
+            payload: { id?: string; order?: { id: string; orderNumber?: string; kitchenReadyAt?: string } };
+          };
+          if (type === 'order:status') {
+            const order = payload.order;
+            // kitchenReadyAt est le signal universel "cuisine terminée" (paid ou ready)
+            if (order?.kitchenReadyAt && !notifiedRef.current.has(order.id)) {
+              notifiedRef.current.add(order.id);
+              const num = order.orderNumber || payload.id?.slice(-4) || '?';
+              toast({
+                title: '🔔 Commande prête !',
+                description: `La commande N°${num} est prête à être récupérée.`,
+              });
+            }
           }
         } catch {}
       };

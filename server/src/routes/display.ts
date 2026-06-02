@@ -250,28 +250,26 @@ const HTML = /* html */`<!DOCTYPE html>
     // ── Appliquer un event d'ordre ─────────────────────────────────────────────
     function applyOrder(order) {
       const { id, status } = order;
+      const kitchenDone = !!order.kitchenReadyAt;
 
-      if (status === READY_STATUS) {
+      if (kitchenDone && preparingOrders[id]) {
+        // Cuisine terminée — kitchenReadyAt est le signal, qu'elle soit paid ou ready
         delete preparingOrders[id];
         readyOrders[id] = order;
         renderReady();
         renderPreparing();
-        // Disparaît automatiquement après READY_DISPLAY_MS (gère aussi commandes comptoir déjà payées)
         scheduleReadyRemoval(id, READY_DISPLAY_MS);
 
-      } else if (order.sentToKitchenAt && !order.kitchenReadyAt && status !== 'cancelled') {
+      } else if (order.sentToKitchenAt && !kitchenDone && status !== 'cancelled') {
         preparingOrders[id] = order;
         delete readyOrders[id];
         renderReady();
         renderPreparing();
 
-      } else if (status === 'paid') {
-        // Retirer de "Prêtes" si la commande y était (client vient chercher avant le timer)
-        // NE PAS retirer de "En préparation" : commande comptoir payée avant que le chef finisse
-        if (readyOrders[id]) {
-          delete readyOrders[id];
-          renderReady();
-        }
+      } else if (status === 'paid' && readyOrders[id]) {
+        // Commande payée après avoir été prête → client servi, retirer de l'affichage
+        delete readyOrders[id];
+        renderReady();
 
       } else if (status === 'cancelled') {
         delete readyOrders[id];
@@ -304,16 +302,17 @@ const HTML = /* html */`<!DOCTYPE html>
           readyOrders     = {};
           preparingOrders = {};
           for (const o of list) {
-            if (o.status === READY_STATUS) {
-              const readyAt  = o.kitchenReadyAt || o.updatedAt;
-              const age      = Date.now() - new Date(readyAt).getTime();
+            const kitchenDone = !!o.kitchenReadyAt;
+            if (kitchenDone) {
+              // Cuisine terminée (paid ou ready) — afficher si encore récent
+              const readyAt   = o.kitchenReadyAt || o.updatedAt;
+              const age       = Date.now() - new Date(readyAt).getTime();
               const remaining = READY_DISPLAY_MS - age;
               if (remaining > 0) {
                 readyOrders[o.id] = o;
-                scheduleReadyRemoval(o.id, remaining); // reprend le compte à rebours
+                scheduleReadyRemoval(o.id, remaining);
               }
-              // Si trop ancien (> 5 min), on l'ignore silencieusement
-            } else if (o.sentToKitchenAt && !o.kitchenReadyAt && o.status !== 'cancelled') {
+            } else if (o.sentToKitchenAt && !kitchenDone && o.status !== 'cancelled') {
               preparingOrders[o.id] = o;
             }
           }
