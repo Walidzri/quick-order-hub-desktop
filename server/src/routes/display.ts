@@ -247,6 +247,54 @@ const HTML = /* html */`<!DOCTYPE html>
       }, delayMs);
     }
 
+    // ── Annonce vocale avec file d'attente ───────────────────────────────────
+    let speechQueue = [];
+    let isSpeaking  = false;
+    let cachedVoice = null;
+
+    function getFrenchFemaleVoice() {
+      if (cachedVoice) return cachedVoice;
+      const voices   = speechSynthesis.getVoices();
+      const frVoices = voices.filter(v => v.lang.startsWith('fr'));
+      const feminine = ['Julie', 'Amélie', 'Audrey', 'Virginie', 'Marie', 'Zoé',
+                        'Google français', 'Microsoft Julie'];
+      cachedVoice = frVoices.find(v => feminine.some(n => v.name.includes(n))) ?? frVoices[0] ?? null;
+      return cachedVoice;
+    }
+
+    function processQueue() {
+      if (isSpeaking || speechQueue.length === 0) return;
+      isSpeaking = true;
+      const utt  = speechQueue.shift();
+      utt.onend  = () => { isSpeaking = false; processQueue(); };
+      utt.onerror = () => { isSpeaking = false; processQueue(); };
+      speechSynthesis.speak(utt);
+    }
+
+    function announce(orderNumber) {
+      if (!window.speechSynthesis) return;
+
+      // parseInt transforme "0042" en 42 → le synthé dit "quarante-deux" et non "zéro zéro quarante-deux"
+      const num = parseInt(orderNumber, 10) || orderNumber;
+
+      function enqueue() {
+        const utt   = new SpeechSynthesisUtterance('Commande numéro ' + num + ', prête !');
+        utt.lang    = 'fr-FR';
+        utt.rate    = 0.88;
+        utt.pitch   = 1.15;
+        const voice = getFrenchFemaleVoice();
+        if (voice) utt.voice = voice;
+        speechQueue.push(utt);
+        processQueue();
+      }
+
+      if (speechSynthesis.getVoices().length > 0) {
+        enqueue();
+      } else {
+        speechSynthesis.addEventListener('voiceschanged', enqueue, { once: true });
+      }
+    }
+
     // ── Appliquer un event d'ordre ─────────────────────────────────────────────
     function applyOrder(order) {
       const { id, status } = order;
@@ -259,6 +307,7 @@ const HTML = /* html */`<!DOCTYPE html>
         renderReady();
         renderPreparing();
         scheduleReadyRemoval(id, READY_DISPLAY_MS);
+        announce(order.orderNumber || id.slice(-4));
 
       } else if (order.sentToKitchenAt && !kitchenDone && status !== 'cancelled') {
         preparingOrders[id] = order;
