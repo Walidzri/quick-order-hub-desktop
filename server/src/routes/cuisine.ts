@@ -118,6 +118,55 @@ const HTML = /* html */`<!DOCTYPE html>
       padding: 80px 20px;
       user-select: none;
     }
+    .tabs { display: flex; gap: 8px; }
+    .tab {
+      padding: 8px 20px;
+      border-radius: 8px;
+      border: none;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      background: #1e293b;
+      color: #64748b;
+      transition: background 0.2s, color 0.2s;
+    }
+    .tab.active { background: #3b82f6; color: #fff; }
+    .card-total {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-align: right;
+      border-top: 1px solid #ffffff10;
+      padding-top: 8px;
+    }
+    .card.done { border-left-color: #22c55e; opacity: 0.7; }
+    .done-time {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #4ade80;
+      text-align: right;
+    }
+    /* ── Thème clair ─────────────────────────────────────────────────────────── */
+    body.light { background: #f1f5f9; color: #0f172a; }
+    body.light header { background: #ffffff; border-bottom: 1px solid #e2e8f0; }
+    body.light h1 { color: #0f172a; }
+    body.light #count { color: #64748b; }
+    body.light .card { background: #ffffff; border-color: #e2e8f0; }
+    body.light .card .order-num { color: #0f172a; }
+    body.light .card .item-name { color: #0f172a; }
+    body.light .card .item-variant,
+    body.light .card .modifiers { color: #64748b; }
+    body.light .card .timer { color: #64748b; }
+    body.light .card .item { border-bottom-color: #e2e8f020; }
+    body.light .card-total { color: #475569; border-top-color: #e2e8f0; }
+    body.light .done-time { color: #16a34a; }
+    body.light .tab { background: #e2e8f0; color: #475569; }
+    body.light .tab.active { background: #3b82f6; color: #fff; }
+    body.light .empty { color: #94a3b8; }
+    #theme-btn {
+      background: none; border: none; font-size: 1.3rem;
+      cursor: pointer; padding: 4px; line-height: 1;
+    }
   </style>
 </head>
 <body>
@@ -126,13 +175,39 @@ const HTML = /* html */`<!DOCTYPE html>
       <h1>🍳 Cuisine</h1>
       <div id="count">Chargement…</div>
     </div>
-    <span id="ws-status" class="disconnected">⬤ Déconnecté</span>
+    <div class="tabs">
+      <button class="tab active" id="tab-active" onclick="showTab('active')">⏳ En cours</button>
+      <button class="tab" id="tab-history" onclick="showTab('history')">📋 Historique</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <button id="theme-btn" onclick="toggleTheme()" title="Changer le thème">🌙</button>
+      <span id="ws-status" class="disconnected">⬤ Déconnecté</span>
+    </div>
   </header>
   <div id="grid"></div>
+  <div id="history-grid" style="display:none;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:12px;"></div>
 
   <script>
-    let orders = {};
+    let orders        = {};
+    let historyOrders = {};
+    let currentTab    = 'active';
+    let appCurrency   = 'EUR';
     let ws = null;
+
+    // ── Thème ─────────────────────────────────────────────────────────────────
+    (function initTheme() {
+      const saved = localStorage.getItem('cuisine-theme');
+      if (saved === 'light') {
+        document.body.classList.add('light');
+        document.getElementById('theme-btn').textContent = '\u2600\uFE0F';
+      }
+    })();
+
+    function toggleTheme() {
+      const isLight = document.body.classList.toggle('light');
+      localStorage.setItem('cuisine-theme', isLight ? 'light' : 'dark');
+      document.getElementById('theme-btn').textContent = isLight ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    }
 
     // ── Date du jour (pour filtre et reset minuit) ────────────────────────────
     function todayStart() {
@@ -152,7 +227,21 @@ const HTML = /* html */`<!DOCTYPE html>
       }
     }, 60000);
 
+    // ── Onglets ───────────────────────────────────────────────────────────────
+    function showTab(tab) {
+      currentTab = tab;
+      document.getElementById('tab-active').className  = 'tab' + (tab === 'active'  ? ' active' : '');
+      document.getElementById('tab-history').className = 'tab' + (tab === 'history' ? ' active' : '');
+      document.getElementById('grid').style.display         = tab === 'active'  ? '' : 'none';
+      document.getElementById('history-grid').style.display = tab === 'history' ? 'grid' : 'none';
+      if (tab === 'history') renderHistory();
+    }
+
     // ── Utils ─────────────────────────────────────────────────────────────────
+    function formatPrice(total) {
+      return (total || 0).toLocaleString('fr-FR', { style: 'currency', currency: appCurrency });
+    }
+
     const TYPE_LABEL  = { 'dine-in': 'Sur place', takeaway: 'À emporter', delivery: 'Livraison' };
     const TYPE_BADGE  = { 'dine-in': 'badge-dine-in', takeaway: 'badge-takeaway', delivery: 'badge-delivery' };
 
@@ -224,7 +313,50 @@ const HTML = /* html */`<!DOCTYPE html>
           + '</div></div>'
           + '<ul class="items">' + itemsHtml + '</ul>'
           + deliveryNote
+          + '<div class="card-total">Total : ' + formatPrice(o.total) + '</div>'
           + '<button class="btn-ready" data-id="' + o.id + '">\u2713 Pr\xEAt</button>'
+          + '</div>';
+      }).join('');
+    }
+
+    // ── Rendu historique ──────────────────────────────────────────────────────
+    function renderHistory() {
+      const grid = document.getElementById('history-grid');
+      const list = Object.values(historyOrders).sort((a, b) =>
+        new Date(b.kitchenReadyAt) - new Date(a.kitchenReadyAt)
+      );
+
+      if (list.length === 0) {
+        grid.innerHTML = '<div class="empty" style="grid-column:1/-1">Aucune commande termin\xE9e ce jour</div>';
+        return;
+      }
+
+      grid.innerHTML = list.map(o => {
+        const readyTime = o.kitchenReadyAt
+          ? new Date(o.kitchenReadyAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+          : '';
+
+        const itemsHtml = (o.lines || []).map(l => {
+          const mods = (l.modifiers || []).map(m => esc(m.optionName)).join(', ');
+          return '<li class="item">'
+            + '<span class="qty">\xD7' + l.quantity + '</span>'
+            + '<div class="item-body">'
+            + '<div class="item-name">' + esc(l.productName) + '</div>'
+            + (l.variantSize ? '<div class="item-variant">' + esc(l.variantSize) + '</div>' : '')
+            + (mods ? '<div class="modifiers">+ ' + mods + '</div>' : '')
+            + (l.note ? '<div class="item-note">\uD83D\uDCDD ' + esc(l.note) + '</div>' : '')
+            + '</div></li>';
+        }).join('');
+
+        return '<div class="card done">'
+          + '<div class="card-header">'
+          + '<div class="order-num">N\xB0' + esc(o.orderNumber || '\u2014') + '</div>'
+          + '<div class="badges">'
+          + '<span class="badge ' + (TYPE_BADGE[o.type] || '') + '">' + esc(TYPE_LABEL[o.type] || o.type) + '</span>'
+          + '</div></div>'
+          + '<ul class="items">' + itemsHtml + '</ul>'
+          + '<div class="card-total">Total : ' + formatPrice(o.total) + '</div>'
+          + (readyTime ? '<div class="done-time">\u2713 Prêt à ' + readyTime + '</div>' : '')
           + '</div>';
       }).join('');
     }
@@ -275,16 +407,27 @@ const HTML = /* html */`<!DOCTYPE html>
     // ── Chargement initial ────────────────────────────────────────────────────
     async function loadOrders() {
       try {
-        const data = await fetch('/api/orders?start=' + encodeURIComponent(todayStart())).then(r => r.json());
+        const [settingsRes, ordersRes] = await Promise.all([
+          fetch('/api/settings'),
+          fetch('/api/orders?start=' + encodeURIComponent(todayStart())),
+        ]);
+        if (settingsRes.ok) {
+          const s = await settingsRes.json();
+          if (s.currency) appCurrency = s.currency;
+        }
+        const data = await ordersRes.json();
         const list = data.orders || data;
         orders = {};
+        historyOrders = {};
         for (const o of list) {
-          // Afficher si envoyé en cuisine ET pas encore marqué prêt par le chef
           if (o.sentToKitchenAt && !o.kitchenReadyAt && o.status !== 'cancelled') {
             orders[o.id] = o;
+          } else if (o.kitchenReadyAt && o.status !== 'cancelled') {
+            historyOrders[o.id] = o;
           }
         }
         renderOrders();
+        if (currentTab === 'history') renderHistory();
       } catch (e) {
         console.error('Erreur chargement commandes', e);
         document.getElementById('count').textContent = 'Erreur de connexion';
@@ -327,12 +470,19 @@ const HTML = /* html */`<!DOCTYPE html>
               orders[o.id] = o;
               renderOrders();
               if (isNew) playBeep();
-            } else if (orders[payload.id]) {
-              delete orders[payload.id];
+            } else if (o.kitchenReadyAt && o.status !== 'cancelled') {
+              // Commande terminée → déplacer dans l'historique
+              delete orders[o.id];
+              historyOrders[o.id] = o;
+              renderOrders();
+              if (currentTab === 'history') renderHistory();
+            } else if (orders[o.id]) {
+              delete orders[o.id];
               renderOrders();
             }
           } else if (type === 'kitchen:purged') {
             orders = {};
+            historyOrders = {};
             loadOrders();
           }
         } catch {}

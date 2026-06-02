@@ -143,13 +143,32 @@ const HTML = /* html */`<!DOCTYPE html>
       align-items: center;
       justify-content: center;
     }
+    /* ── Thème clair ─────────────────────────────────────────────────────────── */
+    body.light { background: #f8fafc; color: #0f172a; }
+    body.light header { background: #ffffff; border-bottom-color: #e2e8f0; }
+    body.light #restaurant-name { color: #0f172a; }
+    body.light #clock { color: #64748b; }
+    body.light .section-label.ready { color: #16a34a; }
+    body.light .section-label.preparing { color: #64748b; }
+    body.light .chip-ready { background: #dcfce7; border-color: #22c55e; color: #15803d; }
+    body.light .chip-preparing { background: #f1f5f9; border-color: #cbd5e1; color: #94a3b8; }
+    body.light .divider { background: #e2e8f0; }
+    body.light .empty-ready { color: #cbd5e1; }
+    #theme-btn {
+      background: none; border: none; font-size: 1.2rem;
+      cursor: pointer; padding: 4px; line-height: 1; opacity: 0.6;
+    }
+    #theme-btn:hover { opacity: 1; }
   </style>
 </head>
 <body>
   <header>
     <div id="restaurant-name">Quick Order Hub</div>
     <div id="clock"></div>
-    <div id="ws-dot"></div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button id="theme-btn" onclick="toggleTheme()" title="Changer le th\xE8me">\uD83C\uDF19</button>
+      <div id="ws-dot"></div>
+    </div>
   </header>
 
   <main>
@@ -175,6 +194,21 @@ const HTML = /* html */`<!DOCTYPE html>
     let readyOrders     = {};  // id → order
     let preparingOrders = {};  // id → order
     let ws = null;
+
+    // ── Thème ─────────────────────────────────────────────────────────────────
+    (function initTheme() {
+      const saved = localStorage.getItem('display-theme');
+      if (saved === 'light') {
+        document.body.classList.add('light');
+        document.getElementById('theme-btn').textContent = '\u2600\uFE0F';
+      }
+    })();
+
+    function toggleTheme() {
+      const isLight = document.body.classList.toggle('light');
+      localStorage.setItem('display-theme', isLight ? 'light' : 'dark');
+      document.getElementById('theme-btn').textContent = isLight ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    }
 
     // ── Date du jour (pour filtre et reset minuit) ────────────────────────────
     function todayStart() {
