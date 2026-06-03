@@ -159,11 +159,38 @@ const HTML = /* html */`<!DOCTYPE html>
       cursor: pointer; padding: 4px; line-height: 1; opacity: 0.6;
     }
     #theme-btn:hover { opacity: 1; }
+
+    /* ── Overlay activation son ─────────────────────────────────────────────── */
+    #audio-overlay {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,0.85);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 24px; cursor: pointer;
+    }
+    #audio-overlay .icon { font-size: 5rem; }
+    #audio-overlay .msg {
+      font-size: clamp(1.4rem, 3vw, 2.2rem);
+      font-weight: 700; color: #f1f5f9; text-align: center;
+    }
+    #audio-overlay .sub {
+      font-size: clamp(0.9rem, 1.5vw, 1.2rem);
+      color: #94a3b8; text-align: center;
+    }
   </style>
 </head>
 <body>
+  <div id="audio-overlay" onclick="activateAudio()">
+    <div class="icon">🔊</div>
+    <div class="msg">Appuyer pour activer le son</div>
+    <div class="sub">Requis par le navigateur</div>
+  </div>
+
   <header>
-    <div id="restaurant-name">Quick Order Hub</div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <img id="header-logo" alt="" style="height:48px;width:auto;object-fit:contain;display:none;border-radius:6px;" />
+      <div id="restaurant-name">Quick Order Hub</div>
+    </div>
     <div id="clock"></div>
     <div style="display:flex;align-items:center;gap:10px;">
       <button id="theme-btn" onclick="toggleTheme()" title="Changer le th\xE8me">\uD83C\uDF19</button>
@@ -306,7 +333,7 @@ const HTML = /* html */`<!DOCTYPE html>
     }
 
     function announce(orderNumber) {
-      if (!window.speechSynthesis) return;
+      if (!window.speechSynthesis || !audioUnlocked) return;
 
       // parseInt transforme "0042" en 42 → le synthé dit "quarante-deux" et non "zéro zéro quarante-deux"
       const num = parseInt(orderNumber, 10) || orderNumber;
@@ -370,11 +397,16 @@ const HTML = /* html */`<!DOCTYPE html>
           fetch('/api/orders?start=' + encodeURIComponent(todayStart())),
         ]);
 
-        // Nom du restaurant
+        // Nom du restaurant + logo
         if (settingsRes.ok) {
           const s = await settingsRes.json();
           if (s.restaurantName) {
             document.getElementById('restaurant-name').textContent = s.restaurantName;
+          }
+          if (s.logo) {
+            const img = document.getElementById('header-logo');
+            img.src = s.logo;
+            img.style.display = 'block';
           }
         }
 
@@ -435,6 +467,19 @@ const HTML = /* html */`<!DOCTYPE html>
           }
         } catch {}
       };
+    }
+
+    // ── Activation audio (requis par la politique autoplay des navigateurs) ───
+    let audioUnlocked = false;
+
+    function activateAudio() {
+      if (audioUnlocked) return;
+      audioUnlocked = true;
+      document.getElementById('audio-overlay').style.display = 'none';
+      // Jouer un silence pour débloquer le contexte audio
+      const utt = new SpeechSynthesisUtterance('');
+      utt.volume = 0;
+      speechSynthesis.speak(utt);
     }
 
     // ── Init ──────────────────────────────────────────────────────────────────
