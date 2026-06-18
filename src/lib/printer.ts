@@ -526,6 +526,7 @@ export class DirectPrinter {
     deliveryCustomerName?: string;
     deliveryPhone?: string;
     deliveryAddress?: string;
+    deliveryFee?: string;
     lines: Array<{
       quantity: number;
       name: string;
@@ -827,6 +828,9 @@ export class DirectPrinter {
         const discountPadding = Math.max(0, width - discountLabel.length - discountValue.length - 1);
         receipt += discountLabel + ' '.repeat(discountPadding) + '-' + discountValue + '\n';
       }
+      if (data.deliveryFee) {
+        receipt += formatLabelValue('Frais livraison', data.deliveryFee);
+      }
       receipt += separator + '\n';
       const totalLabel = this.cleanTextForPrinter(custom.labelTotal);
       const totalValue = this.cleanTextForPrinter(data.total);
@@ -861,11 +865,12 @@ export class DirectPrinter {
     receipt += '\n';
     
     // Infos livraison pour ticket cuisine - après les lignes, avant le pied de page
-    if (isKitchen && (data.deliveryCustomerName || data.deliveryPhone || data.deliveryAddress)) {
+    if (isKitchen && (data.deliveryCustomerName || data.deliveryPhone || data.deliveryAddress || data.deliveryFee)) {
       receipt += '\n';
       if (data.deliveryCustomerName) receipt += formatLabelValue('Client', data.deliveryCustomerName);
       if (data.deliveryPhone) receipt += formatLabelValue('Tel', data.deliveryPhone);
       if (data.deliveryAddress) receipt += formatLabelValue('Adresse', data.deliveryAddress);
+      if (data.deliveryFee) receipt += formatLabelValue('Frais livraison', data.deliveryFee);
       receipt += separator + '\n';
     }
     

@@ -38,6 +38,7 @@ function rowToOrder(row: Record<string, unknown>): Order {
     deliveryAddress:      (row['deliveryAddress']      as string | null) ?? undefined,
     deliveryPhone:        (row['deliveryPhone']        as string | null) ?? undefined,
     deliveryCustomerName: (row['deliveryCustomerName'] as string | null) ?? undefined,
+    deliveryFee:          (row['deliveryFee']          as number | null) ?? undefined,
   };
 }
 
@@ -91,8 +92,8 @@ export const orderService = {
       INSERT INTO orders
         (id, orderNumber, status, type, lines, subtotal, discount, total, paymentMethod,
          promoCode, promoName, createdBy, createdAt, updatedAt, paidAt, sentToKitchenAt,
-         deliveryAddress, deliveryPhone, deliveryCustomerName, kitchen_ready_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         deliveryAddress, deliveryPhone, deliveryCustomerName, deliveryFee, kitchen_ready_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       orderNumber,
@@ -113,6 +114,7 @@ export const orderService = {
       data.deliveryAddress      ?? null,
       data.deliveryPhone        ?? null,
       data.deliveryCustomerName ?? null,
+      data.deliveryFee          ?? null,
       null,
     );
 
@@ -133,7 +135,7 @@ export const orderService = {
         orderNumber=?, status=?, type=?, lines=?, subtotal=?, discount=?, total=?,
         paymentMethod=?, promoCode=?, promoName=?, createdBy=?,
         updatedAt=?, paidAt=?, sentToKitchenAt=?, kitchen_ready_at=?,
-        deliveryAddress=?, deliveryPhone=?, deliveryCustomerName=?,
+        deliveryAddress=?, deliveryPhone=?, deliveryCustomerName=?, deliveryFee=?,
         sync_status='pending'
       WHERE id=?
     `).run(
@@ -155,6 +157,7 @@ export const orderService = {
       merged.deliveryAddress      ?? null,
       merged.deliveryPhone        ?? null,
       merged.deliveryCustomerName ?? null,
+      merged.deliveryFee          ?? null,
       id,
     );
 

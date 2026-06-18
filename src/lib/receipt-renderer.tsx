@@ -196,7 +196,7 @@ export function renderReceiptHTML({
         )}
 
         {/* Infos livraison - après les lignes, avant le pied de page (Bon appétit) */}
-        {order.type === 'delivery' && (order.deliveryCustomerName || order.deliveryPhone || order.deliveryAddress) && (
+        {order.type === 'delivery' && (order.deliveryCustomerName || order.deliveryPhone || order.deliveryAddress || order.deliveryFee) && (
           <>
             <div className="section">
               <div className="order-info">
@@ -208,6 +208,9 @@ export function renderReceiptHTML({
                 )}
                 {order.deliveryAddress && (
                   <div><strong>Adresse:</strong> {order.deliveryAddress}</div>
+                )}
+                {order.deliveryFee && order.deliveryFee > 0 && (
+                  <div><strong>Frais livraison:</strong> {formatCurrency(order.deliveryFee, currency)}</div>
                 )}
               </div>
             </div>
@@ -397,6 +400,12 @@ export function renderReceiptHTML({
               <div className="total-line flex justify-between text-xs text-green-700">
                 <span>{customization.labelDiscount}</span>
                 <span>-{formatCurrency(order.discount, currency)}</span>
+              </div>
+            )}
+            {order.type === 'delivery' && order.deliveryFee && order.deliveryFee > 0 && (
+              <div className="total-line flex justify-between text-xs">
+                <span>Frais livraison</span>
+                <span>+{formatCurrency(order.deliveryFee, currency)}</span>
               </div>
             )}
             {customization.showTotal && (

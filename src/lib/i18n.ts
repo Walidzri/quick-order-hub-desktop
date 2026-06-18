@@ -52,7 +52,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'order.deliveryAddress': 'Adresse',
     'order.deliveryPhone': 'Téléphone',
     'order.deliveryCustomerName': 'Nom du client',
-    
+    'order.deliveryFee': 'Frais de livraison',
+
     // Order Status
     'status.draft': 'Brouillon',
     'status.sentToKitchen': 'En Cuisine',
@@ -787,7 +788,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'order.deliveryAddress': 'Address',
     'order.deliveryPhone': 'Phone',
     'order.deliveryCustomerName': 'Customer name',
-    
+    'order.deliveryFee': 'Delivery fee',
+
     // Order Status
     'status.draft': 'Draft',
     'status.sentToKitchen': 'In Kitchen',
@@ -1517,7 +1519,8 @@ export const translations: Record<Language, Record<string, string>> = {
     'order.deliveryAddress': 'العنوان',
     'order.deliveryPhone': 'الهاتف',
     'order.deliveryCustomerName': 'اسم العميل',
-    
+    'order.deliveryFee': 'رسوم التوصيل',
+
     // Order Status
     'status.draft': 'مسودة',
     'status.sentToKitchen': 'في المطبخ',

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UtensilsCrossed, ShoppingBag, Truck, X, ChevronLeft } from 'lucide-react';
+import { UtensilsCrossed, ShoppingBag, Truck, X, ChevronLeft, Delete } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TouchInput } from '@/components/ui/touch-input';
 import { usePOS } from '@/contexts/POSContext';
@@ -10,6 +10,7 @@ export interface DeliveryInfo {
   address: string;
   phone: string;
   customerName: string;
+  fee?: number;
 }
 
 interface OrderTypeModalProps {
@@ -27,10 +28,42 @@ export function OrderTypeModal({ isOpen, onClose, onSelect, initialDeliveryInfo 
     address: initialDeliveryInfo?.address ?? '',
     phone: initialDeliveryInfo?.phone ?? '',
     customerName: initialDeliveryInfo?.customerName ?? '',
+    fee: initialDeliveryInfo?.fee,
   });
   const [formError, setFormError] = useState('');
+  const [showFeeKeypad, setShowFeeKeypad] = useState(false);
+  const [feeRaw, setFeeRaw] = useState<string>(
+    initialDeliveryInfo?.fee !== undefined ? String(initialDeliveryInfo.fee) : ''
+  );
 
   if (!isOpen) return null;
+
+  // ── Pavé numérique frais de livraison ──────────────────────────────────────
+
+  const handleFeeKey = (key: string) => {
+    // Une seule virgule autorisée
+    if (key === ',' && (feeRaw.includes(',') || feeRaw.includes('.'))) return;
+    // Max 8 caractères
+    if (feeRaw.length >= 8) return;
+    const next = feeRaw + key;
+    setFeeRaw(next);
+    const parsed = parseFloat(next.replace(',', '.'));
+    setDeliveryForm(f => ({ ...f, fee: isNaN(parsed) ? undefined : parsed }));
+  };
+
+  const handleFeeBackspace = () => {
+    const next = feeRaw.slice(0, -1);
+    setFeeRaw(next);
+    const parsed = parseFloat(next.replace(',', '.'));
+    setDeliveryForm(f => ({ ...f, fee: next && !isNaN(parsed) ? parsed : undefined }));
+  };
+
+  const handleFeeClear = () => {
+    setFeeRaw('');
+    setDeliveryForm(f => ({ ...f, fee: undefined }));
+  };
+
+  // ── Handlers formulaire ────────────────────────────────────────────────────
 
   const handleDineIn = () => {
     onSelect('dine-in');
@@ -63,21 +96,28 @@ export function OrderTypeModal({ isOpen, onClose, onSelect, initialDeliveryInfo 
       setFormError(t('order.deliveryPhone') + ' ' + t('general.required'));
       return;
     }
-    onSelect('delivery', { address: address.trim(), phone: phone.trim(), customerName: customerName.trim() });
+    onSelect('delivery', { address: address.trim(), phone: phone.trim(), customerName: customerName.trim(), fee: deliveryForm.fee });
     onClose();
     resetState();
   };
 
   const resetState = () => {
     setStep('select');
-    setDeliveryForm({ address: '', phone: '', customerName: '' });
+    setDeliveryForm({ address: '', phone: '', customerName: '', fee: undefined });
+    setFeeRaw('');
+    setShowFeeKeypad(false);
     setFormError('');
   };
 
   const handleBack = () => {
     setStep('select');
+    setShowFeeKeypad(false);
     setFormError('');
   };
+
+  // ── Rendu ──────────────────────────────────────────────────────────────────
+
+  const feeDisplayValue = feeRaw || '';
 
   return (
     <motion.div
@@ -91,7 +131,7 @@ export function OrderTypeModal({ isOpen, onClose, onSelect, initialDeliveryInfo 
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-        className="bg-background rounded-lg shadow-lg p-6 max-w-md w-full"
+        className="bg-background rounded-lg shadow-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <AnimatePresence mode="wait">
@@ -217,6 +257,79 @@ export function OrderTypeModal({ isOpen, onClose, onSelect, initialDeliveryInfo 
                     quickSuggestions={['Rue', 'Avenue', 'Boulevard', 'Place', 'Allée', 'Chemin', 'Impasse', 'Cours']}
                     className="h-11"
                   />
+                </div>
+
+                {/* Frais de livraison — affichage + pavé numérique */}
+                <div>
+                  <label className="text-sm font-medium block mb-1">
+                    {t('order.deliveryFee')}
+                  </label>
+
+                  {/* Champ d'affichage tactile */}
+                  <button
+                    type="button"
+                    onClick={() => setShowFeeKeypad(v => !v)}
+                    className={`w-full h-11 px-3 rounded-md border text-left font-mono text-base transition-colors ${
+                      showFeeKeypad
+                        ? 'border-primary ring-2 ring-primary/30 bg-background'
+                        : 'border-input bg-background hover:border-primary/50'
+                    }`}
+                  >
+                    {feeDisplayValue
+                      ? <span>{feeDisplayValue}</span>
+                      : <span className="text-muted-foreground">0</span>
+                    }
+                  </button>
+
+                  {/* Pavé numérique */}
+                  {showFeeKeypad && (
+                    <div className="mt-2 p-2 bg-muted/30 rounded-lg border border-border">
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[7, 8, 9, 4, 5, 6, 1, 2, 3].map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => handleFeeKey(String(n))}
+                            className="h-11 text-lg font-bold bg-background border border-border rounded-lg hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors"
+                          >
+                            {n}
+                          </button>
+                        ))}
+                        {/* Dernière ligne : virgule / 0 / effacer */}
+                        <button
+                          type="button"
+                          onClick={() => handleFeeKey(',')}
+                          className="h-11 text-lg font-bold bg-background border border-border rounded-lg hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors"
+                        >
+                          ,
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleFeeKey('0')}
+                          className="h-11 text-lg font-bold bg-background border border-border rounded-lg hover:bg-muted active:bg-primary active:text-primary-foreground transition-colors"
+                        >
+                          0
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleFeeBackspace}
+                          className="h-11 flex items-center justify-center rounded-lg bg-secondary border border-border hover:bg-secondary/80 active:bg-destructive active:text-destructive-foreground transition-colors"
+                        >
+                          <Delete className="w-4 h-4" />
+                        </button>
+                      </div>
+                      {/* Bouton effacer tout */}
+                      {feeRaw && (
+                        <button
+                          type="button"
+                          onClick={handleFeeClear}
+                          className="w-full mt-1.5 h-8 text-xs text-destructive hover:bg-destructive/10 rounded-md transition-colors"
+                        >
+                          Effacer
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

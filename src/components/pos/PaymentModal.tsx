@@ -17,14 +17,15 @@ interface PaymentModalProps {
 
 export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
   const { 
-    createOrder, 
-    sendToKitchen, 
-    markAsPaid, 
-    total, 
+    createOrder,
+    sendToKitchen,
+    markAsPaid,
+    total,
     subtotal,
     discount,
+    deliveryFee,
     appliedPromo,
-    currency, 
+    currency,
     t,
     settings,
     printers
@@ -115,6 +116,7 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
         deliveryCustomerName: order.deliveryCustomerName,
         deliveryPhone: order.deliveryPhone,
         deliveryAddress: order.deliveryAddress,
+        deliveryFee: order.deliveryFee ? formatCurrency(order.deliveryFee, currency) : undefined,
         lines: order.lines.map(line => {
           const lineTotal = (line.unitPrice + line.modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0)) * line.quantity;
           return {
@@ -393,6 +395,12 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
                 <div className="flex justify-between text-sm text-success mb-1">
                   <span>{t('order.discount')} ({appliedPromo?.code})</span>
                   <span>-{formatCurrency(discount, currency)}</span>
+                </div>
+              )}
+              {deliveryFee > 0 && (
+                <div className="flex justify-between text-sm mb-1">
+                  <span>{t('order.deliveryFee')}</span>
+                  <span>+{formatCurrency(deliveryFee, currency)}</span>
                 </div>
               )}
               <div className="flex justify-between text-xl font-bold pt-2 border-t border-border">

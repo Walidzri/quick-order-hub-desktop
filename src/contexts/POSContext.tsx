@@ -70,6 +70,7 @@ export function usePOS() {
     setPendingCartItem: cart.setPendingCartItem,
     subtotal: cart.subtotal,
     discount: cart.discount,
+    deliveryFee: cart.deliveryFee,
     total: cart.total,
     appliedPromo: cart.appliedPromo,
     currentOrder: cart.currentOrder,

@@ -168,6 +168,7 @@ export function PrintPreviewModal({
         deliveryCustomerName: order.deliveryCustomerName,
         deliveryPhone: order.deliveryPhone,
         deliveryAddress: order.deliveryAddress,
+        deliveryFee: order.deliveryFee ? formatCurrency(order.deliveryFee, currency) : undefined,
         lines: order.lines.map(line => {
           const lineTotal = (line.unitPrice + line.modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0)) * line.quantity;
           const showPrices = isKitchen ? customization?.kitchenShowProductPrices : true;

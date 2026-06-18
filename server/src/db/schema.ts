@@ -88,6 +88,7 @@ CREATE TABLE IF NOT EXISTS orders (
   deliveryAddress        TEXT,
   deliveryPhone          TEXT,
   deliveryCustomerName   TEXT,
+  deliveryFee            REAL,
   sync_status            TEXT NOT NULL DEFAULT 'pending',
   synced_at              TEXT
 );
@@ -263,6 +264,10 @@ function applyColumnMigrations(db: Database.Database): void {
   if (!hasColumn('orders', 'kitchen_ready_at')) {
     db.exec(`ALTER TABLE orders ADD COLUMN kitchen_ready_at TEXT`);
     console.log('[DB] Migration : orders.kitchen_ready_at ajouté');
+  }
+  if (!hasColumn('orders', 'deliveryFee')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN deliveryFee REAL`);
+    console.log('[DB] Migration : orders.deliveryFee ajouté');
   }
   if (!hasColumn('products', 'sync_status')) {
     db.exec(`ALTER TABLE products ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'pending'`);

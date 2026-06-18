@@ -45,6 +45,7 @@ export interface Order {
   deliveryAddress?: string;
   deliveryPhone?: string;
   deliveryCustomerName?: string;
+  deliveryFee?: number;
 }
 
 export interface Promotion {

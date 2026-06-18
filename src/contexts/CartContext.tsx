@@ -28,6 +28,7 @@ export interface OrderDraft {
   deliveryAddress?: string;
   deliveryPhone?: string;
   deliveryCustomerName?: string;
+  deliveryFee?: number;
 }
 
 interface CartContextType {
@@ -38,12 +39,13 @@ interface CartContextType {
   setPendingCartItem: (item: CartItem | null) => void;
   subtotal: number;
   discount: number;
+  deliveryFee: number;
   total: number;
   appliedPromo: Promotion | null;
   currentOrder: Order | null;
-  createNewDraft: (name?: string, type?: OrderType, deliveryInfo?: { address: string; phone: string; customerName: string }) => OrderDraft;
-  createDraftWithType: (type: OrderType, item?: CartItem, deliveryInfo?: { address: string; phone: string; customerName: string }) => OrderDraft;
-  updateDraftType: (draftId: string, type: OrderType, deliveryInfo?: { address: string; phone: string; customerName: string }) => void;
+  createNewDraft: (name?: string, type?: OrderType, deliveryInfo?: { address: string; phone: string; customerName: string; fee?: number }) => OrderDraft;
+  createDraftWithType: (type: OrderType, item?: CartItem, deliveryInfo?: { address: string; phone: string; customerName: string; fee?: number }) => OrderDraft;
+  updateDraftType: (draftId: string, type: OrderType, deliveryInfo?: { address: string; phone: string; customerName: string; fee?: number }) => void;
   deleteDraft: (draftId: string) => void;
   addToCart: (item: CartItem) => void;
   updateCartItem: (itemId: string, updates: Partial<CartItem>) => void;
@@ -90,7 +92,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         : 0
     : 0;
 
-  const total = Math.max(0, subtotal - discount);
+  const deliveryFee = activeDraft?.deliveryFee ?? 0;
+  const total = Math.max(0, subtotal - discount) + deliveryFee;
   const appliedPromo = activeDraft?.appliedPromo || null;
 
   const addToCart = useCallback((item: CartItem) => {
@@ -108,7 +111,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   }, [activeOrderId]);
 
-  const createNewDraft = useCallback((name?: string, type: OrderType = 'dine-in', deliveryInfo?: { address: string; phone: string; customerName: string }): OrderDraft => {
+  const createNewDraft = useCallback((name?: string, type: OrderType = 'dine-in', deliveryInfo?: { address: string; phone: string; customerName: string; fee?: number }): OrderDraft => {
     const maxNum = orderDrafts.reduce((max, d) => {
       const m = d.name.match(/Commande (\d+)/);
       return m ? Math.max(max, parseInt(m[1], 10)) : max;
@@ -124,6 +127,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         deliveryAddress: deliveryInfo.address,
         deliveryPhone: deliveryInfo.phone,
         deliveryCustomerName: deliveryInfo.customerName,
+        deliveryFee: deliveryInfo.fee,
       }),
     };
     setOrderDrafts(prev => [...prev, newDraft]);
@@ -131,7 +135,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return newDraft;
   }, [orderDrafts]);
 
-  const createDraftWithType = useCallback((type: OrderType, item?: CartItem, deliveryInfo?: { address: string; phone: string; customerName: string }): OrderDraft => {
+  const createDraftWithType = useCallback((type: OrderType, item?: CartItem, deliveryInfo?: { address: string; phone: string; customerName: string; fee?: number }): OrderDraft => {
     const maxNum = orderDrafts.reduce((max, d) => {
       const m = d.name.match(/Commande (\d+)/);
       return m ? Math.max(max, parseInt(m[1], 10)) : max;
@@ -147,6 +151,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         deliveryAddress: deliveryInfo.address,
         deliveryPhone: deliveryInfo.phone,
         deliveryCustomerName: deliveryInfo.customerName,
+        deliveryFee: deliveryInfo.fee,
       }),
     };
     setOrderDrafts(prev => [...prev, newDraft]);
@@ -155,7 +160,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return newDraft;
   }, [orderDrafts]);
 
-  const updateDraftType = useCallback((draftId: string, type: OrderType, deliveryInfo?: { address: string; phone: string; customerName: string }) => {
+  const updateDraftType = useCallback((draftId: string, type: OrderType, deliveryInfo?: { address: string; phone: string; customerName: string; fee?: number }) => {
     setOrderDrafts(prev => prev.map(draft => {
       if (draft.id !== draftId) return draft;
       const updates: Partial<OrderDraft> = { type };
@@ -163,10 +168,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
         updates.deliveryAddress = deliveryInfo.address;
         updates.deliveryPhone = deliveryInfo.phone;
         updates.deliveryCustomerName = deliveryInfo.customerName;
+        updates.deliveryFee = deliveryInfo.fee;
       } else if (type !== 'delivery') {
         updates.deliveryAddress = undefined;
         updates.deliveryPhone = undefined;
         updates.deliveryCustomerName = undefined;
+        updates.deliveryFee = undefined;
       }
       return { ...draft, ...updates };
     }));
@@ -251,6 +258,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         deliveryAddress: draft.deliveryAddress,
         deliveryPhone: draft.deliveryPhone,
         deliveryCustomerName: draft.deliveryCustomerName,
+        deliveryFee: draft.deliveryFee,
       }),
     });
 
@@ -280,7 +288,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     <CartContext.Provider value={{
       orderDrafts, activeOrderId, setActiveOrderId,
       pendingCartItem, setPendingCartItem,
-      subtotal, discount, total, appliedPromo, currentOrder,
+      subtotal, discount, deliveryFee, total, appliedPromo, currentOrder,
       createNewDraft, createDraftWithType, updateDraftType, deleteDraft,
       addToCart, updateCartItem, removeFromCart, clearCart,
       applyPromoCode, removePromo,

@@ -451,6 +451,7 @@ export function Cart() {
           address: activeDraft.deliveryAddress ?? '',
           phone: activeDraft.deliveryPhone ?? '',
           customerName: activeDraft.deliveryCustomerName ?? '',
+          fee: activeDraft.deliveryFee,
         } : undefined}
       />
 
