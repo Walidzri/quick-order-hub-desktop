@@ -24,7 +24,7 @@ interface SupabaseOrder {
     unit_price: number;
     line_total: number;
     notes: string | null;
-    compositions: { product_id: string; product_name: string }[] | null;
+    compositions: { product_id: string; product_name: string; variant_id?: string; variant_name?: string }[] | null;
     products: { name: string };
     product_variants: { name: string };
     variant_prices: { size_label: string };
@@ -272,8 +272,8 @@ class WebOrderService {
 
       // Compositions as modifiers with isComposition flag
       const compModifiers = (line.compositions || []).map(c => ({
-        optionId: c.product_id,
-        optionName: c.product_name,
+        optionId: c.variant_id || c.product_id,
+        optionName: c.variant_name || c.product_name,
         priceAdjustment: 0,
         isComposition: true,
       }));
