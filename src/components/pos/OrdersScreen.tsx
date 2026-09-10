@@ -4,10 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { formatCurrency } from '@/lib/i18n';
 import { Order, OrderStatus } from '@shared/types';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, 
-  Calendar, 
-  Printer, 
+import {
+  Search,
+  Calendar,
+  Printer,
   ChefHat,
   Receipt,
   Clock,
@@ -21,7 +21,8 @@ import {
   Square,
   ChevronLeft,
   ChevronRight,
-  Loader2
+  Loader2,
+  Truck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TouchInput } from '@/components/ui/touch-input';
@@ -79,6 +80,7 @@ export function OrdersScreen() {
   const { users, user, hasPermission } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
+  const [deliveryOnly, setDeliveryOnly] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [printModalType, setPrintModalType] = useState<'receipt' | 'kitchen'>('receipt');
@@ -190,9 +192,10 @@ export function OrdersScreen() {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Filter orders client-side (for search and status filter on current page)
+  // Filter orders client-side (for search, status filter and delivery filter on current page)
   const filteredOrders = paginatedOrders.filter(order => {
     if (statusFilter !== 'all' && order.status !== statusFilter) return false;
+    if (deliveryOnly && order.type !== 'delivery') return false;
     if (search && !order.orderNumber.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
@@ -431,7 +434,7 @@ export function OrdersScreen() {
             </div>
 
             {/* Status Filter */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {(['all', 'draft', 'sentToKitchen', 'ready', 'paid', 'cancelled'] as const).map((status) => (
                 <button
                   key={status}
@@ -446,6 +449,20 @@ export function OrdersScreen() {
                   {status === 'all' ? t('general.all') : t(`status.${status}`)}
                 </button>
               ))}
+
+              {/* Delivery Only Filter */}
+              <button
+                onClick={() => setDeliveryOnly(!deliveryOnly)}
+                className={cn(
+                  "px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2",
+                  deliveryOnly
+                    ? "bg-orange-500 text-white"
+                    : "bg-secondary hover:bg-secondary/80"
+                )}
+              >
+                <Truck className="w-4 h-4" />
+                {t('orders.deliveryOnly')}
+              </button>
             </div>
 
             {/* Select All Checkbox - Only for admin/chef */}
@@ -671,6 +688,16 @@ export function OrdersScreen() {
               <p className="text-sm text-muted-foreground mt-1">
                 {new Date(selectedOrder.createdAt).toLocaleString()}
               </p>
+              <span className={cn(
+                "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-bold mt-2",
+                selectedOrder.type === 'dine-in' && "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300",
+                selectedOrder.type === 'takeaway' && "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
+                selectedOrder.type === 'delivery' && "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+              )}>
+                {selectedOrder.type === 'dine-in' && '🍽️ Sur place'}
+                {selectedOrder.type === 'takeaway' && '📦 À emporter'}
+                {selectedOrder.type === 'delivery' && '🛵 Livraison'}
+              </span>
               {selectedOrder.createdBy && (
                 <p className="text-sm text-muted-foreground mt-1">
                   {t('orders.cashierLabel')} {getCashierName(selectedOrder.createdBy)}
@@ -723,11 +750,22 @@ export function OrdersScreen() {
                         {formatCurrency(line.unitPrice * line.quantity, currency)}
                       </span>
                     </div>
-                    {line.modifiers.length > 0 && (
-                      <div className="text-sm text-muted-foreground mt-1">
-                        {line.modifiers.map(m => `(S) ${m.optionName}`).join(', ')}
-                      </div>
-                    )}
+                    {line.modifiers.length > 0 && (() => {
+                      const compositions = line.modifiers.filter((m: any) => m.isComposition);
+                      const supplements = line.modifiers.filter((m: any) => !m.isComposition);
+                      const fraction = compositions.length === 2 ? '½' : compositions.length === 3 ? '⅓' : compositions.length === 4 ? '¼' : compositions.length > 0 ? `1/${compositions.length}` : '';
+                      return (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {compositions.length > 0 && (
+                            <span className="text-amber-600 dark:text-amber-400">
+                              {compositions.map((m: any) => `${fraction} ${m.optionName}`).join(' · ')}
+                            </span>
+                          )}
+                          {compositions.length > 0 && supplements.length > 0 && ' — '}
+                          {supplements.length > 0 && supplements.map((m: any) => `(S) ${m.optionName}`).join(', ')}
+                        </div>
+                      );
+                    })()}
                     {line.note && (
                       <div className="text-sm text-primary italic mt-1">
                         {t('order.noteLabel')} {line.note}

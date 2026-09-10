@@ -24,6 +24,7 @@ interface SupabaseOrder {
     unit_price: number;
     line_total: number;
     notes: string | null;
+    compositions: { product_id: string; product_name: string }[] | null;
     products: { name: string };
     product_variants: { name: string };
     variant_prices: { size_label: string };
@@ -190,7 +191,7 @@ class WebOrderService {
     const query = new URLSearchParams({
       select: `
         id,order_number,type,status,notes,delivery_fee,subtotal,total,created_at,
-        order_lines(id,quantity,unit_price,line_total,notes,
+        order_lines(id,quantity,unit_price,line_total,notes,compositions,
           products(name),
           product_variants(name),
           variant_prices(size_label),
@@ -261,22 +262,35 @@ class WebOrderService {
     const db = getDatabase();
 
     // Build lines in local format
-    const lines = order.order_lines.map(line => ({
-      id: line.id,
-      productId: '',
-      productName: line.products.name,
-      variantId: '',
-      variantSize: line.variant_prices.size_label,
-      quantity: line.quantity,
-      unitPrice: line.unit_price,
-      modifiers: line.order_line_supplements.map(s => ({
+    const lines = order.order_lines.map(line => {
+      // Supplements as modifiers
+      const supModifiers = line.order_line_supplements.map(s => ({
         optionId: '',
         optionName: s.supplements.name,
         priceAdjustment: s.price,
-      })),
-      note: line.notes || undefined,
-      isManual: false,
-    }));
+      }));
+
+      // Compositions as modifiers with isComposition flag
+      const compModifiers = (line.compositions || []).map(c => ({
+        optionId: c.product_id,
+        optionName: c.product_name,
+        priceAdjustment: 0,
+        isComposition: true,
+      }));
+
+      return {
+        id: line.id,
+        productId: '',
+        productName: line.products.name,
+        variantId: '',
+        variantSize: line.variant_prices.size_label,
+        quantity: line.quantity,
+        unitPrice: line.unit_price,
+        modifiers: [...compModifiers, ...supModifiers],
+        note: line.notes || undefined,
+        isManual: false,
+      };
+    });
 
     const customerName = order.profiles
       ? `${order.profiles.first_name || ''} ${order.profiles.last_name || ''}`.trim()
