@@ -89,6 +89,7 @@ CREATE TABLE IF NOT EXISTS orders (
   deliveryPhone          TEXT,
   deliveryCustomerName   TEXT,
   deliveryFee            REAL,
+  notes                  TEXT,
   sync_status            TEXT NOT NULL DEFAULT 'pending',
   synced_at              TEXT
 );
@@ -276,6 +277,32 @@ function applyColumnMigrations(db: Database.Database): void {
   if (!hasColumn('products', 'synced_at')) {
     db.exec(`ALTER TABLE products ADD COLUMN synced_at TEXT`);
     console.log('[DB] Migration : products.synced_at ajouté');
+  }
+  if (!hasColumn('products', 'compositionConfig')) {
+    db.exec(`ALTER TABLE products ADD COLUMN compositionConfig TEXT`);
+    console.log('[DB] Migration : products.compositionConfig ajouté');
+  }
+
+  // Web orders support (click & collect from website)
+  if (!hasColumn('orders', 'source')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN source TEXT NOT NULL DEFAULT 'pos'`);
+    console.log('[DB] Migration : orders.source ajouté');
+  }
+  if (!hasColumn('orders', 'web_order_id')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN web_order_id TEXT`);
+    console.log('[DB] Migration : orders.web_order_id ajouté');
+  }
+  if (!hasColumn('orders', 'web_status')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN web_status TEXT`);
+    console.log('[DB] Migration : orders.web_status ajouté');
+  }
+  if (!hasColumn('orders', 'web_customer_phone')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN web_customer_phone TEXT`);
+    console.log('[DB] Migration : orders.web_customer_phone ajouté');
+  }
+  if (!hasColumn('orders', 'notes')) {
+    db.exec(`ALTER TABLE orders ADD COLUMN notes TEXT`);
+    console.log('[DB] Migration : orders.notes ajouté');
   }
 }
 

@@ -229,7 +229,12 @@ class WebOrderService {
         }
 
         // Convert to local order format and insert
-        this.insertWebOrder(order);
+        try {
+          this.insertWebOrder(order);
+        } catch (insertErr) {
+          console.error(`[WebOrders] INSERT échoué pour commande ${order.id}:`, insertErr);
+          continue;
+        }
         pulled++;
 
         // Mark as synced on Supabase
