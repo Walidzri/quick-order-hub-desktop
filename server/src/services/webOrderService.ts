@@ -310,9 +310,10 @@ class WebOrderService {
         subtotal, discount, total,
         createdAt, updatedAt,
         deliveryAddress, deliveryPhone, deliveryCustomerName, deliveryFee,
+        notes,
         sync_status,
         source, web_order_id, web_status, web_customer_phone
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       `web-${order.id.slice(0, 8)}-${Date.now()}`,
       `W${order.order_number}`,
@@ -328,6 +329,7 @@ class WebOrderService {
       customerPhone,
       customerName,
       order.delivery_fee || 0,
+      order.notes || null,
       'synced',
       'web',
       order.id,

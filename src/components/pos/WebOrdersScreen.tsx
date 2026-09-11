@@ -45,6 +45,7 @@ interface WebOrder {
   deliveryCustomerName?: string;
   deliveryFee?: number;
   source?: string;
+  notes?: string;
   web_order_id?: string;
   web_status?: string;
   web_customer_phone?: string;
@@ -565,6 +566,13 @@ function OrderCard({
           </div>
         ))}
       </div>
+
+      {/* Order notes */}
+      {order.notes && (
+        <div className="bg-amber-950/30 border border-amber-800/40 rounded-lg px-3 py-2 text-sm text-amber-400">
+          📝 {order.notes}
+        </div>
+      )}
 
       {/* Total */}
       <div className="flex justify-between items-center pt-2 border-t text-sm">

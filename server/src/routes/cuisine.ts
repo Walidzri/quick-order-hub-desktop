@@ -789,6 +789,7 @@ const HTML = /* html */`<!DOCTYPE html>
             ? '<div class="web-customer">' + ICO.user + ' ' + [o.deliveryCustomerName, o.web_customer_phone].filter(Boolean).map(esc).join(' — ') + '</div>'
             : '')
           + '<ul class="items">' + itemsHtml + '</ul>'
+          + (o.notes ? '<div class="delivery-note" style="background:#78350f;border-color:#92400e">' + ICO.note + ' ' + esc(o.notes) + '</div>' : '')
           + deliveryNote
           + '<div class="card-total">Total : ' + formatPrice(o.total) + '</div>'
           + '<button class="btn-ready" data-id="' + o.id + '">' + ICO.check + ' Pr\xEAt</button>'
@@ -841,6 +842,8 @@ const HTML = /* html */`<!DOCTYPE html>
           ? '<div class="delivery-note">' + ICO.truck + ' ' + [o.deliveryCustomerName, o.deliveryPhone, o.deliveryAddress].filter(Boolean).map(esc).join(' \u2014 ') + '</div>'
           : '';
 
+        var orderNote = o.notes ? '<div class="delivery-note" style="background:#78350f;border-color:#92400e">' + ICO.note + ' ' + esc(o.notes) + '</div>' : '';
+
         return '<div class="card web-pending" id="wcard-' + o.id + '">'
           + '<div class="card-header">'
           + '<div class="order-num">N\xB0' + esc(o.orderNumber || '\u2014') + '</div>'
@@ -852,6 +855,7 @@ const HTML = /* html */`<!DOCTYPE html>
           + '</div></div>'
           + customerInfo
           + '<ul class="items">' + itemsHtml + '</ul>'
+          + orderNote
           + deliveryNote
           + '<div class="card-total">Total : ' + formatPrice(o.total) + '</div>'
           + '<div class="web-actions">'
