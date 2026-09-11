@@ -183,15 +183,30 @@ export function WebOrdersScreen() {
     }
   }
 
+  const [rejectingOrderId, setRejectingOrderId] = useState<string | null>(null);
+
+  const REJECT_REASONS = [
+    'Rupture de stock',
+    'Restaurant fermé',
+    'Coup de feu (cuisine surchargée)',
+    'Adresse hors zone de livraison',
+    'Commande incorrecte',
+  ];
+
   async function handleReject(id: string) {
-    const reason = prompt('Raison du refus (optionnel) :');
-    if (reason === null) return;
+    setRejectingOrderId(id);
+  }
+
+  async function confirmReject(reason: string) {
+    if (!rejectingOrderId) return;
+    const id = rejectingOrderId;
+    setRejectingOrderId(null);
     setActionLoading(id);
     try {
       const res = await fetch(`http://localhost:3002/api/web-orders/${id}/reject`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: reason || undefined }),
+        body: JSON.stringify({ reason }),
       });
       if (res.ok) {
         toast({ title: 'Commande refusée' });
@@ -386,6 +401,47 @@ export function WebOrdersScreen() {
           </div>
         )}
       </div>
+
+      {/* Reject reason modal */}
+      {rejectingOrderId && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center"
+          onClick={() => setRejectingOrderId(null)}
+        >
+          <div
+            className="bg-card border rounded-2xl p-6 w-[90%] max-w-md space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-center">Raison du refus</h3>
+            <div className="flex flex-col gap-2">
+              {REJECT_REASONS.map((reason) => (
+                <Button
+                  key={reason}
+                  variant="destructive"
+                  className="w-full justify-start text-left h-auto py-3"
+                  onClick={() => confirmReject(reason)}
+                >
+                  {reason}
+                </Button>
+              ))}
+              <Button
+                variant="destructive"
+                className="w-full justify-start text-left h-auto py-3 opacity-70"
+                onClick={() => confirmReject('')}
+              >
+                Refuser sans raison
+              </Button>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full mt-2"
+              onClick={() => setRejectingOrderId(null)}
+            >
+              Annuler
+            </Button>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }
