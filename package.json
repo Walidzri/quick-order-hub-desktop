@@ -54,6 +54,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
+    "electron-updater": "^6.8.9",
     "embla-carousel-react": "^8.6.0",
     "escpos": "^3.0.0-alpha.6",
     "escpos-usb": "^3.0.0-alpha.4",
@@ -113,6 +114,13 @@
     "directories": {
       "output": "release"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Walidzri",
+        "repo": "quick-order-hub-desktop"
+      }
+    ],
     "win": {
       "target": [
         "nsis"
@@ -136,7 +144,7 @@
         "to": "PrintDaemon/PrintDaemon.exe"
       }
     ],
-"nsis": {
+    "nsis": {
       "oneClick": false,
       "allowElevation": false,
       "allowToChangeInstallationDirectory": true,

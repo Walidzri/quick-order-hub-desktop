@@ -13,6 +13,7 @@ import { SetupScreen } from '@/components/auth/SetupScreen';
 import { LockScreen } from '@/components/auth/LockScreen';
 import { GlobalVirtualKeyboard } from '@/components/ui/GlobalVirtualKeyboard';
 import { GlobalNumericKeyboard } from '@/components/ui/GlobalNumericKeyboard';
+import UpdateNotification from '@/components/pos/UpdateNotification';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
@@ -125,6 +126,9 @@ function POSApp() {
         {/* Global Virtual Keyboard - Fixed at bottom */}
         <GlobalVirtualKeyboard />
         <GlobalNumericKeyboard />
+
+        {/* Auto-update notification */}
+        <UpdateNotification />
       </div>
     </div>
   );

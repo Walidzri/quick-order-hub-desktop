@@ -770,6 +770,44 @@ export function SettingsScreen() {
                 </div>
               )}
 
+              {/* Mise à jour manuelle */}
+              <div className="p-4 bg-muted/50 rounded-lg border border-border">
+                <label className="text-sm font-medium block mb-1">
+                  Mise à jour
+                </label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Vérifier si une nouvelle version est disponible
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={async () => {
+                    toast({ title: 'Mise à jour', description: 'Recherche en cours...' });
+                    try {
+                      await fetch('http://localhost:3002/api/update/check', { method: 'POST' });
+                      // Wait a bit then check status
+                      setTimeout(async () => {
+                        const res = await fetch('http://localhost:3002/api/update/status');
+                        const data = await res.json();
+                        if (data.status === 'available') {
+                          toast({ title: 'Mise à jour disponible', description: `Version ${data.availableVersion}` });
+                        } else if (data.status === 'idle') {
+                          toast({ title: 'À jour', description: `Version ${data.currentVersion} — aucune mise à jour` });
+                        } else if (data.status === 'error') {
+                          toast({ title: 'Erreur', description: data.error, variant: 'destructive' });
+                        }
+                      }, 3000);
+                    } catch {
+                      toast({ title: 'Erreur', description: 'Impossible de vérifier les mises à jour', variant: 'destructive' });
+                    }
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Rechercher une mise à jour
+                </Button>
+              </div>
+
               {/* Version & Copyright */}
               <div className="pt-6 mt-6 border-t border-border">
                 <div className="text-center space-y-2">

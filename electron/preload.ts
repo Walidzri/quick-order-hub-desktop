@@ -49,6 +49,7 @@ try {
 
     // PrintDaemon C# runs as separate process - check status via HTTP: http://127.0.0.1:9100/status
     // No IPC handlers needed
+    // Auto-update is handled via Fastify HTTP routes (/api/update/*), not IPC
 });
   
   if (process.env.NODE_ENV === 'development') {

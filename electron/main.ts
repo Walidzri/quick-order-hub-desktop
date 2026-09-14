@@ -7,7 +7,26 @@ import { Socket, createConnection } from 'net';
 import { request } from 'http';
 import { createRequire } from 'module';
 import { spawn, ChildProcess } from 'child_process';
+import { autoUpdater } from 'electron-updater';
 import { startServer, stopServer } from '../server/src/index';
+
+// Load .env file (GH_TOKEN for auto-updates)
+try {
+  const envPath = join(dirname(fileURLToPath(import.meta.url)), '..', '.env');
+  if (existsSync(envPath)) {
+    const envContent = readFileSync(envPath, 'utf8');
+    for (const line of envContent.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx > 0) {
+        const key = trimmed.slice(0, eqIdx).trim();
+        const val = trimmed.slice(eqIdx + 1).trim();
+        if (!process.env[key]) process.env[key] = val;
+      }
+    }
+  }
+} catch { /* .env loading is optional */ }
 // PrintDaemon C# is now used instead of integrated Node.js daemon
 // import { createPrintDaemonServer } from './print-daemon-integrated';
 
@@ -344,6 +363,114 @@ function stopPrintDaemon(): void {
   }
 }
 
+// ─── Auto-Updater Setup ───────────────────────────────────────────────
+// State shared with Fastify routes via updateState global
+export const updateState = {
+  status: 'idle' as 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'error',
+  version: null as string | null,
+  releaseNotes: null as string | null,
+  progress: 0,
+  error: null as string | null,
+  appVersion: '',
+};
+
+function setupAutoUpdater(): void {
+  updateState.appVersion = app.getVersion();
+
+  // Don't check for updates in development
+  if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+    console.log('[UPDATER] Skipping auto-update check (dev mode)');
+    return;
+  }
+
+  // Don't auto-download — let the user decide
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  // GitHub private repo — read-only PAT from env
+  const ghToken = process.env.GH_TOKEN || '';
+  if (ghToken) {
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: 'Walidzri',
+      repo: 'quick-order-hub-desktop',
+      private: true,
+      token: ghToken,
+    });
+  } else {
+    console.warn('[UPDATER] No GH_TOKEN set — updates from private repo will fail');
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: 'Walidzri',
+      repo: 'quick-order-hub-desktop',
+    });
+  }
+
+  autoUpdater.on('checking-for-update', () => {
+    console.log('[UPDATER] Checking for updates...');
+    updateState.status = 'checking';
+    updateState.error = null;
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('[UPDATER] Update available:', info.version);
+    updateState.status = 'available';
+    updateState.version = info.version;
+    updateState.releaseNotes = typeof info.releaseNotes === 'string' ? info.releaseNotes : null;
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    console.log('[UPDATER] App is up to date');
+    updateState.status = 'idle';
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    console.log(`[UPDATER] Download: ${Math.round(progress.percent)}%`);
+    updateState.status = 'downloading';
+    updateState.progress = Math.round(progress.percent);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('[UPDATER] Update downloaded:', info.version);
+    updateState.status = 'downloaded';
+    updateState.version = info.version;
+  });
+
+  autoUpdater.on('error', (error) => {
+    console.error('[UPDATER] Error:', error.message);
+    updateState.status = 'error';
+    updateState.error = error.message;
+  });
+
+  // Check for updates at startup
+  autoUpdater.checkForUpdates().catch((err) => {
+    console.error('[UPDATER] Failed to check for updates:', err.message);
+  });
+}
+
+// Expose updater actions for Fastify routes
+export function updaterCheckForUpdates(): void {
+  if (!app.isPackaged) {
+    updateState.status = 'idle';
+    return;
+  }
+  autoUpdater.checkForUpdates().catch((err) => {
+    console.error('[UPDATER] Manual check failed:', err.message);
+    updateState.status = 'error';
+    updateState.error = err.message;
+  });
+}
+
+export function updaterDownload(): void {
+  autoUpdater.downloadUpdate();
+}
+
+export function updaterInstall(): void {
+  isQuitting = true;
+  stopPrintDaemon();
+  autoUpdater.quitAndInstall(false, true);
+}
+
 // This method will be called when Electron has finished initialization
 app.on('ready', async () => {
   // Remove the menu bar completely
@@ -364,6 +491,9 @@ app.on('ready', async () => {
   }
 
   createWindow();
+
+  // Setup auto-updater (checks for updates after 3s delay)
+  setTimeout(() => setupAutoUpdater(), 3000);
 
   // Start PrintDaemon C# after a short delay to ensure everything is ready
   setTimeout(() => {

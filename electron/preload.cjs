@@ -41,6 +41,11 @@ try {
     // Auto-démarrage Windows
     getLoginItemSettings: () => ipcRenderer.invoke('app:getLoginItemSettings'),
     setOpenAtLogin: (openAtLogin) => ipcRenderer.invoke('app:setOpenAtLogin', openAtLogin),
+
+    // Logging API
+    writeLog: (logLine) => ipcRenderer.invoke('log:write', logLine),
+
+    // Auto-update is handled via Fastify HTTP routes (/api/update/*), not IPC
   });
   
   if (process.env.NODE_ENV === 'development') {
