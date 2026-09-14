@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Product, ProductVariant, Category } from '@shared/types';
+import { Product, ProductVariant, Category, CompositionConfig } from '@shared/types';
 import { formatCurrency, Currency } from '@/lib/i18n';
 import { usePOS } from '@/contexts/POSContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -251,6 +251,11 @@ export function ProductsManagement({
                     <span className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded-full">
                       {category?.name || product.categoryId}
                     </span>
+                    {product.compositionConfig && (
+                      <span className="text-xs px-2 py-0.5 bg-amber-500/10 text-amber-600 rounded-full">
+                        🧩 Composite ×{product.compositionConfig.count}
+                      </span>
+                    )}
                     {product.available === false && (
                       <span className="text-xs px-2 py-0.5 bg-destructive/10 text-destructive rounded-full">
                         {t('products.unavailable')}
@@ -407,6 +412,10 @@ function ProductModal({ product, categories, currency, existingVariants = [], on
   const [hasVariants, setHasVariants] = useState(false);
   const [image, setImage] = useState<string | undefined>(undefined);
   const [selectedSupplementIds, setSelectedSupplementIds] = useState<string[]>([]);
+  const [isComposite, setIsComposite] = useState(false);
+  const [compositionCount, setCompositionCount] = useState('2');
+  const [compositionSourceCategoryId, setCompositionSourceCategoryId] = useState('');
+  const [compositionLabel, setCompositionLabel] = useState('');
   const [error, setError] = useState('');
   
   // Get all available supplements
@@ -422,6 +431,17 @@ function ProductModal({ product, categories, currency, existingVariants = [], on
       setSortOrder(product.sortOrder);
       setImage(product.image);
       setSelectedSupplementIds(product.supplementIds || []);
+      if (product.compositionConfig) {
+        setIsComposite(true);
+        setCompositionCount(String(product.compositionConfig.count));
+        setCompositionSourceCategoryId(product.compositionConfig.sourceCategoryId);
+        setCompositionLabel(product.compositionConfig.label || '');
+      } else {
+        setIsComposite(false);
+        setCompositionCount('2');
+        setCompositionSourceCategoryId('');
+        setCompositionLabel('');
+      }
       // Load existing variants
       if (existingVariants && existingVariants.length > 0) {
         setVariants(existingVariants.map(v => ({ size: v.size, price: v.price.toString() })));
@@ -441,6 +461,10 @@ function ProductModal({ product, categories, currency, existingVariants = [], on
       setHasVariants(false);
       setImage(undefined);
       setSelectedSupplementIds([]);
+      setIsComposite(false);
+      setCompositionCount('2');
+      setCompositionSourceCategoryId('');
+      setCompositionLabel('');
     }
     setError('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -488,6 +512,11 @@ function ProductModal({ product, categories, currency, existingVariants = [], on
       sortOrder,
       image: image || undefined,
       supplementIds: categoryId !== 'supplements' && selectedSupplementIds.length > 0 ? selectedSupplementIds : undefined,
+      compositionConfig: isComposite && compositionSourceCategoryId ? {
+        count: parseInt(compositionCount) || 2,
+        sourceCategoryId: compositionSourceCategoryId,
+        label: compositionLabel.trim() || undefined,
+      } : undefined,
     };
 
     await onSave(productToSave, productVariants);
@@ -747,6 +776,73 @@ function ProductModal({ product, categories, currency, existingVariants = [], on
                 />
               </div>
             </div>
+
+            {/* Produit composite */}
+            {categoryId !== 'supplements' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl">
+                  <div>
+                    <span className="font-medium">🧩 Produit composite</span>
+                    <p className="text-sm text-muted-foreground">
+                      Composer à partir d'articles d'une autre catégorie (ex: Panachée = 2 pizzas)
+                    </p>
+                  </div>
+                  <Switch
+                    checked={isComposite}
+                    onCheckedChange={setIsComposite}
+                  />
+                </div>
+                {isComposite && (
+                  <div className="border border-border rounded-lg p-4 space-y-3 bg-muted/20">
+                    <div>
+                      <label className="text-sm font-medium text-muted-foreground">
+                        Catégorie source *
+                      </label>
+                      <Select value={compositionSourceCategoryId} onValueChange={setCompositionSourceCategoryId}>
+                        <SelectTrigger className="mt-1 h-12">
+                          <SelectValue placeholder="Choisir une catégorie..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.filter(c => c.id !== 'supplements').map(cat => (
+                            <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Nombre de choix *
+                        </label>
+                        <Select value={compositionCount} onValueChange={setCompositionCount}>
+                          <SelectTrigger className="mt-1 h-12">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="2">2 (Panachée)</SelectItem>
+                            <SelectItem value="3">3 (3 saisons)</SelectItem>
+                            <SelectItem value="4">4 (4 saisons)</SelectItem>
+                            <SelectItem value="5">5</SelectItem>
+                            <SelectItem value="6">6</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-muted-foreground">
+                          Label (optionnel)
+                        </label>
+                        <TouchInput
+                          value={compositionLabel}
+                          onChange={setCompositionLabel}
+                          placeholder="ex: Côtés, Saveurs..."
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Supplements Association - Only for non-supplement products */}
             {categoryId !== 'supplements' && allSupplements.length > 0 && (

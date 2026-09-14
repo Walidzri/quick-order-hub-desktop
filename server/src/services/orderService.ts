@@ -39,6 +39,10 @@ function rowToOrder(row: Record<string, unknown>): Order {
     deliveryPhone:        (row['deliveryPhone']        as string | null) ?? undefined,
     deliveryCustomerName: (row['deliveryCustomerName'] as string | null) ?? undefined,
     deliveryFee:          (row['deliveryFee']          as number | null) ?? undefined,
+    source:               (row['source']               as string | null) ?? 'pos',
+    web_order_id:         (row['web_order_id']         as string | null) ?? undefined,
+    web_status:           (row['web_status']           as string | null) ?? undefined,
+    web_customer_phone:   (row['web_customer_phone']   as string | null) ?? undefined,
   };
 }
 

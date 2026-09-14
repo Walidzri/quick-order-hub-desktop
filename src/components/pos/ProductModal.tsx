@@ -30,6 +30,18 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
   const [showNote, setShowNote] = useState(false);
   const [selectedSupplements, setSelectedSupplements] = useState<Map<string, SelectedSupplement>>(new Map());
 
+  // ── Composition state ──────────────────────────────────────────────────────
+  const compositionConfig = product.compositionConfig;
+  const isComposite = !!compositionConfig;
+  const [compositionChoices, setCompositionChoices] = useState<Product[]>([]);
+
+  // Products available for composition selection
+  const compositionProducts = useMemo(() => {
+    if (!compositionConfig) return [];
+    return getProductsByCategory(compositionConfig.sourceCategoryId)
+      .filter(p => p.available !== false);
+  }, [compositionConfig, getProductsByCategory]);
+
   // Get supplements category products filtered by product, category, and supplement associations
   const supplementsProducts = useMemo(() => {
     const allSupplements = getProductsByCategory('supplements');
@@ -171,6 +183,22 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
     ? `${category.name} ${product.name}`
     : product.name;
 
+  // Toggle a composition choice (can pick same product multiple times up to count)
+  const toggleCompositionChoice = (chosenProduct: Product) => {
+    if (!compositionConfig) return;
+    const maxCount = compositionConfig.count;
+
+    // Check if we already have this product in choices
+    const existingIndex = compositionChoices.findIndex(p => p.id === chosenProduct.id);
+    if (existingIndex >= 0) {
+      // Remove it
+      setCompositionChoices(prev => prev.filter((_, i) => i !== existingIndex));
+    } else if (compositionChoices.length < maxCount) {
+      // Add it
+      setCompositionChoices(prev => [...prev, chosenProduct]);
+    }
+  };
+
   const handleAdd = () => {
     // Convert selected supplements to modifiers
     const modifiers: OrderLineModifier[] = Array.from(selectedSupplements.values()).map(sup => ({
@@ -178,6 +206,18 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
       optionName: sup.supplementProduct.name + (sup.supplementVariant ? ` (${sup.supplementVariant.size})` : ''),
       priceAdjustment: sup.price,
     }));
+
+    // Add composition choices as modifiers with isComposition flag
+    if (isComposite) {
+      compositionChoices.forEach(chosen => {
+        modifiers.push({
+          optionId: chosen.id,
+          optionName: chosen.name,
+          priceAdjustment: 0,
+          isComposition: true,
+        });
+      });
+    }
 
     const orderLine: OrderLine = {
       id: generateUUID(),
@@ -214,7 +254,7 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
           exit={{ scale: 0.9, opacity: 0, y: 20 }}
           className={cn(
             "bg-card rounded-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden shadow-2xl flex flex-col",
-            supplementsProducts.length > 0 ? "max-w-6xl" : "max-w-lg"
+            (supplementsProducts.length > 0 || isComposite) ? "max-w-6xl" : "max-w-lg"
           )}
           onClick={(e) => e.stopPropagation()}
         >
@@ -267,6 +307,74 @@ export function ProductModal({ product, variants, onClose }: ProductModalProps) 
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Composition selection */}
+            {isComposite && compositionProducts.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-muted-foreground mb-1">
+                  🧩 {compositionConfig!.label || 'Composition'}
+                </h3>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Choisissez {compositionConfig!.count} article{compositionConfig!.count > 1 ? 's' : ''} — {compositionChoices.length}/{compositionConfig!.count} sélectionné{compositionChoices.length > 1 ? 's' : ''}
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  {compositionProducts.map((cp) => {
+                    // Count how many times this product is selected
+                    const selectedCount = compositionChoices.filter(c => c.id === cp.id).length;
+                    const isFull = compositionChoices.length >= compositionConfig!.count && selectedCount === 0;
+
+                    return (
+                      <button
+                        key={cp.id}
+                        onClick={() => toggleCompositionChoice(cp)}
+                        disabled={isFull}
+                        className={cn(
+                          "p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 text-left relative",
+                          selectedCount > 0
+                            ? "border-primary bg-primary/10"
+                            : isFull
+                              ? "border-border opacity-40 cursor-not-allowed"
+                              : "border-border hover:border-primary/50 active:bg-muted/50"
+                        )}
+                      >
+                        {cp.image && (
+                          <img src={cp.image} alt={cp.name} className="w-full h-16 object-cover rounded-lg mb-2" />
+                        )}
+                        <div className="font-semibold text-sm">{cp.name}</div>
+                        {selectedCount > 0 && (
+                          <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                            {selectedCount > 1 ? (
+                              <span className="text-xs font-bold text-primary-foreground">{selectedCount}</span>
+                            ) : (
+                              <Check className="w-3.5 h-3.5 text-primary-foreground" />
+                            )}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {compositionChoices.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {compositionChoices.map((choice, idx) => {
+                      const fraction = compositionConfig!.count === 2 ? '½' : compositionConfig!.count === 3 ? '⅓' : compositionConfig!.count === 4 ? '¼' : `1/${compositionConfig!.count}`;
+                      return (
+                        <span key={idx} className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full font-medium">
+                          {fraction} {choice.name}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCompositionChoices(prev => prev.filter((_, i) => i !== idx));
+                            }}
+                            className="ml-1 hover:text-destructive"
+                          >×</button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 

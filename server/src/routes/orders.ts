@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { orderService } from '../services/orderService';
 import { wsService } from '../services/wsService';
+import { webOrderService } from '../services/webOrderService';
 
 export async function ordersRoutes(fastify: FastifyInstance) {
   // GET /api/orders — supporte ?status=, ?start=, ?end=, ?page=, ?pageSize=
@@ -59,9 +60,15 @@ export async function ordersRoutes(fastify: FastifyInstance) {
 
   fastify.patch('/api/orders/:id/status', async (request, reply) => {
     const { id }     = request.params as { id: string };
-    const { status } = request.body as { status: any };
+    const { status, rejectionReason } = request.body as { status: any; rejectionReason?: string };
     const order = orderService.updateStatus(id, status);
     wsService.broadcast('order:status', { id: order.id, status: order.status, order });
+
+    // Sync status vers Supabase si c'est une commande web
+    if (order.web_order_id && webOrderService.isRunning()) {
+      webOrderService.updateWebOrderStatus(order.web_order_id, status, rejectionReason).catch(() => {});
+    }
+
     return order;
   });
 
@@ -86,21 +93,37 @@ export async function ordersRoutes(fastify: FastifyInstance) {
   fastify.delete('/api/orders/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     orderService.delete(id);
+    wsService.broadcast('order:deleted', { id });
     return reply.status(204).send();
   });
 
   // Supprimer plusieurs commandes
   fastify.post('/api/orders/delete-multiple', async (request, reply) => {
     const { ids } = request.body as { ids: string[] };
-    for (const id of ids) orderService.delete(id);
+    for (const id of ids) {
+      orderService.delete(id);
+      wsService.broadcast('order:deleted', { id });
+    }
     return { deleted: ids.length };
   });
 
   // Supprimer toutes les commandes
   fastify.delete('/api/orders', async (request, reply) => {
     const all = orderService.getAll();
-    for (const o of all) orderService.delete(o.id);
+    for (const o of all) {
+      orderService.delete(o.id);
+      wsService.broadcast('order:deleted', { id: o.id });
+    }
     return { deleted: all.length };
+  });
+
+  // Re-annoncer une commande prête (relance l'audio + affichage display)
+  fastify.post('/api/orders/:id/re-announce', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const order = orderService.getById(id);
+    if (!order) return reply.status(404).send({ error: 'Commande introuvable' });
+    wsService.broadcast('order:re-announce', { id: order.id, order });
+    return { ok: true };
   });
 
   // Purge des commandes cuisine bloquées (jours précédents)

@@ -1,6 +1,6 @@
 import { usePOS } from '@/contexts/POSContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ShoppingCart, ClipboardList, BarChart3, Settings, Maximize2, Minimize2, LogOut, Lock } from 'lucide-react';
+import { ShoppingCart, ClipboardList, BarChart3, Settings, Maximize2, Minimize2, LogOut, Lock, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -12,6 +12,7 @@ interface NavItem {
 const allNavItems: NavItem[] = [
   { id: 'order', labelKey: 'nav.newOrder', icon: <ShoppingCart className="w-6 h-6" /> },
   { id: 'orders', labelKey: 'nav.orders', icon: <ClipboardList className="w-6 h-6" /> },
+  { id: 'weborders', labelKey: 'nav.webOrders', icon: <Globe className="w-6 h-6" /> },
   { id: 'reports', labelKey: 'nav.reports', icon: <BarChart3 className="w-6 h-6" /> },
   { id: 'settings', labelKey: 'nav.settings', icon: <Settings className="w-6 h-6" /> },
 ];
@@ -25,8 +26,11 @@ export function MainNav({ activeView, onViewChange }: MainNavProps) {
   const { t, kioskMode, toggleKioskMode, settings } = usePOS();
   const { canAccessView, logout, lock, user } = useAuth();
   
-  // Filter nav items based on permissions
-  const navItems = allNavItems.filter(item => canAccessView(item.id));
+  // Filter nav items based on permissions + settings
+  const navItems = allNavItems.filter(item => {
+    if (item.id === 'weborders' && !settings?.webOrdersEnabled) return false;
+    return canAccessView(item.id);
+  });
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border shadow-lg safe-bottom">

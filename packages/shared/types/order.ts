@@ -7,6 +7,7 @@ export interface OrderLineModifier {
   optionId: string;
   optionName: string;
   priceAdjustment: number;
+  isComposition?: boolean; // true = partie d'un produit composite (½, ⅓, ¼)
 }
 
 export interface OrderLine {
@@ -46,6 +47,11 @@ export interface Order {
   deliveryPhone?: string;
   deliveryCustomerName?: string;
   deliveryFee?: number;
+  /** Commandes web (click & collect) */
+  source?: string;
+  web_order_id?: string;
+  web_status?: string;
+  web_customer_phone?: string;
 }
 
 export interface Promotion {

@@ -19,6 +19,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Navigation
     'nav.newOrder': 'Nouvelle Commande',
     'nav.orders': 'Commandes',
+    'nav.webOrders': 'Web',
     'nav.reports': 'Rapports',
     'nav.settings': 'Paramètres',
     
@@ -74,6 +75,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Orders List
     'orders.title': 'Liste des Commandes',
     'orders.filter': 'Filtrer par date',
+    'orders.deliveryOnly': 'Livraisons uniquement',
     'orders.reprint': 'Réimprimer',
     'orders.kitchen': 'Ticket Cuisine',
     'orders.receipt': 'Reçu Client',
@@ -164,7 +166,18 @@ export const translations: Record<Language, Record<string, string>> = {
     'reports.totalOrders': 'Total Commandes',
     'reports.paidOrders': 'Commandes Payées',
     'reports.totalRevenue': 'Chiffre d\'Affaires',
+    'reports.revenueExcludesDelivery': '(hors frais de livraison)',
+    'reports.deliverySummary': 'Bilan Livraisons',
+    'reports.deliveryCount': 'Commandes livrées',
+    'reports.deliveryRevenue': 'CA livraisons (frais inclus)',
+    'reports.deliveryFeesTotal': 'Total frais de livraison',
     'reports.exportCsv': 'Exporter CSV',
+    'reports.sourceAll': 'Tout',
+    'reports.sourcePOS': 'Caisse',
+    'reports.sourceWeb': 'Web',
+    'reports.customPeriod': 'Personnalisé',
+    'reports.from': 'Du',
+    'reports.to': 'Au',
     
     // Manual Item
     'manual.title': 'Article Manuel',
@@ -655,6 +668,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'payment.successTitle': 'Paiement Réussi!',
     'payment.preparingReceipt': 'Préparation du reçu...',
     'payment.continue': 'Continuer',
+    'payment.calculateChange': 'Calculer la monnaie',
     'payment.disabled': 'Désactivé',
     'payment.cardDisabledMessage': 'Le paiement par carte est désactivé. Activez-le dans les paramètres.',
     'payment.cardDisabledTooltip': 'Paiement par carte désactivé dans les paramètres',
@@ -755,6 +769,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Navigation
     'nav.newOrder': 'New Order',
     'nav.orders': 'Orders',
+    'nav.webOrders': 'Web',
     'nav.reports': 'Reports',
     'nav.settings': 'Settings',
     
@@ -810,6 +825,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Orders List
     'orders.title': 'Order List',
     'orders.filter': 'Filter by date',
+    'orders.deliveryOnly': 'Deliveries only',
     'orders.reprint': 'Reprint',
     'orders.kitchen': 'Kitchen Ticket',
     'orders.receipt': 'Customer Receipt',
@@ -900,7 +916,18 @@ export const translations: Record<Language, Record<string, string>> = {
     'reports.totalOrders': 'Total Orders',
     'reports.paidOrders': 'Paid Orders',
     'reports.totalRevenue': 'Total Revenue',
+    'reports.revenueExcludesDelivery': '(excl. delivery fees)',
+    'reports.deliverySummary': 'Delivery Summary',
+    'reports.deliveryCount': 'Delivered orders',
+    'reports.deliveryRevenue': 'Delivery revenue (fees incl.)',
+    'reports.deliveryFeesTotal': 'Total delivery fees',
     'reports.exportCsv': 'Export CSV',
+    'reports.sourceAll': 'All',
+    'reports.sourcePOS': 'POS',
+    'reports.sourceWeb': 'Web',
+    'reports.customPeriod': 'Custom',
+    'reports.from': 'From',
+    'reports.to': 'To',
     
     // Manual Item
     'manual.title': 'Manual Item',
@@ -1386,6 +1413,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'payment.successTitle': 'Payment Successful!',
     'payment.preparingReceipt': 'Preparing receipt...',
     'payment.continue': 'Continue',
+    'payment.calculateChange': 'Calculate change',
     'payment.disabled': 'Disabled',
     'payment.cardDisabledMessage': 'Card payment is disabled. Enable it in settings.',
     'payment.cardDisabledTooltip': 'Card payment disabled in settings',
@@ -1486,6 +1514,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Navigation
     'nav.newOrder': 'طلب جديد',
     'nav.orders': 'الطلبات',
+    'nav.webOrders': 'ويب',
     'nav.reports': 'التقارير',
     'nav.settings': 'الإعدادات',
     
@@ -1541,6 +1570,7 @@ export const translations: Record<Language, Record<string, string>> = {
     // Orders List
     'orders.title': 'قائمة الطلبات',
     'orders.filter': 'تصفية حسب التاريخ',
+    'orders.deliveryOnly': 'التوصيل فقط',
     'orders.reprint': 'إعادة الطباعة',
     'orders.kitchen': 'تذكرة المطبخ',
     'orders.receipt': 'إيصال العميل',
@@ -1637,7 +1667,18 @@ export const translations: Record<Language, Record<string, string>> = {
     'reports.totalOrders': 'إجمالي الطلبات',
     'reports.paidOrders': 'الطلبات المدفوعة',
     'reports.totalRevenue': 'إجمالي الإيرادات',
+    'reports.revenueExcludesDelivery': '(بدون رسوم التوصيل)',
+    'reports.deliverySummary': 'ملخص التوصيل',
+    'reports.deliveryCount': 'طلبات التوصيل',
+    'reports.deliveryRevenue': 'إيرادات التوصيل (شاملة الرسوم)',
+    'reports.deliveryFeesTotal': 'إجمالي رسوم التوصيل',
     'reports.exportCsv': 'تصدير CSV',
+    'reports.sourceAll': 'الكل',
+    'reports.sourcePOS': 'الكاشير',
+    'reports.sourceWeb': 'ويب',
+    'reports.customPeriod': 'مخصص',
+    'reports.from': 'من',
+    'reports.to': 'إلى',
     
     // Manual Item
     'manual.title': 'عنصر يدوي',
@@ -2124,6 +2165,7 @@ export const translations: Record<Language, Record<string, string>> = {
     'payment.successTitle': 'تم الدفع بنجاح!',
     'payment.preparingReceipt': 'جاري تحضير الإيصال...',
     'payment.continue': 'متابعة',
+    'payment.calculateChange': 'حساب الباقي',
     'payment.disabled': 'معطل',
     'payment.cardDisabledMessage': 'الدفع بالبطاقة معطل. قم بتفعيله في الإعدادات.',
     'payment.cardDisabledTooltip': 'الدفع بالبطاقة معطل في الإعدادات',

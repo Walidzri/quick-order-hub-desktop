@@ -291,6 +291,7 @@ describe('orderService', () => {
 - [ ] **Long polling click & collect** — `GET /api/orders/pending` (VPS) toutes les 30s
 - [ ] **Panel admin** — interface web sur VPS (commandes, stats, produits)
 - [ ] **Système de licences** — machine ID + vérification locale ou VPS (voir `README/ARCHITECTURE.md` section 13)
+- [ ] **Module Rentabilité** — champ `cost_price` sur les produits + charges fixes par période (loyer, électricité, salaires) + onglet "Marge/Bénéfice" dans les Rapports
 - [ ] **Tests Vitest** — orderService, syncService, backupService
 
 #### Tests Phase 4

@@ -123,8 +123,15 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
             quantity: line.quantity,
             name: line.productName,
             size: line.variantSize,
-            modifiers: line.modifiers.map(m => m.optionName),
-            modifierPrices: line.modifiers.map(m => (m.priceAdjustment >= 0 ? '+' : '') + formatCurrency(m.priceAdjustment, currency)),
+            modifiers: line.modifiers.map(m => {
+              if ((m as any).isComposition) {
+                const compositions = line.modifiers.filter(mod => (mod as any).isComposition);
+                const fr = compositions.length === 2 ? '½' : compositions.length === 3 ? '⅓' : compositions.length === 4 ? '¼' : `1/${compositions.length}`;
+                return `${fr} ${m.optionName}`;
+              }
+              return m.optionName;
+            }),
+            modifierPrices: line.modifiers.map(m => (m as any).isComposition ? '' : (m.priceAdjustment >= 0 ? '+' : '') + formatCurrency(m.priceAdjustment, currency)),
             note: line.note,
             price: customization?.kitchenShowProductPrices ? formatCurrency(lineTotal, currency) : undefined,
             unitPrice: customization?.kitchenShowProductPrices ? formatCurrency(line.unitPrice, currency) : undefined,
@@ -258,32 +265,46 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
     }
   };
 
-  const handlePayment = async () => {
+  const handlePayment = async (overrideMethod?: PaymentMethod) => {
+    const payMethod = overrideMethod || method;
     setIsProcessing(true);
     setStep('processing');
-    
+
     try {
       // Calculate payment amounts
-      const received = method === 'cash' ? (parseFloat(amountReceived) || total) : total;
+      const received = payMethod === 'cash' ? (parseFloat(amountReceived) || total) : total;
       const change = Math.max(0, received - total);
-      
+
       // Store payment info for receipt
       setPaymentAmountReceived(received);
       setPaymentChange(change);
-      
+
       // Create order
       const order = await createOrder();
-      
+
       // Send to kitchen if not already sent
       await sendToKitchen(order.id);
-      
+
       // Mark as paid
-      const paidOrderData = await markAsPaid(order.id, method);
-      
+      const paidOrderData = await markAsPaid(order.id, payMethod);
+
       setStep('done');
       setPaidOrder(paidOrderData);
 
-      // Automatically print kitchen ticket after payment (l'impulsion tiroir est lancée au début du ticket cuisine)
+      // Automatically print kitchen ticket after payment (si activé dans les settings)
+      // Vérifier s'il y a au moins une imprimante cuisine active avant de tenter
+      const hasActiveKitchenPrinter = printers?.some(
+        (p) => p.role === 'kitchen' && p.enabled !== false
+      );
+      if (settings?.kitchenPrintEnabled === false || !hasActiveKitchenPrinter) {
+        // Impression cuisine désactivée ou aucune imprimante active — ouvrir le tiroir caisse directement si espèces
+        if (method === 'cash') await openCashDrawerIfNeeded();
+        setTimeout(() => {
+          if (onPaymentSuccess) onPaymentSuccess(paidOrderData, received, change);
+          onClose();
+        }, 2000);
+        return;
+      }
       const printErrs = await printKitchenTicketAutomatically(paidOrderData, openCashDrawerIfNeeded);
       if (printErrs.length > 0) {
         // Keep modal open — user must close manually after reading the error
@@ -414,31 +435,26 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
                 <h3 className="text-sm font-medium text-muted-foreground mb-3">
                   {t('payment.method')}
                 </h3>
-                
+
                 <div className="grid grid-cols-2 gap-3">
+                  {/* Espèces — 1 tap = paiement instantané */}
                   <button
-                    onClick={() => setMethod('cash')}
-                    className={cn(
-                      "p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-2",
-                      method === 'cash'
-                        ? "border-primary bg-primary/10"
-                        : "border-border hover:border-primary/50"
-                    )}
+                    onClick={() => handlePayment('cash')}
+                    className="p-6 rounded-xl border-2 border-border hover:border-success bg-success/5 hover:bg-success/10 transition-all flex flex-col items-center gap-2 active:scale-95"
                   >
                     <Banknote className="w-10 h-10 text-success" />
                     <span className="font-bold">{t('payment.cash')}</span>
                   </button>
-                  
+
+                  {/* Carte — 1 tap = paiement instantané */}
                   <button
-                    onClick={() => setMethod('card')}
+                    onClick={() => handlePayment('card')}
                     disabled={!settings?.cardPaymentEnabled}
                     className={cn(
-                      "p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-2 relative",
+                      "p-6 rounded-xl border-2 transition-all flex flex-col items-center gap-2 relative active:scale-95",
                       !settings?.cardPaymentEnabled
                         ? "border-border/30 bg-muted/30 opacity-50 cursor-not-allowed"
-                        : method === 'card'
-                          ? "border-primary bg-primary/10"
-                          : "border-border hover:border-primary/50"
+                        : "border-border hover:border-info bg-info/5 hover:bg-info/10"
                     )}
                     title={!settings?.cardPaymentEnabled ? t('payment.cardDisabledTooltip') : undefined}
                   >
@@ -460,20 +476,22 @@ export function PaymentModal({ onClose, onPaymentSuccess }: PaymentModalProps) {
                   </button>
                 </div>
 
-                <div className="pt-2 flex-shrink-0 sticky bottom-0 bg-card">
-                  <Button
-                    onClick={() => method === 'cash' ? setStep('cash') : handlePayment()}
-                    disabled={method === 'card' && !settings?.cardPaymentEnabled}
-                    className="w-full h-14 text-base sm:text-lg font-bold gradient-primary border-0"
-                  >
-                    {method === 'cash' ? t('payment.continue') : t('payment.confirm')}
-                  </Button>
-                  {method === 'card' && !settings?.cardPaymentEnabled && (
-                    <p className="text-xs text-muted-foreground text-center mt-2">
-                      {t('payment.cardDisabledMessage')}
-                    </p>
-                  )}
-                </div>
+                {/* Bouton optionnel pour calculer la monnaie */}
+                <button
+                  onClick={() => { setMethod('cash'); setStep('cash'); }}
+                  className="w-full py-3 px-4 rounded-xl border border-dashed border-border hover:border-primary/50 bg-muted/30 hover:bg-muted/60 transition-all flex items-center justify-center gap-2 group"
+                >
+                  <Banknote className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+                    {t('payment.calculateChange')}
+                  </span>
+                </button>
+
+                {!settings?.cardPaymentEnabled && (
+                  <p className="text-xs text-muted-foreground text-center">
+                    {t('payment.cardDisabledMessage')}
+                  </p>
+                )}
               </div>
             )}
 

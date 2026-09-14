@@ -78,8 +78,16 @@ export function OrderTypeModal({ isOpen, onClose, onSelect, initialDeliveryInfo 
   };
 
   const handleDeliveryClick = () => {
-    setStep('delivery-form');
-    setFormError('');
+    // Si on a des infos initiales (mode édition), afficher le formulaire
+    if (initialDeliveryInfo) {
+      setStep('delivery-form');
+      setFormError('');
+    } else {
+      // Sinon, sélectionner directement le type delivery (les infos seront demandées au moment de payer)
+      onSelect('delivery');
+      onClose();
+      resetState();
+    }
   };
 
   const handleDeliverySubmit = () => {

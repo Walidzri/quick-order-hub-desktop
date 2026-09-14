@@ -16,9 +16,12 @@ import { eventsRoutes } from './routes/events';
 import { cuisineRoutes } from './routes/cuisine';
 import { displayRoutes } from './routes/display';
 import { syncRoutes } from './routes/sync';
+import { audioRoutes } from './routes/audio';
+import { webOrdersRoutes } from './routes/webOrders';
 import { initDatabase, closeDatabase, getDefaultDbPath } from './db/connection';
 import { settingsService } from './services/settingsService';
 import { syncService } from './services/syncService';
+import { webOrderService } from './services/webOrderService';
 import { orderService } from './services/orderService';
 import { wsService } from './services/wsService';
 
@@ -80,6 +83,8 @@ export async function startServer(port = 3002, dbPath?: string): Promise<typeof 
   await fastify.register(cuisineRoutes);
   await fastify.register(displayRoutes);
   await fastify.register(syncRoutes);
+  await fastify.register(audioRoutes);
+  await fastify.register(webOrdersRoutes);
 
   fastify.get('/api/health', async () => {
     return { status: 'ok', timestamp: new Date().toISOString() };
@@ -130,11 +135,24 @@ export async function startServer(port = 3002, dbPath?: string): Promise<typeof 
     console.log('[FASTIFY] Sync cloud désactivée (cloudSyncEnabled: false)');
   }
 
+  // Démarrer le polling des commandes web (click & collect) si activé
+  const webKey = currentSettings?.supabaseServiceKey || currentSettings?.supabaseAnonKey;
+  if (currentSettings?.webOrdersEnabled && currentSettings.supabaseUrl && webKey) {
+    webOrderService.start({
+      supabaseUrl: currentSettings.supabaseUrl,
+      supabaseAnonKey: webKey,
+      pollInterval: (currentSettings.webOrdersPollInterval || 30) * 1000,
+    });
+  } else {
+    console.log('[FASTIFY] Commandes web désactivées (webOrdersEnabled: false)');
+  }
+
   return fastify;
 }
 
 export async function stopServer(): Promise<void> {
   syncService.stop();
+  webOrderService.stop();
   await fastify.close();
   closeDatabase();
   console.log('[FASTIFY] Server stopped');

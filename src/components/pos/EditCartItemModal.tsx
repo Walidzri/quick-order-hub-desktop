@@ -72,9 +72,9 @@ export function EditCartItemModal({ item, onClose, onSave }: EditCartItemModalPr
     const initialSupplements = new Map<string, SelectedSupplement>();
     const currentSize = selectedVariant?.size || item.variantSize;
     
-    item.modifiers.forEach(modifier => {
+    item.modifiers.filter(m => !(m as any).isComposition).forEach(modifier => {
       // Try to find the supplement product by optionId or optionName
-      const supplementProduct = supplementsProducts.find(sup => 
+      const supplementProduct = supplementsProducts.find(sup =>
         sup.id === modifier.optionId || 
         modifier.optionName.includes(sup.name)
       );
@@ -197,12 +197,17 @@ export function EditCartItemModal({ item, onClose, onSave }: EditCartItemModalPr
 
   const handleSave = () => {
     // Convert selected supplements to modifiers (only if product exists)
-    const modifiers: OrderLineModifier[] = product 
-      ? Array.from(selectedSupplements.values()).map(sup => ({
-          optionId: sup.supplementVariant?.id || sup.supplementProduct.id,
-          optionName: sup.supplementProduct.name + (sup.supplementVariant ? ` (${sup.supplementVariant.size})` : ''),
-          priceAdjustment: sup.price,
-        }))
+    // Preserve composition modifiers (isComposition: true) — they are not editable here
+    const compositionModifiers = item.modifiers.filter(m => (m as any).isComposition);
+    const modifiers: OrderLineModifier[] = product
+      ? [
+          ...compositionModifiers,
+          ...Array.from(selectedSupplements.values()).map(sup => ({
+            optionId: sup.supplementVariant?.id || sup.supplementProduct.id,
+            optionName: sup.supplementProduct.name + (sup.supplementVariant ? ` (${sup.supplementVariant.size})` : ''),
+            priceAdjustment: sup.price,
+          })),
+        ]
       : item.modifiers; // Keep existing modifiers for manual items
     
     // Calculate new unit price

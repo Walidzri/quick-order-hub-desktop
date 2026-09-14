@@ -308,52 +308,92 @@ const HTML = /* html */`<!DOCTYPE html>
       }, delayMs);
     }
 
-    // ── Annonce vocale avec file d'attente ───────────────────────────────────
-    let speechQueue = [];
-    let isSpeaking  = false;
-    let cachedVoice = null;
+    // ── Audio — ding Web Audio + annonce vocale serveur ───────────────────────
+    let audioCtx = null;
 
-    function getFrenchFemaleVoice() {
-      if (cachedVoice) return cachedVoice;
-      const voices   = speechSynthesis.getVoices();
-      const frVoices = voices.filter(v => v.lang.startsWith('fr'));
-      const feminine = ['Julie', 'Amélie', 'Audrey', 'Virginie', 'Marie', 'Zoé',
-                        'Google français', 'Microsoft Julie'];
-      cachedVoice = frVoices.find(v => feminine.some(n => v.name.includes(n))) ?? frVoices[0] ?? null;
-      return cachedVoice;
+    // Ding synthétisé (Web Audio API — marche partout)
+    function playDing() {
+      if (!audioCtx) return Promise.resolve();
+      const now = audioCtx.currentTime;
+      var osc1 = audioCtx.createOscillator();
+      var g1   = audioCtx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(880, now);
+      g1.gain.setValueAtTime(0.35, now);
+      g1.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+      osc1.connect(g1); g1.connect(audioCtx.destination);
+      osc1.start(now); osc1.stop(now + 0.5);
+      var osc2 = audioCtx.createOscillator();
+      var g2   = audioCtx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1175, now + 0.12);
+      g2.gain.setValueAtTime(0, now);
+      g2.gain.setValueAtTime(0.35, now + 0.12);
+      g2.gain.exponentialRampToValueAtTime(0.01, now + 0.7);
+      osc2.connect(g2); g2.connect(audioCtx.destination);
+      osc2.start(now + 0.12); osc2.stop(now + 0.7);
+      return new Promise(function(r) { setTimeout(r, 750); });
     }
 
-    function processQueue() {
-      if (isSpeaking || speechQueue.length === 0) return;
-      isSpeaking = true;
-      const utt  = speechQueue.shift();
-      utt.onend  = () => { isSpeaking = false; processQueue(); };
-      utt.onerror = () => { isSpeaking = false; processQueue(); };
+    // Objet Audio unique pour les annonces vocales serveur
+    var announceAudio = new Audio();
+    announceAudio.preload = 'auto';
+
+    // File d'attente des annonces (évite les chevauchements)
+    var announceQueue = [];
+    var isAnnouncing  = false;
+
+    function processAnnounceQueue() {
+      if (isAnnouncing || announceQueue.length === 0) return;
+      isAnnouncing = true;
+      var num = announceQueue.shift();
+
+      // Essayer l'audio serveur en priorité
+      announceAudio.src = '/api/audio/announce/' + encodeURIComponent(num);
+      announceAudio.play()
+        .then(function() {
+          // Attendre la fin de la lecture
+          announceAudio.onended = function() {
+            announceAudio.onended = null;
+            isAnnouncing = false;
+            processAnnounceQueue();
+          };
+        })
+        .catch(function() {
+          // Audio serveur échoué → fallback speechSynthesis si dispo
+          trySpeakFallback(num, function() {
+            isAnnouncing = false;
+            processAnnounceQueue();
+          });
+        });
+    }
+
+    // Fallback speechSynthesis — uniquement si des voix sont disponibles
+    function trySpeakFallback(orderNumber, onDone) {
+      if (!window.speechSynthesis || speechSynthesis.getVoices().length === 0) {
+        onDone();
+        return;
+      }
+      var num = parseInt(orderNumber, 10) || orderNumber;
+      var utt = new SpeechSynthesisUtterance('Commande num\xe9ro ' + num + ', pr\xEAte !');
+      utt.lang  = 'fr-FR';
+      utt.rate  = 0.88;
+      utt.pitch = 1.15;
+      var voices  = speechSynthesis.getVoices();
+      var frVoice = voices.filter(function(v) { return v.lang.indexOf('fr') === 0; })[0];
+      if (frVoice) utt.voice = frVoice;
+      utt.onend   = onDone;
+      utt.onerror = onDone;
       speechSynthesis.speak(utt);
     }
 
-    function announce(orderNumber) {
-      if (!window.speechSynthesis || !audioUnlocked) return;
-
-      // parseInt transforme "0042" en 42 → le synthé dit "quarante-deux" et non "zéro zéro quarante-deux"
-      const num = parseInt(orderNumber, 10) || orderNumber;
-
-      function enqueue() {
-        const utt   = new SpeechSynthesisUtterance('Commande numéro ' + num + ', prête !');
-        utt.lang    = 'fr-FR';
-        utt.rate    = 0.88;
-        utt.pitch   = 1.15;
-        const voice = getFrenchFemaleVoice();
-        if (voice) utt.voice = voice;
-        speechQueue.push(utt);
-        processQueue();
-      }
-
-      if (speechSynthesis.getVoices().length > 0) {
-        enqueue();
-      } else {
-        speechSynthesis.addEventListener('voiceschanged', enqueue, { once: true });
-      }
+    async function announce(orderNumber) {
+      if (!audioUnlocked) return;
+      // 1) Ding garanti (Web Audio API)
+      await playDing();
+      // 2) Annonce vocale (serveur WAV → fallback speechSynthesis)
+      announceQueue.push(orderNumber);
+      processAnnounceQueue();
     }
 
     // ── Appliquer un event d'ordre ─────────────────────────────────────────────
@@ -446,6 +486,7 @@ const HTML = /* html */`<!DOCTYPE html>
 
       ws.onopen = () => {
         document.getElementById('ws-dot').className = 'connected';
+        loadOrders();
       };
 
       ws.onclose = () => {
@@ -460,6 +501,19 @@ const HTML = /* html */`<!DOCTYPE html>
             applyOrder(payload);
           } else if (type === 'order:status') {
             applyOrder({ ...payload.order, status: payload.status });
+          } else if (type === 'order:re-announce') {
+            const o = payload.order;
+            if (o) {
+              readyOrders[o.id] = o;
+              renderReady();
+              scheduleReadyRemoval(o.id, READY_DISPLAY_MS);
+              announce(o.orderNumber || o.id.slice(-4));
+            }
+          } else if (type === 'order:deleted') {
+            delete readyOrders[payload.id];
+            delete preparingOrders[payload.id];
+            renderReady();
+            renderPreparing();
           } else if (type === 'kitchen:purged') {
             readyOrders = {};
             preparingOrders = {};
@@ -476,10 +530,27 @@ const HTML = /* html */`<!DOCTYPE html>
       if (audioUnlocked) return;
       audioUnlocked = true;
       document.getElementById('audio-overlay').style.display = 'none';
-      // Jouer un silence pour débloquer le contexte audio
-      const utt = new SpeechSynthesisUtterance('');
-      utt.volume = 0;
-      speechSynthesis.speak(utt);
+
+      // Débloquer AudioContext (Web Audio API — ding)
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioCtx.resume();
+
+      // Débloquer l'objet Audio dans le geste utilisateur (politique autoplay)
+      // play() + pause() + reset sur un src vide suffit à capter le geste
+      announceAudio.src = '';
+      announceAudio.play().catch(function() {});
+      announceAudio.pause();
+      announceAudio.currentTime = 0;
+
+      // Ding de test
+      playDing();
+
+      // Débloquer speechSynthesis en bonus (Chrome PC)
+      if (window.speechSynthesis) {
+        var utt = new SpeechSynthesisUtterance('');
+        utt.volume = 0;
+        speechSynthesis.speak(utt);
+      }
     }
 
     // ── Init ──────────────────────────────────────────────────────────────────
@@ -499,6 +570,11 @@ export async function displayRoutes(fastify: FastifyInstance) {
         '<!DOCTYPE html><html><body style="font-family:sans-serif;text-align:center;padding:4rem;background:#0f172a;color:#94a3b8"><h1>📺 Télé salle désactivée</h1><p>Ce service est désactivé dans les paramètres du POS.</p></body></html>'
       );
     }
-    reply.type('text/html').send(HTML);
+    reply
+      .header('Cache-Control', 'no-store, no-cache, must-revalidate')
+      .header('Pragma', 'no-cache')
+      .header('Expires', '0')
+      .type('text/html')
+      .send(HTML);
   });
 }

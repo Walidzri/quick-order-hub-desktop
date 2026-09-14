@@ -49,9 +49,9 @@ export function PrintPreviewModal({
     if (!order) return;
 
     try {
-      const kitchenPrinter = printers.find(p => p.role === 'kitchen');
+      const kitchenPrinter = printers.find(p => p.role === 'kitchen' && p.enabled !== false);
       if (!kitchenPrinter || !kitchenPrinter.tcpHost) {
-        return; // Silent fail for kitchen printer - not critical
+        return; // Silent fail - pas d'imprimante cuisine active ou pas configurée
       }
 
       // Get customization settings for kitchen ticket
@@ -82,8 +82,15 @@ export function PrintPreviewModal({
             quantity: line.quantity,
             name: line.productName,
             size: line.variantSize,
-            modifiers: line.modifiers.map(m => m.optionName),
-            modifierPrices: line.modifiers.map(m => (m.priceAdjustment >= 0 ? '+' : '') + formatCurrency(m.priceAdjustment, currency)),
+            modifiers: line.modifiers.map(m => {
+              if ((m as any).isComposition) {
+                const compositions = line.modifiers.filter(mod => (mod as any).isComposition);
+                const fr = compositions.length === 2 ? '½' : compositions.length === 3 ? '⅓' : compositions.length === 4 ? '¼' : `1/${compositions.length}`;
+                return `${fr} ${m.optionName}`;
+              }
+              return m.optionName;
+            }),
+            modifierPrices: line.modifiers.map(m => (m as any).isComposition ? '' : (m.priceAdjustment >= 0 ? '+' : '') + formatCurrency(m.priceAdjustment, currency)),
             note: line.note,
             price: customization?.kitchenShowProductPrices ? formatCurrency(lineTotal, currency) : undefined,
             unitPrice: customization?.kitchenShowProductPrices ? formatCurrency(line.unitPrice, currency) : undefined,
@@ -136,9 +143,11 @@ export function PrintPreviewModal({
       );
 
       if (rolePrinters.length === 0) {
-        throw new Error(
-          `Aucune imprimante ACTIVE configurée pour le rôle "${printerRole === 'cashier' ? 'Reçu client' : 'Ticket cuisine'}".`
-        );
+        // Aucune imprimante active — skip silencieusement, pas de requête réseau
+        console.log(`[PRINT][Preview] Aucune imprimante active pour le rôle "${printerRole}" — impression ignorée.`);
+        setIsPrinting(false);
+        onClose();
+        return;
       }
 
       // Get customization settings
@@ -176,10 +185,17 @@ export function PrintPreviewModal({
             quantity: line.quantity,
             name: line.productName,
             size: line.variantSize,
-            modifiers: line.modifiers.map(m => m.optionName),
-            modifierPrices: line.modifiers.map(m => (m.priceAdjustment >= 0 ? '+' : '') + formatCurrency(m.priceAdjustment, currency)),
+            modifiers: line.modifiers.map(m => {
+              if ((m as any).isComposition) {
+                const compositions = line.modifiers.filter(mod => (mod as any).isComposition);
+                const fr = compositions.length === 2 ? '½' : compositions.length === 3 ? '⅓' : compositions.length === 4 ? '¼' : `1/${compositions.length}`;
+                return `${fr} ${m.optionName}`;
+              }
+              return m.optionName;
+            }),
+            modifierPrices: line.modifiers.map(m => (m as any).isComposition ? '' : (m.priceAdjustment >= 0 ? '+' : '') + formatCurrency(m.priceAdjustment, currency)),
             note: line.note,
-            price: isKitchen 
+            price: isKitchen
               ? (customization?.kitchenShowProductPrices ? formatCurrency(lineTotal, currency) : undefined)
               : formatCurrency(lineTotal, currency),
             unitPrice: showPrices ? formatCurrency(line.unitPrice, currency) : undefined,

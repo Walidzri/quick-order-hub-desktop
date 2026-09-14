@@ -15,16 +15,23 @@ import {
   Clock,
   PieChart as PieChartIcon,
   Minus,
-  Loader2
+  Loader2,
+  Truck,
+  CalendarDays
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
+import { fr, enUS, ar } from 'date-fns/locale';
+import type { DateRange } from 'react-day-picker';
 import type { UserSession, User, Order } from '@shared/types';
 import { api } from '@/services/api';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
-type PeriodType = 'day' | 'week' | 'month' | 'year';
+type PeriodType = 'day' | 'week' | 'month' | 'year' | 'custom';
 
 interface CashierStats {
   user: User;
@@ -66,12 +73,17 @@ export function ReportsScreen() {
   const { loadOrdersByDateRange, currency, t, language } = usePOS();
   const { hasPermission } = useAuth();
   const [period, setPeriod] = useState<PeriodType>('day');
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: new Date(),
+    to: new Date(),
+  });
   const [userSessions, setUserSessions] = useState<UserSession[]>([]);
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [periodOrders, setPeriodOrders] = useState<Order[]>([]);
   const [prevPeriodOrders, setPrevPeriodOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAllOrders, setShowAllOrders] = useState(false);
+  const [sourceFilter, setSourceFilter] = useState<'all' | 'pos' | 'web'>('all');
 
   const loadCashierStats = useCallback(async () => {
     try {
@@ -98,6 +110,18 @@ export function ReportsScreen() {
     let prevEnd: Date;
 
     switch (period) {
+      case 'custom': {
+        start = new Date(dateRange?.from || now);
+        start.setHours(0, 0, 0, 0);
+        end = new Date(dateRange?.to || dateRange?.from || now);
+        end.setHours(23, 59, 59, 999);
+        const duration = end.getTime() - start.getTime();
+        prevEnd = new Date(start.getTime() - 1);
+        prevEnd.setHours(23, 59, 59, 999);
+        prevStart = new Date(prevEnd.getTime() - duration);
+        prevStart.setHours(0, 0, 0, 0);
+        break;
+      }
       case 'day':
         start = new Date(now);
         start.setHours(0, 0, 0, 0);
@@ -144,7 +168,7 @@ export function ReportsScreen() {
     }
 
     return { startDate: start, endDate: end, prevStartDate: prevStart, prevEndDate: prevEnd };
-  }, [period]);
+  }, [period, dateRange]);
 
   // Load orders when period changes - OPTIMIZED: only loads needed date ranges
   useEffect(() => {
@@ -172,14 +196,27 @@ export function ReportsScreen() {
     setShowAllOrders(false);
   }, [startDate, endDate, prevStartDate, prevEndDate, loadOrdersByDateRange, loadCashierStats]);
 
-  const paidOrders = periodOrders.filter(o => o.status === 'paid');
-  const prevPaidOrders = prevPeriodOrders.filter(o => o.status === 'paid');
-  
-  const totalRevenue = paidOrders.reduce((sum, o) => sum + o.total, 0);
-  const prevTotalRevenue = prevPaidOrders.reduce((sum, o) => sum + o.total, 0);
-  
+  const filterBySource = (orders: Order[]) => {
+    if (sourceFilter === 'all') return orders;
+    if (sourceFilter === 'web') return orders.filter(o => o.source === 'web');
+    return orders.filter(o => o.source !== 'web'); // 'pos' = everything that's not web
+  };
+
+  const filteredOrders = filterBySource(periodOrders);
+  const filteredPrevOrders = filterBySource(prevPeriodOrders);
+  const paidOrders = filteredOrders.filter(o => o.status === 'paid');
+  const prevPaidOrders = filteredPrevOrders.filter(o => o.status === 'paid');
+
+  // Revenue excludes delivery fees
+  const totalRevenue = paidOrders.reduce((sum, o) => sum + o.total - (o.deliveryFee || 0), 0);
+  const prevTotalRevenue = prevPaidOrders.reduce((sum, o) => sum + o.total - (o.deliveryFee || 0), 0);
+
   const avgOrderValue = paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0;
   const prevAvgOrderValue = prevPaidOrders.length > 0 ? prevTotalRevenue / prevPaidOrders.length : 0;
+
+  // Delivery stats
+  const deliveryOrders = paidOrders.filter(o => o.type === 'delivery');
+  const totalDeliveryFees = paidOrders.reduce((sum, o) => sum + (o.deliveryFee || 0), 0);
 
   // Calculate percentage changes
   const calcChange = (current: number, previous: number): number | null => {
@@ -187,7 +224,7 @@ export function ReportsScreen() {
     return ((current - previous) / previous) * 100;
   };
 
-  const ordersChange = calcChange(periodOrders.length, prevPeriodOrders.length);
+  const ordersChange = calcChange(filteredOrders.length, filteredPrevOrders.length);
   const paidOrdersChange = calcChange(paidOrders.length, prevPaidOrders.length);
   const revenueChange = calcChange(totalRevenue, prevTotalRevenue);
   const avgChange = calcChange(avgOrderValue, prevAvgOrderValue);
@@ -330,6 +367,8 @@ export function ReportsScreen() {
         return now.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
       case 'year':
         return now.getFullYear().toString();
+      case 'custom':
+        return `${startDate.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })} — ${endDate.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}`;
       default:
         return '';
     }
@@ -364,10 +403,11 @@ export function ReportsScreen() {
   const stats = [
     {
       title: t('reports.totalOrders'),
-      value: periodOrders.length,
+      value: filteredOrders.length,
       icon: <ShoppingCart className="w-6 h-6" />,
       color: 'bg-info/10 text-info',
       change: ordersChange,
+      subtitle: undefined as string | undefined,
     },
     {
       title: t('reports.paidOrders'),
@@ -375,6 +415,7 @@ export function ReportsScreen() {
       icon: <TrendingUp className="w-6 h-6" />,
       color: 'bg-success/10 text-success',
       change: paidOrdersChange,
+      subtitle: undefined as string | undefined,
     },
     {
       title: t('reports.totalRevenue'),
@@ -382,6 +423,7 @@ export function ReportsScreen() {
       icon: <DollarSign className="w-6 h-6" />,
       color: 'bg-primary/10 text-primary',
       change: revenueChange,
+      subtitle: t('reports.revenueExcludesDelivery'),
     },
     {
       title: t('reports.avgOrder'),
@@ -389,16 +431,18 @@ export function ReportsScreen() {
       icon: <ShoppingBag className="w-6 h-6" />,
       color: 'bg-warning/10 text-warning',
       change: avgChange,
+      subtitle: undefined as string | undefined,
     },
   ];
 
   const handleExportCSV = () => {
     const now = new Date();
-    const headers = ['N° Commande', 'Date', 'Statut', 'Articles', 'Sous-total', 'Remise', 'Total', 'Paiement'];
-    const rows = periodOrders.map(o => [
+    const headers = ['N° Commande', 'Date', 'Statut', 'Source', 'Articles', 'Sous-total', 'Remise', 'Total', 'Paiement'];
+    const rows = filteredOrders.map(o => [
       o.orderNumber,
       new Date(o.createdAt).toLocaleString(getLocale()),
       o.status,
+      o.source === 'web' ? 'Web' : 'POS',
       o.lines.length,
       o.subtotal,
       o.discount,
@@ -418,6 +462,7 @@ export function ReportsScreen() {
     const periodSuffix = period === 'day' ? now.toISOString().split('T')[0] :
                          period === 'week' ? `semaine_${startDate.toISOString().split('T')[0]}` :
                          period === 'month' ? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}` :
+                         period === 'custom' ? `${dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : ''}_${dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : ''}` :
                          `${now.getFullYear()}`;
     a.download = `commandes_${periodSuffix}.csv`;
     a.click();
@@ -438,7 +483,7 @@ export function ReportsScreen() {
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             {/* Period Selector */}
             <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
-              {(['day', 'week', 'month', 'year'] as PeriodType[]).map((p) => (
+              {(['day', 'week', 'month', 'year', 'custom'] as PeriodType[]).map((p) => (
                 <button
                   key={p}
                   onClick={() => setPeriod(p)}
@@ -453,9 +498,59 @@ export function ReportsScreen() {
                   {p === 'week' && t('period.week')}
                   {p === 'month' && t('period.month')}
                   {p === 'year' && t('period.year')}
+                  {p === 'custom' && <CalendarDays className="w-4 h-4 inline" />}
                 </button>
               ))}
             </div>
+            {/* Source filter */}
+            <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1">
+              {(['all', 'pos', 'web'] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSourceFilter(s)}
+                  className={cn(
+                    "px-2 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors",
+                    sourceFilter === s
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {s === 'all' && t('reports.sourceAll')}
+                  {s === 'pos' && t('reports.sourcePOS')}
+                  {s === 'web' && t('reports.sourceWeb')}
+                </button>
+              ))}
+            </div>
+            {/* Custom date range calendar */}
+            {period === 'custom' && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-xs sm:text-sm gap-2">
+                    <CalendarDays className="w-4 h-4" />
+                    {dateRange?.from ? (
+                      dateRange.to ? (
+                        <>
+                          {format(dateRange.from, 'dd/MM/yyyy')} — {format(dateRange.to, 'dd/MM/yyyy')}
+                        </>
+                      ) : (
+                        format(dateRange.from, 'dd/MM/yyyy')
+                      )
+                    ) : (
+                      t('reports.customPeriod')
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="range"
+                    selected={dateRange}
+                    onSelect={setDateRange}
+                    numberOfMonths={2}
+                    locale={language === 'ar-DZ' ? ar : language === 'en-US' ? enUS : fr}
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
             <Button onClick={handleExportCSV} variant="outline" size="sm" className="text-xs sm:text-sm">
               <Download className="w-4 h-4 mr-2" />
               <span className="hidden sm:inline">{t('reports.exportCsv')}</span>
@@ -479,6 +574,9 @@ export function ReportsScreen() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs sm:text-sm text-muted-foreground truncate">{stat.title}</p>
                       <p className="text-2xl sm:text-3xl font-bold mt-1">{stat.value}</p>
+                      {stat.subtitle && (
+                        <p className="text-[10px] text-muted-foreground">{stat.subtitle}</p>
+                      )}
                       {/* Comparison with previous period */}
                       <div className="mt-1">
                         {renderChange(stat.change)}
@@ -493,6 +591,34 @@ export function ReportsScreen() {
             </motion.div>
           ))}
         </div>
+
+        {/* Delivery Summary */}
+        {deliveryOrders.length > 0 && (
+          <Card className="mb-4 sm:mb-6">
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Truck className="w-4 h-4 sm:w-5 sm:h-5" />
+                {t('reports.deliverySummary')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-0">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-xs sm:text-sm text-muted-foreground">{t('reports.deliveryCount')}</p>
+                  <p className="text-2xl font-bold mt-1">{deliveryOrders.length}</p>
+                </div>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-xs sm:text-sm text-muted-foreground">{t('reports.deliveryRevenue')}</p>
+                  <p className="text-2xl font-bold mt-1">{formatCurrency(deliveryOrders.reduce((sum, o) => sum + o.total, 0), currency)}</p>
+                </div>
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <p className="text-xs sm:text-sm text-muted-foreground">{t('reports.deliveryFeesTotal')}</p>
+                  <p className="text-2xl font-bold mt-1 text-orange-500">{formatCurrency(totalDeliveryFees, currency)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Category Breakdown - Donut Chart */}
         {categoryData.length > 0 && (
@@ -702,6 +828,7 @@ export function ReportsScreen() {
               {period === 'week' && t('reports.salesWeek')}
               {period === 'month' && t('reports.salesMonth')}
               {period === 'year' && t('reports.salesYear')}
+              {period === 'custom' && t('reports.customPeriod')}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
@@ -724,7 +851,12 @@ export function ReportsScreen() {
                       className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 sm:p-4 bg-muted/50 rounded-lg gap-2"
                     >
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm sm:text-base">{order.orderNumber}</div>
+                        <div className="font-medium text-sm sm:text-base flex items-center gap-1.5">
+                          {order.orderNumber}
+                          {order.source === 'web' && (
+                            <span className="text-[10px] bg-blue-500/10 text-blue-600 px-1.5 py-0.5 rounded font-medium">WEB</span>
+                          )}
+                        </div>
                         <div className="text-xs sm:text-sm text-muted-foreground">
                           {new Date(order.paidAt || order.createdAt).toLocaleString(getLocale(), {
                             day: 'numeric',

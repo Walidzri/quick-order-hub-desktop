@@ -31,6 +31,12 @@ export interface ModifierOption {
   sizeBasedPrices?: Record<string, number>;
 }
 
+export interface CompositionConfig {
+  count: number;              // Nombre de choix (2 = panachée, 3 = 3 saisons, etc.)
+  sourceCategoryId: string;   // Catégorie source (ex: id de la catégorie "Pizzas")
+  label?: string;             // Label affiché (ex: "Côtés", "Saveurs")
+}
+
 export interface Product {
   id: string;
   categoryId: string;
@@ -43,4 +49,5 @@ export interface Product {
   available?: boolean;
   image?: string; // Base64 image data
   supplementIds?: string[]; // IDs of supplements that can be added to this product
+  compositionConfig?: CompositionConfig; // Config produit composite (panachée, 3 saisons, etc.)
 }

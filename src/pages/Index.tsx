@@ -7,6 +7,7 @@ import { OrderScreen } from '@/components/pos/OrderScreen';
 import { OrdersScreen } from '@/components/pos/OrdersScreen';
 import { ReportsScreen } from '@/components/pos/ReportsScreen';
 import { SettingsScreen } from '@/components/pos/SettingsScreen';
+import { WebOrdersScreen } from '@/components/pos/WebOrdersScreen';
 import { LoginScreen } from '@/components/auth/LoginScreen';
 import { SetupScreen } from '@/components/auth/SetupScreen';
 import { LockScreen } from '@/components/auth/LockScreen';
@@ -15,7 +16,7 @@ import { GlobalNumericKeyboard } from '@/components/ui/GlobalNumericKeyboard';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
-type View = 'order' | 'orders' | 'reports' | 'settings';
+type View = 'order' | 'orders' | 'weborders' | 'reports' | 'settings';
 
 function POSApp() {
   const { isLoading, kioskMode, direction, settings } = usePOS();
@@ -27,7 +28,7 @@ function POSApp() {
   useEffect(() => {
     if (isAuthenticated && !canAccessView(activeView)) {
       // Find first accessible view
-      const views: View[] = ['order', 'orders', 'reports', 'settings'];
+      const views: View[] = ['order', 'orders', 'weborders', 'reports', 'settings'];
       const accessibleView = views.find(v => canAccessView(v));
       if (accessibleView) {
         setActiveView(accessibleView);
@@ -111,6 +112,7 @@ function POSApp() {
           >
             {activeView === 'order' && canAccessView('order') && <OrderScreen />}
             {activeView === 'orders' && canAccessView('orders') && <OrdersScreen />}
+            {activeView === 'weborders' && <WebOrdersScreen />}
             {activeView === 'reports' && canAccessView('reports') && <ReportsScreen />}
             {activeView === 'settings' && canAccessView('settings') && <SettingsScreen />}
           </motion.div>

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { Product, Category, ProductVariant, ModifierGroup, ModifierOption } from '@shared/types';
+import type { Product, Category, ProductVariant, ModifierGroup, ModifierOption, CompositionConfig } from '@shared/types';
 import { getDatabase } from '../db/connection';
 import { syncService } from './syncService';
 
@@ -31,8 +31,9 @@ function rowToProduct(row: Record<string, unknown>): Product {
     available:        row['available'] === 1 || row['available'] === true,
     description:      (row['description'] as string | null) ?? undefined,
     image:            (row['image']       as string | null) ?? undefined,
-    modifierGroupIds: parseJson<string[]>(row['modifierGroupIds'], []),
-    supplementIds:    parseJson<string[]>(row['supplementIds'],    []),
+    modifierGroupIds:  parseJson<string[]>(row['modifierGroupIds'], []),
+    supplementIds:     parseJson<string[]>(row['supplementIds'],    []),
+    compositionConfig: parseJson<CompositionConfig | undefined>(row['compositionConfig'], undefined),
   };
 }
 
@@ -141,8 +142,8 @@ export const productService = {
     const id = data.id ?? randomUUID();
     db.prepare(`
       INSERT INTO products
-        (id, categoryId, name, basePrice, sortOrder, available, description, image, modifierGroupIds, supplementIds)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (id, categoryId, name, basePrice, sortOrder, available, description, image, modifierGroupIds, supplementIds, compositionConfig)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       data.categoryId ?? null,
@@ -154,6 +155,7 @@ export const productService = {
       data.image ?? null,
       JSON.stringify(data.modifierGroupIds ?? []),
       JSON.stringify(data.supplementIds ?? []),
+      data.compositionConfig ? JSON.stringify(data.compositionConfig) : null,
     );
     syncService.syncProducts().catch(() => {});
     return productService.getProductById(id)!;
@@ -168,7 +170,7 @@ export const productService = {
       UPDATE products SET
         categoryId=?, name=?, basePrice=?, sortOrder=?, available=?,
         description=?, image=?, modifierGroupIds=?, supplementIds=?,
-        sync_status='pending'
+        compositionConfig=?, sync_status='pending'
       WHERE id=?
     `).run(
       merged.categoryId,
@@ -180,6 +182,7 @@ export const productService = {
       merged.image ?? null,
       JSON.stringify(merged.modifierGroupIds ?? []),
       JSON.stringify(merged.supplementIds ?? []),
+      merged.compositionConfig ? JSON.stringify(merged.compositionConfig) : null,
       id,
     );
     syncService.syncProducts().catch(() => {});

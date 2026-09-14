@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { settingsService } from '../services/settingsService';
 import { syncService } from '../services/syncService';
+import { webOrderService } from '../services/webOrderService';
 import { productService } from '../services/productService';
 import { orderService } from '../services/orderService';
 import { promotionService } from '../services/promotionService';
@@ -26,6 +27,37 @@ export async function settingsRoutes(fastify: FastifyInstance) {
         syncService.start({ vpsUrl: cloudUrl, apiKey: cloudKey, syncInterval: 30_000, retryMaxDelay: 300_000 });
       } else if (!body.cloudSyncEnabled && syncService.isRunning()) {
         syncService.stop();
+      }
+    }
+
+    // Démarrer/arrêter le polling des commandes web (click & collect)
+    if ('webOrdersEnabled' in body) {
+      if (body.webOrdersEnabled && !webOrderService.isRunning()) {
+        const s = settingsService.get();
+        const wKey = s.supabaseServiceKey || s.supabaseAnonKey;
+        if (s.supabaseUrl && wKey) {
+          webOrderService.start({
+            supabaseUrl: s.supabaseUrl,
+            supabaseAnonKey: wKey,
+            pollInterval: (s.webOrdersPollInterval || 30) * 1000,
+          });
+        }
+      } else if (!body.webOrdersEnabled && webOrderService.isRunning()) {
+        webOrderService.stop();
+      }
+    }
+
+    // Redémarrer le polling si les paramètres Supabase changent (et que le service est actif)
+    if (('supabaseUrl' in body || 'supabaseAnonKey' in body || 'supabaseServiceKey' in body || 'webOrdersPollInterval' in body) && webOrderService.isRunning()) {
+      const s = settingsService.get();
+      const rKey = s.supabaseServiceKey || s.supabaseAnonKey;
+      if (s.supabaseUrl && rKey) {
+        webOrderService.stop();
+        webOrderService.start({
+          supabaseUrl: s.supabaseUrl,
+          supabaseAnonKey: rKey,
+          pollInterval: (s.webOrdersPollInterval || 30) * 1000,
+        });
       }
     }
 

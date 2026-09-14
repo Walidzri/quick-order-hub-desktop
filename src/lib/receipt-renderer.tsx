@@ -153,20 +153,30 @@ export function renderReceiptHTML({
                       {line.quantity}x {productName}
                       {showModifiers && line.variantSize && ` (${line.variantSize})`}
                     </div>
-                    {showModifiers && line.modifiers.length > 0 && (
-                      <div className="line-details">
-                        {line.modifiers.map((mod, modIndex) => (
-                          <div key={modIndex}>
-                            + (S) {mod.optionName}
-                            {showProductPrices && (
-                              <span className="ml-1 opacity-90">
-                                {mod.priceAdjustment >= 0 ? '+' : ''}{formatCurrency(mod.priceAdjustment, currency)}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    {showModifiers && line.modifiers.length > 0 && (() => {
+                      const compositions = line.modifiers.filter(m => (m as any).isComposition);
+                      const supplements = line.modifiers.filter(m => !(m as any).isComposition);
+                      const fraction = compositions.length === 2 ? '½' : compositions.length === 3 ? '⅓' : compositions.length === 4 ? '¼' : compositions.length > 0 ? `1/${compositions.length}` : '';
+                      return (
+                        <div className="line-details">
+                          {compositions.map((mod, modIndex) => (
+                            <div key={`c-${modIndex}`}>
+                              {fraction} {mod.optionName}
+                            </div>
+                          ))}
+                          {supplements.map((mod, modIndex) => (
+                            <div key={`s-${modIndex}`}>
+                              + (S) {mod.optionName}
+                              {showProductPrices && (
+                                <span className="ml-1 opacity-90">
+                                  {mod.priceAdjustment >= 0 ? '+' : ''}{formatCurrency(mod.priceAdjustment, currency)}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                     {showNotes && line.note && (
                       <div className="line-details" style={{ fontStyle: 'italic', fontWeight: 'bold' }}>
                         [!] Note: {line.note}
@@ -174,19 +184,20 @@ export function renderReceiptHTML({
                     )}
                     {showProductPrices && (
                       <div className="mt-1 text-sm">
-                        <div className="flex justify-between items-baseline text-xs opacity-90">
-                          <span>{t('receipt.unitPrice')}</span>
-                          <span>
-                            {formatCurrency(line.unitPrice, currency)}
-                            {line.quantity > 1 && ` × ${line.quantity} = ${formatCurrency(line.unitPrice * line.quantity, currency)}`}
-                          </span>
-                        </div>
+                        {line.quantity > 1 && (
+                          <div className="flex justify-between items-baseline text-xs opacity-90">
+                            <span>{t('receipt.unitPrice')}</span>
+                            <span>
+                              {formatCurrency(line.unitPrice, currency)} × {line.quantity} = {formatCurrency(line.unitPrice * line.quantity, currency)}
+                            </span>
+                          </div>
+                        )}
                         <div className="text-right font-semibold mt-0.5">
                           {formatCurrency(lineTotal, currency)}
                         </div>
                       </div>
                     )}
-                    {index < order.lines.length - 1 && <Separator />}
+                    {index < order.lines.length - 1 && <div className="my-1" />}
                   </div>
                 );
               })}
@@ -229,7 +240,7 @@ export function renderReceiptHTML({
   return (
     <>
       {/* Restaurant Header - With customizable alignment */}
-      <div className={`header mb-4 ${headerAlignClass}`}>
+      <div className={`header mb-2 ${headerAlignClass}`}>
         {settings?.logo && customization.showLogo && (
           <div className="mb-3 flex justify-center">
             <img 
@@ -257,12 +268,9 @@ export function renderReceiptHTML({
       {/* Receipt Header Message (Bienvenue) */}
       {settings?.receiptHeader && (
         <>
-          {/* Retour à la ligne pour aérer avant "bienvenue" (identique à l'impression) */}
-          <div className="mb-2"></div>
-          <div className={`section text-xs mb-3 ${headerAlignClass}`} style={{ whiteSpace: 'pre-line' }}>
+          <div className={`section text-xs mb-1 ${headerAlignClass}`} style={{ whiteSpace: 'pre-line' }}>
             {settings.receiptHeader}
           </div>
-          {/* Séparation entre "bienvenue" et le numéro de commande (identique à l'impression) */}
           <Separator />
         </>
       )}
@@ -272,7 +280,7 @@ export function renderReceiptHTML({
       {/* Order number #XXX large, centered, right below Bienvenue */}
       {customization.showOrderNumber && (
         <>
-          <div className="text-center my-4">
+          <div className="text-center my-2">
             <span style={{ fontSize: '1.75rem', fontWeight: 700 }}>{orderNumberDisplay}</span>
           </div>
           <Separator />
@@ -282,7 +290,7 @@ export function renderReceiptHTML({
       {/* Order Info - Conditional display (no order number here) */}
       {(customization.showDate || customization.showTime || customization.showOrderType || customization.showPaymentMethod || customization.showCashier) && (
         <>
-          <div className="section mb-4">
+          <div className="section mb-2">
             <div className="order-info text-xs space-y-1">
               {customization.showDate && (
                 <div className="flex justify-between">
@@ -329,7 +337,7 @@ export function renderReceiptHTML({
       {/* Order Lines - Conditional display */}
       {customization.showProducts && order.lines.length > 0 && (
         <>
-          <div className="section mb-4 space-y-3">
+          <div className="section mb-2 space-y-2">
             {order.lines.map((line, index) => {
               const unitPriceWithModifiers = line.unitPrice + line.modifiers.reduce((sum, m) => sum + m.priceAdjustment, 0);
               const lineTotal = unitPriceWithModifiers * line.quantity;
@@ -344,20 +352,30 @@ export function renderReceiptHTML({
                       Variante: {line.variantSize}
                     </div>
                   )}
-                  {customization.showModifiers && line.modifiers.length > 0 && (
-                    <div className="line-details text-xs ml-3 text-gray-600 space-y-0.5">
-                      {line.modifiers.map((mod, modIndex) => (
-                        <div key={modIndex}>
-                          + (S) {mod.optionName}
-                          {customization.showProductPrices && (
-                            <span className="ml-1 text-muted-foreground">
-                              {mod.priceAdjustment >= 0 ? '+' : ''}{formatCurrency(mod.priceAdjustment, currency)}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {customization.showModifiers && line.modifiers.length > 0 && (() => {
+                    const compositions = line.modifiers.filter(m => (m as any).isComposition);
+                    const supplements = line.modifiers.filter(m => !(m as any).isComposition);
+                    const fraction = compositions.length === 2 ? '½' : compositions.length === 3 ? '⅓' : compositions.length === 4 ? '¼' : compositions.length > 0 ? `1/${compositions.length}` : '';
+                    return (
+                      <div className="line-details text-xs ml-3 text-gray-600 space-y-0.5">
+                        {compositions.map((mod, modIndex) => (
+                          <div key={`c-${modIndex}`}>
+                            {fraction} {mod.optionName}
+                          </div>
+                        ))}
+                        {supplements.map((mod, modIndex) => (
+                          <div key={`s-${modIndex}`}>
+                            + (S) {mod.optionName}
+                            {customization.showProductPrices && (
+                              <span className="ml-1 text-muted-foreground">
+                                {mod.priceAdjustment >= 0 ? '+' : ''}{formatCurrency(mod.priceAdjustment, currency)}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   {customization.showNotes && line.note && (
                     <div className="line-details text-xs ml-3 text-amber-700 font-semibold italic mt-1">
                       ⚠ NOTE: {line.note}
@@ -365,13 +383,14 @@ export function renderReceiptHTML({
                   )}
                   {customization.showProductPrices && (
                     <div className="mt-1 text-sm">
-                      <div className="flex justify-between items-baseline text-xs text-muted-foreground">
-                        <span>{t('receipt.unitPrice')}</span>
-                        <span>
-                          {formatCurrency(line.unitPrice, currency)}
-                          {line.quantity > 1 && ` × ${line.quantity} = ${formatCurrency(line.unitPrice * line.quantity, currency)}`}
-                        </span>
-                      </div>
+                      {line.quantity > 1 && (
+                        <div className="flex justify-between items-baseline text-xs text-muted-foreground">
+                          <span>{t('receipt.unitPrice')}</span>
+                          <span>
+                            {formatCurrency(line.unitPrice, currency)} × {line.quantity} = {formatCurrency(line.unitPrice * line.quantity, currency)}
+                          </span>
+                        </div>
+                      )}
                       <div className="text-right font-semibold mt-0.5">
                         {formatCurrency(lineTotal, currency)}
                       </div>
@@ -387,10 +406,11 @@ export function renderReceiptHTML({
       )}
 
       {/* Totals - Conditional display */}
-      {(customization.showSubtotal || customization.showDiscount || customization.showTotal || customization.showAmountReceived || customization.showChange) && (
+      {(customization.showTotal || customization.showAmountReceived || customization.showChange) && (
         <>
           <div className="totals space-y-2 mb-4">
-            {customization.showSubtotal && (
+            {/* Sous-total uniquement s'il y a une réduction (sinon redondant avec total) */}
+            {customization.showSubtotal && order.discount > 0 && (
               <div className="total-line flex justify-between text-xs">
                 <span>{customization.labelSubtotal}</span>
                 <span>{formatCurrency(order.subtotal, currency)}</span>
@@ -470,16 +490,13 @@ export function renderReceiptHTML({
 
       {/* Receipt Footer */}
       {settings?.receiptFooter && (
-        <>
-          <div className={`footer text-xs mb-3 ${headerAlignClass}`} style={{ whiteSpace: 'pre-line' }}>
-            {settings.receiptFooter}
-          </div>
-          <Separator />
-        </>
+        <div className={`footer text-xs mb-1 ${headerAlignClass}`} style={{ whiteSpace: 'pre-line' }}>
+          {settings.receiptFooter}
+        </div>
       )}
 
-      <div className={`footer mt-4 ${headerAlignClass}`}>
-        <div className="text-sm font-semibold uppercase tracking-wide mb-2">
+      <div className={`footer mt-1 ${headerAlignClass}`}>
+        <div className="text-sm font-semibold uppercase tracking-wide">
           {customization.labelThankYou}
         </div>
       </div>

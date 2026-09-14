@@ -670,8 +670,6 @@ export class DirectPrinter {
         // Reset: normal size, bold off
         receipt += '\x1B\x21\x00'; // ESC ! 0x00 = normal size
         receipt += '\x1B\x45\x00'; // ESC E 0x00 = bold off
-        // Pas de séparateur après le nom du restaurant (comme dans l'aperçu)
-        receipt += '\n';
       }
       if (data.address) {
         // Use ESC/POS alignment command based on headerAlignment (same as restaurant name)
@@ -698,8 +696,6 @@ export class DirectPrinter {
       // Pas de séparation entre address/phone et header (bienvenue)
       // if (data.address || data.phone) receipt += separator + '\n';
       if (data.header) {
-        // Retour à la ligne pour aérer avant "bienvenue"
-        receipt += '\n';
         // Use ESC/POS alignment command based on headerAlignment (same as restaurant name)
         const headerLines = data.header.split('\n');
         headerLines.forEach(line => {
@@ -712,10 +708,7 @@ export class DirectPrinter {
             receipt += cleanedLine + '\n';
           }
         });
-        // Séparation entre le bloc "bienvenue" et le numéro de commande
-        if (custom.separatorStyle !== 'none') receipt += '\n' + separator;
-        receipt += '\n'; // Retour à la ligne après la séparation
-        receipt += '\n'; // Retour à la ligne supplémentaire avant le numéro de commande
+        if (custom.separatorStyle !== 'none') receipt += separator + '\n';
       }
       bigOrderNumberBlock();
     }
@@ -755,8 +748,7 @@ export class DirectPrinter {
     if (custom.separatorStyle !== 'none') {
       receipt += separator + '\n';
     }
-    receipt += '\n';
-    
+
     // Debug: Log receipt content (first 500 chars)
     if (process.env.NODE_ENV === 'development') {
       console.log('Receipt content (first 500 chars):', receipt.substring(0, 500));
@@ -778,7 +770,12 @@ export class DirectPrinter {
         if (showModifiers && line.modifiers && line.modifiers.length > 0) {
           line.modifiers.forEach((mod, modIdx) => {
             const modPrice = line.modifierPrices && line.modifierPrices[modIdx];
-            receipt += `   + (S) ${this.cleanTextForPrinter(mod)}${showProductPrices && modPrice ? ' ' + modPrice : ''}\n`;
+            const isComposition = /^[\u00BD\u2153\u00BC]|^1\//.test(mod);
+            if (isComposition) {
+              receipt += `   ${this.cleanTextForPrinter(mod)}\n`;
+            } else {
+              receipt += `   + (S) ${this.cleanTextForPrinter(mod)}${showProductPrices && modPrice ? ' ' + modPrice : ''}\n`;
+            }
           });
         }
         
@@ -786,43 +783,40 @@ export class DirectPrinter {
           receipt += `   NOTE: ${this.cleanTextForPrinter(line.note)}\n`;
         }
         
-        if (showProductPrices) {
-          if (line.unitPrice) {
+        if (showProductPrices && line.price) {
+          if (line.quantity > 1 && line.unitPrice) {
+            // Plusieurs articles → montrer le détail unitaire
             const unitLabel = 'Prix unit.:';
-            const unitValue = line.quantity > 1 && line.unitPriceSubtotal
+            const unitValue = line.unitPriceSubtotal
               ? `${line.unitPrice} x ${line.quantity} = ${line.unitPriceSubtotal}`
-              : line.quantity > 1
-                ? `${line.unitPrice} x ${line.quantity}`
-                : line.unitPrice;
+              : `${line.unitPrice} x ${line.quantity}`;
             const unitPadding = Math.max(1, width - unitLabel.length - this.cleanTextForPrinter(unitValue).length);
             receipt += unitLabel + ' '.repeat(unitPadding) + unitValue + '\n';
           }
-          if (line.price) {
-            const priceText = this.cleanTextForPrinter(line.price);
-            const padding = Math.max(0, width - priceText.length);
-            receipt += ' '.repeat(padding) + priceText + '\n';
-          }
+          // Prix total de la ligne (seul affichage quand qty=1)
+          const priceText = this.cleanTextForPrinter(line.price);
+          const padding = Math.max(0, width - priceText.length);
+          receipt += ' '.repeat(padding) + priceText + '\n';
         }
         
-        if (index < data.lines.length - 1 && custom.separatorStyle !== 'none') {
-          receipt += '   ' + separatorChar.repeat(Math.max(0, width - 6)) + '\n';
+        if (index < data.lines.length - 1) {
+          receipt += '\n';
         }
       });
-      
-      receipt += '\n';
+
       if (custom.separatorStyle !== 'none') {
         receipt += separator + '\n';
       }
     }
-    
+
     // Totals section - Professional format (only for receipts, not kitchen tickets)
     if (!isKitchen) {
-      receipt += '\n';
-      const subtotalLabel = this.cleanTextForPrinter(custom.labelSubtotal);
-      const subtotalValue = this.cleanTextForPrinter(data.subtotal);
-      const subtotalPadding = Math.max(0, width - subtotalLabel.length - subtotalValue.length);
-      receipt += subtotalLabel + ' '.repeat(subtotalPadding) + subtotalValue + '\n';
+      // Sous-total uniquement s'il y a une réduction (sinon redondant avec total)
       if (data.discount) {
+        const subtotalLabel = this.cleanTextForPrinter(custom.labelSubtotal);
+        const subtotalValue = this.cleanTextForPrinter(data.subtotal);
+        const subtotalPadding = Math.max(0, width - subtotalLabel.length - subtotalValue.length);
+        receipt += subtotalLabel + ' '.repeat(subtotalPadding) + subtotalValue + '\n';
         const discountLabel = this.cleanTextForPrinter(custom.labelDiscount);
         const discountValue = this.cleanTextForPrinter(data.discount);
         const discountPadding = Math.max(0, width - discountLabel.length - discountValue.length - 1);
@@ -831,16 +825,18 @@ export class DirectPrinter {
       if (data.deliveryFee) {
         receipt += formatLabelValue('Frais livraison', data.deliveryFee);
       }
-      receipt += separator + '\n';
+      // Séparateur avant total uniquement s'il y a du contenu au-dessus (discount ou frais)
+      if ((data.discount || data.deliveryFee) && custom.separatorStyle !== 'none') {
+        receipt += separator + '\n';
+      }
       const totalLabel = this.cleanTextForPrinter(custom.labelTotal);
       const totalValue = this.cleanTextForPrinter(data.total);
       const totalPadding = Math.max(0, width - totalLabel.length - totalValue.length);
       receipt += totalLabel + ' '.repeat(totalPadding) + totalValue + '\n';
-      receipt += separator + '\n';
-      
+
       // Payment details
       if (data.amountReceived && data.change) {
-        receipt += '\n';
+        if (custom.separatorStyle !== 'none') receipt += separator + '\n';
         const amountLabel = this.cleanTextForPrinter(custom.labelAmountReceived);
         const amountValue = this.cleanTextForPrinter(data.amountReceived);
         const amountPadding = Math.max(0, width - amountLabel.length - amountValue.length);
@@ -849,33 +845,27 @@ export class DirectPrinter {
         const changeValue = this.cleanTextForPrinter(data.change);
         const changePadding = Math.max(0, width - changeLabel.length - changeValue.length);
         receipt += changeLabel + ' '.repeat(changePadding) + changeValue + '\n';
-        receipt += separator + '\n';
       }
 
       // Infos livraison - après le total, avant le pied de page
       if (data.deliveryCustomerName || data.deliveryPhone || data.deliveryAddress) {
-        receipt += '\n';
+        if (custom.separatorStyle !== 'none') receipt += separator + '\n';
         if (data.deliveryCustomerName) receipt += formatLabelValue('Client', data.deliveryCustomerName);
         if (data.deliveryPhone) receipt += formatLabelValue('Tel', data.deliveryPhone);
         if (data.deliveryAddress) receipt += formatLabelValue('Adresse', data.deliveryAddress);
-        receipt += separator + '\n';
       }
     }
-    
-    receipt += '\n';
-    
+
     // Infos livraison pour ticket cuisine - après les lignes, avant le pied de page
     if (isKitchen && (data.deliveryCustomerName || data.deliveryPhone || data.deliveryAddress || data.deliveryFee)) {
-      receipt += '\n';
       if (data.deliveryCustomerName) receipt += formatLabelValue('Client', data.deliveryCustomerName);
       if (data.deliveryPhone) receipt += formatLabelValue('Tel', data.deliveryPhone);
       if (data.deliveryAddress) receipt += formatLabelValue('Adresse', data.deliveryAddress);
       if (data.deliveryFee) receipt += formatLabelValue('Frais livraison', data.deliveryFee);
-      receipt += separator + '\n';
     }
-    
-    receipt += '\n';
-    
+
+    if (custom.separatorStyle !== 'none') receipt += separator + '\n';
+
     // Footer (only for receipts, not kitchen tickets)
     if (!isKitchen && data.footer) {
       const footerLines = data.footer.split('\n');
@@ -884,13 +874,10 @@ export class DirectPrinter {
         const padding = Math.max(0, Math.floor((width - cleanedLine.length) / 2));
         receipt += ' '.repeat(padding) + cleanedLine + '\n';
       });
-      receipt += separator + '\n';
     }
-    
+
     // Closing message
-    receipt += '\n';
     if (isKitchen) {
-      // Kitchen ticket closing message - use ESC/POS alignment based on headerAlignment
       const bonAppetitMsg = this.cleanTextForPrinter(custom.labelBonAppetit);
       if (custom.headerAlignment === 'center') {
         receipt += DirectPrinter.escCenter + bonAppetitMsg + '\n' + DirectPrinter.escLeft;
@@ -899,9 +886,7 @@ export class DirectPrinter {
       } else {
         receipt += bonAppetitMsg + '\n';
       }
-      receipt += '\n';
     } else {
-      // Receipt closing message - use ESC/POS alignment based on headerAlignment
       const thankYouMsg = this.cleanTextForPrinter(custom.labelThankYou);
       if (custom.headerAlignment === 'center') {
         receipt += DirectPrinter.escCenter + thankYouMsg + '\n' + DirectPrinter.escLeft;
@@ -910,7 +895,6 @@ export class DirectPrinter {
       } else {
         receipt += thankYouMsg + '\n';
       }
-      receipt += '\n';
     }
     
     return receipt;

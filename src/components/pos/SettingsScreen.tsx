@@ -103,6 +103,13 @@ export function SettingsScreen() {
     products: { pending: number; synced: number; error: number; lastSyncedAt: string | null };
   } | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [webOrdersStatus, setWebOrdersStatus] = useState<{
+    running: boolean;
+    lastPollAt: string | null;
+    config: { supabaseUrl: string; pollInterval: number } | null;
+  } | null>(null);
+  const [isWebPulling, setIsWebPulling] = useState(false);
+  const [isTestingWebConnection, setIsTestingWebConnection] = useState(false);
   const [openAtLogin, setOpenAtLogin] = useState(false);
 
   // Charger l'état auto-démarrage Windows au montage
@@ -202,6 +209,83 @@ export function SettingsScreen() {
       await fetchSyncStatus();
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  // Web orders status
+  const fetchWebOrdersStatus = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:3002/api/web-orders/status');
+      if (res.ok) setWebOrdersStatus(await res.json());
+    } catch {
+      // Silently ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === 'data') {
+      fetchWebOrdersStatus();
+    }
+  }, [activeSection, fetchWebOrdersStatus]);
+
+  const handleTestWebConnection = async () => {
+    const key = settings?.supabaseServiceKey || settings?.supabaseAnonKey;
+    if (!settings?.supabaseUrl || !key) {
+      toast({ title: 'Erreur', description: 'URL et clé Service Role Supabase requis', variant: 'destructive' });
+      return;
+    }
+    setIsTestingWebConnection(true);
+    try {
+      const res = await fetch('http://localhost:3002/api/web-orders/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supabaseUrl: settings.supabaseUrl, supabaseAnonKey: key }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        // Log debug to console for inspection
+        console.log('[WebOrders Test]', data);
+        if (data.debug) {
+          console.log('[WebOrders Debug]', data.debug.join('\n'));
+        }
+        if (data.ok) {
+          toast({
+            title: 'Connexion réussie',
+            description: `${data.totalOrders} commande(s) total, ${data.ordersCount} en attente de sync`,
+          });
+        } else {
+          toast({
+            title: 'Connexion échouée',
+            description: data.message + (data.debug ? '\n\nVoir console (F12) pour le détail' : ''),
+            variant: 'destructive',
+          });
+        }
+      }
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de contacter le serveur POS', variant: 'destructive' });
+    } finally {
+      setIsTestingWebConnection(false);
+    }
+  };
+
+  const handleWebOrdersPull = async () => {
+    setIsWebPulling(true);
+    try {
+      const res = await fetch('http://localhost:3002/api/web-orders/pull', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.error) {
+          toast({ title: 'Pull échoué', description: data.error, variant: 'destructive' });
+        } else {
+          toast({
+            title: 'Pull terminé',
+            description: `${data.pulled} nouvelle(s) commande(s) importée(s)`,
+          });
+        }
+      }
+      await fetchWebOrdersStatus();
+    } finally {
+      setIsWebPulling(false);
     }
   };
 
@@ -572,6 +656,37 @@ export function SettingsScreen() {
                   <Switch
                     checked={settings.displayEnabled !== false}
                     onCheckedChange={(checked) => updateSettings({ displayEnabled: checked })}
+                  />
+                </div>
+              </div>
+
+              {/* Impression automatique */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium block mb-1">
+                  🖨️ Impression automatique
+                </label>
+                <div className="flex items-center justify-between p-3 sm:p-4 bg-muted/50 rounded-xl">
+                  <div>
+                    <span className="font-medium text-sm sm:text-base">🍳 Ticket cuisine</span>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      Imprimer automatiquement le ticket cuisine après paiement
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.kitchenPrintEnabled !== false}
+                    onCheckedChange={(checked) => updateSettings({ kitchenPrintEnabled: checked })}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 sm:p-4 bg-muted/50 rounded-xl">
+                  <div>
+                    <span className="font-medium text-sm sm:text-base">🧾 Ticket client</span>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
+                      Imprimer automatiquement le ticket de caisse après paiement
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings.receiptPrintEnabled !== false}
+                    onCheckedChange={(checked) => updateSettings({ receiptPrintEnabled: checked })}
                   />
                 </div>
               </div>
@@ -1397,6 +1512,106 @@ export function SettingsScreen() {
                         <><Wifi className="w-3 h-3 mr-2" />{t('data.cloudSyncNow')}</>
                       )}
                     </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* 1b. Commandes Web (Click & Collect) */}
+              <div className="p-3 sm:p-4 bg-green-500/10 border-2 border-green-500/20 rounded-xl">
+                <h3 className="font-medium text-green-600 dark:text-green-400 mb-3 text-sm sm:text-base flex items-center gap-2">
+                  <Network className="w-4 h-4" />
+                  Commandes Web (Click &amp; Collect)
+                </h3>
+                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg mb-3">
+                  <div className="flex-1 pr-4">
+                    <p className="text-sm font-medium">
+                      {settings?.webOrdersEnabled ? 'Service actif' : 'Service inactif'}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Pull les commandes depuis le site web (Supabase)
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings?.webOrdersEnabled || false}
+                    onCheckedChange={async (checked) => {
+                      await updateSettings({ webOrdersEnabled: checked });
+                      await fetchWebOrdersStatus();
+                    }}
+                  />
+                </div>
+
+                {settings?.webOrdersEnabled && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">URL Supabase</label>
+                      <Input
+                        value={settings?.supabaseUrl || ''}
+                        onChange={(e) => updateSettings({ supabaseUrl: e.target.value })}
+                        placeholder="https://xxx.supabase.co"
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">Clé Service Role Supabase</label>
+                      <Input
+                        type="password"
+                        value={settings?.supabaseServiceKey || ''}
+                        onChange={(e) => updateSettings({ supabaseServiceKey: e.target.value })}
+                        placeholder="eyJ... (service_role key)"
+                        className="text-sm font-mono"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Utilise la clé service_role (pas anon) — nécessaire pour accéder aux commandes
+                      </p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                        Intervalle de poll (secondes)
+                      </label>
+                      <Input
+                        type="number"
+                        min={10}
+                        max={300}
+                        value={settings?.webOrdersPollInterval || 30}
+                        onChange={(e) => updateSettings({ webOrdersPollInterval: parseInt(e.target.value, 10) || 30 })}
+                        className="text-sm w-24"
+                      />
+                    </div>
+
+                    {/* Status */}
+                    <div className="flex flex-wrap gap-2 text-xs items-center">
+                      {webOrdersStatus ? (
+                        <>
+                          <span className={`px-2 py-1 rounded ${webOrdersStatus.running ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-destructive/10 text-destructive'}`}>
+                            {webOrdersStatus.running ? 'Polling actif' : 'Polling arrêté'}
+                          </span>
+                          {webOrdersStatus.lastPollAt && (
+                            <span className="px-2 py-1 bg-muted rounded text-muted-foreground">
+                              Dernier poll : {new Date(webOrdersStatus.lastPollAt).toLocaleTimeString()}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={handleTestWebConnection} disabled={isTestingWebConnection}>
+                        {isTestingWebConnection ? (
+                          <><Loader2 className="w-3 h-3 mr-2 animate-spin" />Test en cours...</>
+                        ) : (
+                          <><Activity className="w-3 h-3 mr-2" />Tester la connexion</>
+                        )}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={handleWebOrdersPull} disabled={isWebPulling}>
+                        {isWebPulling ? (
+                          <><Loader2 className="w-3 h-3 mr-2 animate-spin" />Pull en cours...</>
+                        ) : (
+                          <><RefreshCw className="w-3 h-3 mr-2" />Forcer un pull maintenant</>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>

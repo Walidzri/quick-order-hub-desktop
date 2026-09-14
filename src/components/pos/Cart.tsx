@@ -19,6 +19,7 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/
 import { ManualItemModal } from './ManualItemModal';
 import { PaymentModal } from './PaymentModal';
 import { OrderTypeModal } from './OrderTypeModal';
+import { DeliveryInfoModal, DeliveryInfo } from './DeliveryInfoModal';
 import { PrintPreviewModal } from './PrintPreviewModal';
 import { EditCartItemModal } from './EditCartItemModal';
 
@@ -62,6 +63,7 @@ export function Cart() {
   const [showEditType, setShowEditType] = useState(false);
 
   const [showPayment, setShowPayment] = useState(false);
+  const [showDeliveryInfo, setShowDeliveryInfo] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [paidOrder, setPaidOrder] = useState<{ order: any; amountReceived: number; change: number } | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
@@ -125,6 +127,19 @@ export function Cart() {
 
   const handlePay = async () => {
     if (cart.length === 0) return;
+    // Si c'est une livraison et que les infos ne sont pas encore renseignées → demander les infos d'abord
+    if (activeDraft?.type === 'delivery' && !activeDraft.deliveryCustomerName) {
+      setShowDeliveryInfo(true);
+      return;
+    }
+    setShowPayment(true);
+  };
+
+  const handleDeliveryInfoSubmit = (info: DeliveryInfo) => {
+    if (activeDraft) {
+      updateDraftType(activeDraft.id, 'delivery', info);
+    }
+    setShowDeliveryInfo(false);
     setShowPayment(true);
   };
 
@@ -248,11 +263,27 @@ export function Cart() {
                                   {item.variantSize && (
                                     <span className="text-[10px] sm:text-xs text-muted-foreground">{item.variantSize}</span>
                                   )}
-                                  {item.modifiers.length > 0 && (
-                                    <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
-                                      +{item.modifiers.length} {t('order.supplementsAbbr')}
-                                    </p>
-                                  )}
+                                  {item.modifiers.length > 0 && (() => {
+                                    const compositions = item.modifiers.filter((m: any) => m.isComposition);
+                                    const supplements = item.modifiers.filter((m: any) => !m.isComposition);
+                                    const fraction = compositions.length === 2 ? '½' : compositions.length === 3 ? '⅓' : compositions.length === 4 ? '¼' : compositions.length > 0 ? `1/${compositions.length}` : '';
+                                    return (
+                                      <>
+                                        {compositions.length > 0 && (
+                                          <div className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-400">
+                                            {compositions.map((c: any, i: number) => (
+                                              <span key={i}>{fraction} {c.optionName}{i < compositions.length - 1 ? ' · ' : ''}</span>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {supplements.length > 0 && (
+                                          <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                                            +{supplements.length} {t('order.supplementsAbbr')}
+                                          </p>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
                                   {item.note && (
                                     <p className="text-[10px] text-primary italic truncate mt-0.5">
                                       {item.note}
@@ -399,9 +430,21 @@ export function Cart() {
         <ManualItemModal onClose={() => setShowManualItem(false)} />
       )}
       
+      <DeliveryInfoModal
+        isOpen={showDeliveryInfo}
+        onClose={() => setShowDeliveryInfo(false)}
+        onSubmit={handleDeliveryInfoSubmit}
+        initialInfo={activeDraft?.type === 'delivery' && activeDraft.deliveryCustomerName ? {
+          address: activeDraft.deliveryAddress ?? '',
+          phone: activeDraft.deliveryPhone ?? '',
+          customerName: activeDraft.deliveryCustomerName ?? '',
+          fee: activeDraft.deliveryFee,
+        } : undefined}
+      />
+
       {showPayment && (
-        <PaymentModal 
-          onClose={() => setShowPayment(false)} 
+        <PaymentModal
+          onClose={() => setShowPayment(false)}
           onPaymentSuccess={(order, amountReceived, change) => {
             setPaidOrder({ order, amountReceived, change });
             setShowPrintPreview(true);

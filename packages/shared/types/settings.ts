@@ -119,11 +119,20 @@ export interface Settings {
   backupDirectory?: string; // Répertoire de sauvegarde
   /** Paiement par carte */
   cardPaymentEnabled?: boolean; // Activer/désactiver le paiement par carte (défaut: false)
-  /** Synchronisation cloud */
+  /** Synchronisation cloud (push vers VPS) */
   cloudSyncEnabled?: boolean; // Activer/désactiver la sync vers le VPS (défaut: false)
+  /** Service Cloud — Pull commandes depuis Supabase (site web click & collect) */
+  webOrdersEnabled?: boolean;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string; // Kept for backwards compat
+  supabaseServiceKey?: string; // Service role key — bypasses RLS (required for POS server)
+  webOrdersPollInterval?: number; // en secondes (défaut: 30)
   /** Services réseau locaux */
   cuisineEnabled?: boolean; // Activer/désactiver la page tablette cuisine (défaut: true)
   displayEnabled?: boolean; // Activer/désactiver la page télé salle (défaut: true)
+  /** Impression automatique */
+  kitchenPrintEnabled?: boolean; // Imprimer le ticket cuisine automatiquement (défaut: true)
+  receiptPrintEnabled?: boolean; // Imprimer le ticket client automatiquement (défaut: true)
 }
 
 export interface NumberingCounter {
