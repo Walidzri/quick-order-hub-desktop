@@ -41,10 +41,22 @@ interface SupabaseOrder {
   } | null;
 }
 
+/** En dessous de cet âge, une commande sans ligne est sûrement en cours d'écriture (log informatif). */
+const EMPTY_ORDER_GRACE_MS = 2 * 60_000;
+
+function webLineName(productName: string, variantName: string | null | undefined): string {
+  const variant = variantName?.trim();
+  if (!variant || variant.toLowerCase() === productName.trim().toLowerCase()) return productName;
+  return `${productName} ${variant}`;
+}
+
 class WebOrderService {
   private config: WebOrderConfig | null = null;
   private intervalId: NodeJS.Timeout | null = null;
   private lastPollAt: string | null = null;
+
+  /** Commandes vides déjà signalées dans les logs (évite de répéter à chaque pull). */
+  private skippedEmptyOrders = new Set<string>();
 
   start(config: WebOrderConfig): void {
     this.config = config;
@@ -195,7 +207,7 @@ class WebOrderService {
           products(name),
           product_variants(name),
           variant_prices(size_label),
-          order_line_supplements(price,supplements(name))
+          order_line_supplements(price,supplements:supplement_id(name))
         ),
         addresses(address_line,city),
         profiles!orders_profile_id_fkey(first_name,last_name,phone)
@@ -225,6 +237,22 @@ class WebOrderService {
         if (existingIds.has(order.id)) {
           // Already imported — just mark as synced on Supabase
           await this.markSyncedOnSupabase(order.id);
+          continue;
+        }
+
+        // Une commande sans ligne n'est jamais importée : soit le site est encore en
+        // train d'écrire les lignes (elle passera au prochain pull), soit sa création
+        // a échoué à mi-chemin et elle ne doit pas arriver en cuisine.
+        if (order.order_lines.length === 0) {
+          if (!this.skippedEmptyOrders.has(order.id)) {
+            this.skippedEmptyOrders.add(order.id);
+            const ageMs = Date.now() - new Date(order.created_at).getTime();
+            if (ageMs < EMPTY_ORDER_GRACE_MS) {
+              console.log(`[WebOrders] Commande W${order.order_number} sans ligne pour l'instant — import différé`);
+            } else {
+              console.warn(`[WebOrders] Commande W${order.order_number} (${order.id}) sans aucune ligne — ignorée (création incomplète côté site)`);
+            }
+          }
           continue;
         }
 
@@ -286,7 +314,8 @@ class WebOrderService {
       return {
         id: line.id,
         productId: '',
-        productName: line.products.name,
+        // "Tacos" + variante "Poulet" → "Tacos Poulet" (sinon la cuisine ne sait pas quoi préparer)
+        productName: webLineName(line.products.name, line.product_variants?.name),
         variantId: '',
         variantSize: line.variant_prices.size_label,
         quantity: line.quantity,
