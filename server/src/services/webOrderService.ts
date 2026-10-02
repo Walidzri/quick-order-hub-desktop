@@ -1,3 +1,4 @@
+import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
 import { getDatabase } from '../db/connection';
 import { wsService } from './wsService';
 import { settingsService } from './settingsService';
@@ -41,8 +42,50 @@ interface SupabaseOrder {
   } | null;
 }
 
+/**
+ * 'realtime' : Supabase Realtime connecté — les commandes arrivent à l'INSERT,
+ *              un poll de sécurité espacé rattrape un éventuel événement raté.
+ * 'polling'  : Realtime coupé — on revient au poll classique (pollInterval).
+ */
+export type WebOrdersMode = 'realtime' | 'polling';
+
+/** Poll de sécurité quand le Realtime est connecté (événement raté, socket à moitié mort). */
+const SAFETY_POLL_MS = 2 * 60_000;
+/**
+ * Le site crée la commande via create_order() (une seule transaction) : l'INSERT n'est
+ * émis qu'une fois les lignes écrites. Ce court délai regroupe juste les commandes en rafale.
+ */
+const REALTIME_PULL_DELAY_MS = 500;
 /** En dessous de cet âge, une commande sans ligne est sûrement en cours d'écriture (log informatif). */
 const EMPTY_ORDER_GRACE_MS = 2 * 60_000;
+/** Délai avant de recréer le channel s'il est fermé. */
+const RESUBSCRIBE_DELAY_MS = 10_000;
+/** En polling depuis plus longtemps que ça → on recrée complètement la connexion Realtime. */
+const REALTIME_STALE_MS = 2 * 60_000;
+
+/**
+ * Évite deux exécutions simultanées (Realtime + poll) : un appel pendant qu'un
+ * run est en cours en programme un seul autre à la suite, et partage sa promesse.
+ */
+function singleFlight<T>(fn: () => Promise<T>): () => Promise<T> {
+  let inFlight: Promise<T> | null = null;
+  let queued = false;
+  return () => {
+    if (inFlight) {
+      queued = true;
+      return inFlight;
+    }
+    inFlight = (async () => {
+      let result: T;
+      do {
+        queued = false;
+        result = await fn();
+      } while (queued);
+      return result;
+    })().finally(() => { inFlight = null; });
+    return inFlight;
+  };
+}
 
 function webLineName(productName: string, variantName: string | null | undefined): string {
   const variant = variantName?.trim();
@@ -52,43 +95,184 @@ function webLineName(productName: string, variantName: string | null | undefined
 
 class WebOrderService {
   private config: WebOrderConfig | null = null;
-  private intervalId: NodeJS.Timeout | null = null;
   private lastPollAt: string | null = null;
+
+  private mode: WebOrdersMode = 'polling';
+  private pollingSince: number | null = null;
+  private realtimeSince: string | null = null;
+  private lastRealtimeEventAt: string | null = null;
+
+  private client: SupabaseClient | null = null;
+  private channel: RealtimeChannel | null = null;
+
+  private pollTimer: NodeJS.Timeout | null = null;
+  private realtimePullTimer: NodeJS.Timeout | null = null;
+  private statusSyncTimer: NodeJS.Timeout | null = null;
+  private resubscribeTimer: NodeJS.Timeout | null = null;
 
   /** Commandes vides déjà signalées dans les logs (évite de répéter à chaque pull). */
   private skippedEmptyOrders = new Set<string>();
 
+  /** Pull des commandes en attente — jamais deux en parallèle (cf. singleFlight). */
+  readonly pullOrders = singleFlight(() => this.fetchAndImportOrders());
+  /** Sync retour des statuts — jamais deux en parallèle. */
+  readonly syncStatusUpdates = singleFlight(() => this.fetchStatusUpdates());
+
   start(config: WebOrderConfig): void {
+    this.stop();
     this.config = config;
-    if (this.intervalId) clearInterval(this.intervalId);
+    this.mode = 'polling';
+    this.pollingSince = Date.now();
 
-    this.intervalId = setInterval(() => {
-      this.pullOrders().catch(err =>
-        console.warn('[WebOrders] Erreur poll :', err.message)
-      );
-      this.syncStatusUpdates().catch(err =>
-        console.warn('[WebOrders] Erreur sync statuts :', err.message)
-      );
-    }, config.pollInterval);
+    console.log(`[WebOrders] Démarré — Supabase: ${config.supabaseUrl}, poll secours: ${config.pollInterval / 1000}s`);
 
-    console.log(`[WebOrders] Démarré — Supabase: ${config.supabaseUrl}, intervalle: ${config.pollInterval / 1000}s`);
-
-    // Immediate first pull + status sync
-    this.pullOrders().catch(() => {});
-    this.syncStatusUpdates().catch(() => {});
+    // Pull + sync statuts immédiats, puis boucle de poll (intervalle selon le mode)
+    this.runPollCycle();
+    this.connectRealtime();
   }
 
   stop(): void {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
+    const wasRunning = this.config !== null;
     this.config = null;
-    console.log('[WebOrders] Arrêté');
+    for (const t of [this.pollTimer, this.realtimePullTimer, this.statusSyncTimer, this.resubscribeTimer]) {
+      if (t) clearTimeout(t);
+    }
+    this.pollTimer = this.realtimePullTimer = this.statusSyncTimer = this.resubscribeTimer = null;
+    this.disconnectRealtime();
+    this.mode = 'polling';
+    this.realtimeSince = null;
+    if (wasRunning) console.log('[WebOrders] Arrêté');
   }
 
   isRunning(): boolean {
-    return this.intervalId !== null;
+    return this.config !== null;
+  }
+
+  // ─── Boucle de poll ──────────────────────────────────────────────────────
+
+  private runPollCycle(): void {
+    if (this.pollTimer) clearTimeout(this.pollTimer);
+    this.pollTimer = null;
+    if (!this.config) return;
+
+    Promise.allSettled([this.pullOrders(), this.syncStatusUpdates()]).then(() => {
+      if (!this.config) return;
+
+      // Realtime toujours pas revenu après un long moment → on repart de zéro
+      if (this.mode === 'polling' && this.pollingSince && Date.now() - this.pollingSince > REALTIME_STALE_MS) {
+        console.warn('[WebOrders] Realtime absent depuis trop longtemps — reconnexion complète');
+        this.pollingSince = Date.now();
+        this.disconnectRealtime();
+        this.connectRealtime();
+      }
+
+      this.schedulePoll();
+    });
+  }
+
+  private schedulePoll(): void {
+    if (this.pollTimer) clearTimeout(this.pollTimer);
+    if (!this.config) return;
+    const delay = this.mode === 'realtime' ? SAFETY_POLL_MS : this.config.pollInterval;
+    this.pollTimer = setTimeout(() => this.runPollCycle(), delay);
+  }
+
+  private setMode(next: WebOrdersMode, reason?: string): void {
+    if (this.mode === next) return;
+    this.mode = next;
+
+    if (next === 'realtime') {
+      this.pollingSince = null;
+      this.realtimeSince = new Date().toISOString();
+      console.log('[WebOrders] 🟢 Realtime connecté — poll de sécurité toutes les', SAFETY_POLL_MS / 1000, 's');
+      // Rattrapage : tout ce qui est arrivé pendant la coupure
+      this.runPollCycle();
+    } else {
+      this.pollingSince = Date.now();
+      this.realtimeSince = null;
+      console.warn(`[WebOrders] 🟠 Realtime coupé${reason ? ` (${reason})` : ''} — bascule en polling ${this.config ? this.config.pollInterval / 1000 : '?'}s`);
+      this.schedulePoll();
+    }
+  }
+
+  // ─── Realtime ────────────────────────────────────────────────────────────
+
+  private connectRealtime(): void {
+    if (!this.config) return;
+
+    this.client = createClient(this.config.supabaseUrl, this.config.supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+
+    const channel = this.client
+      .channel('pos-web-orders')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => {
+        this.lastRealtimeEventAt = new Date().toISOString();
+        this.scheduleRealtimePull();
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, () => {
+        // Statut changé sur le site (admin, livreur) — inclut nos propres PATCH, sans risque
+        this.lastRealtimeEventAt = new Date().toISOString();
+        this.scheduleStatusSync();
+      });
+    this.channel = channel;
+
+    channel.subscribe((status, err) => {
+      if (channel !== this.channel) return; // channel remplacé ou service arrêté
+
+      switch (status) {
+        case 'SUBSCRIBED':
+          this.setMode('realtime');
+          break;
+        case 'CHANNEL_ERROR':
+        case 'TIMED_OUT':
+          // realtime-js retente tout seul ; SUBSCRIBED repassera en mode realtime
+          this.setMode('polling', err?.message ?? status);
+          break;
+        case 'CLOSED':
+          this.setMode('polling', 'channel fermé');
+          this.scheduleResubscribe();
+          break;
+      }
+    });
+  }
+
+  private disconnectRealtime(): void {
+    const client = this.client;
+    const channel = this.channel;
+    this.channel = null;
+    this.client = null;
+    if (client && channel) {
+      client.removeChannel(channel).catch(() => {});
+    }
+    client?.realtime.disconnect();
+  }
+
+  private scheduleResubscribe(): void {
+    if (this.resubscribeTimer || !this.config) return;
+    this.resubscribeTimer = setTimeout(() => {
+      this.resubscribeTimer = null;
+      if (!this.config || this.mode === 'realtime') return;
+      this.disconnectRealtime();
+      this.connectRealtime();
+    }, RESUBSCRIBE_DELAY_MS);
+  }
+
+  /** Regroupe les INSERT rapprochés en un seul pull. */
+  private scheduleRealtimePull(): void {
+    if (this.realtimePullTimer) return;
+    this.realtimePullTimer = setTimeout(() => {
+      this.realtimePullTimer = null;
+      this.pullOrders().catch(err => console.warn('[WebOrders] Erreur pull realtime :', err.message));
+    }, REALTIME_PULL_DELAY_MS);
+  }
+
+  private scheduleStatusSync(): void {
+    if (this.statusSyncTimer) return;
+    this.statusSyncTimer = setTimeout(() => {
+      this.statusSyncTimer = null;
+      this.syncStatusUpdates().catch(err => console.warn('[WebOrders] Erreur sync statuts :', err.message));
+    }, 1_000);
   }
 
   private get headers(): Record<string, string> {
@@ -99,9 +283,6 @@ class WebOrderService {
     };
   }
 
-  /**
-   * Pull pending orders from Supabase that haven't been synced to POS yet.
-   */
   /**
    * Test the connection to Supabase — returns table count or error.
    */
@@ -188,7 +369,11 @@ class WebOrderService {
     }
   }
 
-  async pullOrders(): Promise<{ pulled: number; error?: string }> {
+  /**
+   * Pull pending orders from Supabase that haven't been synced to POS yet.
+   * Ne pas appeler directement : passer par pullOrders (single-flight).
+   */
+  private async fetchAndImportOrders(): Promise<{ pulled: number; error?: string }> {
     if (!this.config) return { pulled: 0, error: 'Service non configuré' };
 
     const db = getDatabase();
@@ -450,8 +635,9 @@ class WebOrderService {
   /**
    * Sync status updates from Supabase for active web orders.
    * Handles cases where driver/admin changes status on the website.
+   * Ne pas appeler directement : passer par syncStatusUpdates (single-flight).
    */
-  async syncStatusUpdates(): Promise<void> {
+  private async fetchStatusUpdates(): Promise<void> {
     if (!this.config) return;
 
     const db = getDatabase();
@@ -523,6 +709,9 @@ class WebOrderService {
   getStatus() {
     return {
       running: this.isRunning(),
+      mode: this.mode,
+      realtimeSince: this.realtimeSince,
+      lastRealtimeEventAt: this.lastRealtimeEventAt,
       lastPollAt: this.lastPollAt,
       config: this.config ? {
         supabaseUrl: this.config.supabaseUrl,

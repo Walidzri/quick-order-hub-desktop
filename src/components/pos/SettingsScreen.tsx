@@ -105,6 +105,8 @@ export function SettingsScreen() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [webOrdersStatus, setWebOrdersStatus] = useState<{
     running: boolean;
+    mode: 'realtime' | 'polling';
+    lastRealtimeEventAt: string | null;
     lastPollAt: string | null;
     config: { supabaseUrl: string; pollInterval: number } | null;
   } | null>(null);
@@ -223,9 +225,11 @@ export function SettingsScreen() {
   }, []);
 
   useEffect(() => {
-    if (activeSection === 'data') {
-      fetchWebOrdersStatus();
-    }
+    if (activeSection !== 'data') return;
+    fetchWebOrdersStatus();
+    // Rafraîchir l'état Realtime / polling tant que la section est ouverte
+    const interval = setInterval(fetchWebOrdersStatus, 5000);
+    return () => clearInterval(interval);
   }, [activeSection, fetchWebOrdersStatus]);
 
   const handleTestWebConnection = async () => {
@@ -1604,7 +1608,7 @@ export function SettingsScreen() {
                     </div>
                     <div>
                       <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                        Intervalle de poll (secondes)
+                        Intervalle de poll en mode secours (secondes)
                       </label>
                       <Input
                         type="number"
@@ -1620,12 +1624,27 @@ export function SettingsScreen() {
                     <div className="flex flex-wrap gap-2 text-xs items-center">
                       {webOrdersStatus ? (
                         <>
-                          <span className={`px-2 py-1 rounded ${webOrdersStatus.running ? 'bg-green-500/10 text-green-600 dark:text-green-400' : 'bg-destructive/10 text-destructive'}`}>
-                            {webOrdersStatus.running ? 'Polling actif' : 'Polling arrêté'}
+                          <span className={`px-2 py-1 rounded ${
+                            !webOrdersStatus.running
+                              ? 'bg-destructive/10 text-destructive'
+                              : webOrdersStatus.mode === 'realtime'
+                                ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                                : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                          }`}>
+                            {!webOrdersStatus.running
+                              ? 'Service arrêté'
+                              : webOrdersStatus.mode === 'realtime'
+                                ? '🟢 Temps réel'
+                                : '🟠 Mode secours (polling)'}
                           </span>
+                          {webOrdersStatus.lastRealtimeEventAt && (
+                            <span className="px-2 py-1 bg-muted rounded text-muted-foreground">
+                              Dernier événement : {new Date(webOrdersStatus.lastRealtimeEventAt).toLocaleTimeString()}
+                            </span>
+                          )}
                           {webOrdersStatus.lastPollAt && (
                             <span className="px-2 py-1 bg-muted rounded text-muted-foreground">
-                              Dernier poll : {new Date(webOrdersStatus.lastPollAt).toLocaleTimeString()}
+                              Dernier pull : {new Date(webOrdersStatus.lastPollAt).toLocaleTimeString()}
                             </span>
                           )}
                         </>
