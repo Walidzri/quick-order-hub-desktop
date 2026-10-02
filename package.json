@@ -1,6 +1,6 @@
 {
   "name": "quick-order-hub-desktop",
-  "version": "4.2.2",
+  "version": "4.3.0",
   "description": "Quick Order Hub - Desktop Application",
   "author": "WMH",
   "main": "dist-electron/main.js",
